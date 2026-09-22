@@ -226,6 +226,9 @@
       actor: null,
       p: "",
       log,
+      overNote(n) {
+        return n > 0 ? `(${n}オーバー)` : "";
+      },
       hasDebuff,
       effectiveAtk,
       effectiveDef,
@@ -233,10 +236,12 @@
         return applyHit(ctx, player, enemy, mult, opts || {});
       },
       hurt(unit, amount, source) {
-        const dealt = Math.max(0, Math.floor(amount));
-        unit.hp = Math.max(0, unit.hp - dealt);
+        const raw = Math.max(0, Math.floor(amount));
+        const before = unit.hp;
+        unit.hp = Math.max(0, unit.hp - raw);
+        const dealt = before - unit.hp;
         if (source !== "self" && dealt > 0) unit.tookHit = true;
-        return dealt;
+        return { dealt, over: Math.max(0, raw - dealt), raw };
       },
       heal(unit, base) {
         let eff = unit.healEff;
@@ -245,9 +250,10 @@
         });
         eff = Math.max(0, eff);
         const amount = Math.max(0, Math.floor(base * eff));
-        const before = unit.hp;
-        unit.hp = Math.min(unit.maxHp, unit.hp + amount);
-        return unit.hp - before;
+        const room = Math.max(0, unit.maxHp - unit.hp);
+        const got = Math.min(room, amount);
+        unit.hp += got;
+        return { got, over: Math.max(0, amount - got), raw: amount };
       },
       addEffect(unit, effect) {
         const next = { ...effect, fresh: unit === ctx.actor };
@@ -274,7 +280,9 @@
         dealt = Math.max(1, Math.floor(dealt * (1 - (reflect.reduction || 0))));
         back = Math.max(0, Math.floor(dealt * reflect.value));
       }
+      const hpBefore = defender.hp;
       defender.hp = Math.max(0, defender.hp - dealt);
+      const over = Math.max(0, dealt - hpBefore);
       if (dealt > 0) defender.tookHit = true;
       if (amp) {
         attacker.effects = attacker.effects.filter((effect) => effect !== amp);
@@ -284,14 +292,16 @@
         defender.effects = defender.effects.filter((effect) => effect !== reflect);
       }
       if (back > 0) {
+        const atkBefore = attacker.hp;
         attacker.hp = Math.max(0, attacker.hp - back);
+        const backOver = Math.max(0, back - atkBefore);
         attacker.tookHit = true;
         trailer = {
-          text: `${attacker.name}の攻撃に対し、${back}が跳ね返った。`,
+          text: `${attacker.name}の攻撃に対し、${back}が跳ね返った。${backOver > 0 ? `(${backOver}オーバー)` : ""}`,
           kind: "hit",
         };
       }
-      return { dmg: dealt, amped: !!amp, reflect: back };
+      return { dmg: dealt, over, amped: !!amp, reflect: back };
     }
 
     function startTurn(unit) {
@@ -302,16 +312,20 @@
         if (effect.kind === "regenFlat") extraRegen += effect.value;
       });
       if (hot > 0) {
-        const got = ctx.heal(unit, hot);
-        if (got > 0) log(`${unit.name}の再生で${got}回復した。`, "heal");
+        const healed = ctx.heal(unit, hot);
+        if (healed.got > 0 || healed.over > 0) {
+          log(`${unit.name}の再生で${healed.got}回復した。${ctx.overNote(healed.over)}`, "heal");
+        }
       }
       const blocked = unit.effects.some((effect) => effect.kind === "noRegen");
       if (!blocked && (unit.regenAmount > 0 || extraRegen > 0)) {
         unit.regenCounter += 1;
         if (unit.regenCounter >= unit.regenInterval) {
           unit.regenCounter = 0;
-          const got = ctx.heal(unit, unit.regenAmount + extraRegen);
-          if (got > 0) log(`${unit.name}の体力が${got}回復した。`, "heal");
+          const healed = ctx.heal(unit, unit.regenAmount + extraRegen);
+          if (healed.got > 0 || healed.over > 0) {
+            log(`${unit.name}の体力が${healed.got}回復した。${ctx.overNote(healed.over)}`, "heal");
+          }
         }
       }
       let dot = 0;
@@ -319,8 +333,8 @@
         if (effect.kind === "dot") dot += effect.value;
       });
       if (dot > 0) {
-        const dealt = ctx.hurt(unit, dot, "dot");
-        log(`${unit.name}は毒で${dealt}のダメージ。`, "dot");
+        const hurt = ctx.hurt(unit, dot, "dot");
+        log(`${unit.name}は毒で${hurt.dealt}のダメージ。${ctx.overNote(hurt.over)}`, "dot");
       }
       return unit.hp > 0;
     }
@@ -371,13 +385,13 @@
       }
       const hit = applyHit(ctx, player, enemy, 1, { amp: false });
       const waitText = waiting.length ? `${waiting.join("、")}は再使用を待っていて、` : "";
-      log(`${waitText}条件に合う技がなく、通常攻撃。${enemy.name}に${hit.dmg}のダメージ。`, "attack");
+      log(`${waitText}条件に合う技がなく、通常攻撃。${enemy.name}に${hit.dmg}のダメージ。${ctx.overNote(hit.over)}`, "attack");
       player.lastAction = "normal";
     }
 
     function enemyAttack(mult, label) {
       const hit = applyHit(ctx, enemy, player, mult, { amp: false });
-      log(`${enemy.name}の${label}。あなたに${hit.dmg}のダメージ。`, "hit");
+      log(`${enemy.name}の${label}。あなたに${hit.dmg}のダメージ。${ctx.overNote(hit.over)}`, "hit");
     }
 
     function enemyAct() {
@@ -413,7 +427,7 @@
           turns: 4,
           negative: true,
         });
-        log(`${enemy.name}の毒針。あなたに${hit.dmg}のダメージ。毒が回る。`, "dot");
+        log(`${enemy.name}の毒針。あなたに${hit.dmg}のダメージ。${ctx.overNote(hit.over)}毒が回る。`, "dot");
         return;
       }
       if (enemy.pattern === "berserk") {
