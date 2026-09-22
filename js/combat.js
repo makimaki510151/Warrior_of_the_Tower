@@ -146,7 +146,7 @@
     });
     dr = Math.max(-0.5, Math.min(0.75, dr));
     damage *= 1 - dr;
-    return Math.max(1, Math.round(damage));
+    return Math.max(1, Math.floor(damage));
   }
 
   function conditionMet(cond, ctx) {
@@ -233,7 +233,7 @@
         return applyHit(ctx, player, enemy, mult, opts || {});
       },
       hurt(unit, amount, source) {
-        const dealt = Math.max(0, Math.round(amount));
+        const dealt = Math.max(0, Math.floor(amount));
         unit.hp = Math.max(0, unit.hp - dealt);
         if (source !== "self" && dealt > 0) unit.tookHit = true;
         return dealt;
@@ -244,7 +244,7 @@
           if (effect.kind === "healDown") eff *= 1 - effect.value;
         });
         eff = Math.max(0, eff);
-        const amount = Math.max(0, Math.round(base * eff));
+        const amount = Math.max(0, Math.floor(base * eff));
         const before = unit.hp;
         unit.hp = Math.min(unit.maxHp, unit.hp + amount);
         return unit.hp - before;
@@ -271,8 +271,8 @@
       const reflect = defender.effects.find((effect) => effect.kind === "reflect");
       let back = 0;
       if (reflect) {
-        dealt = Math.max(1, Math.round(dealt * (1 - (reflect.reduction || 0))));
-        back = Math.max(0, Math.round(dealt * reflect.value));
+        dealt = Math.max(1, Math.floor(dealt * (1 - (reflect.reduction || 0))));
+        back = Math.max(0, Math.floor(dealt * reflect.value));
       }
       defender.hp = Math.max(0, defender.hp - dealt);
       if (dealt > 0) defender.tookHit = true;
@@ -404,7 +404,7 @@
       }
       if (enemy.pattern === "venom" && enemy.actionCount % 3 === 0) {
         const hit = applyHit(ctx, enemy, player, 0.55, { amp: false });
-        const dot = Math.max(1, Math.round(effectiveAtk(enemy) * 0.24));
+        const dot = Math.max(1, Math.floor(effectiveAtk(enemy) * 0.24));
         ctx.actor = enemy;
         ctx.addEffect(player, {
           id: "enemy-venom",

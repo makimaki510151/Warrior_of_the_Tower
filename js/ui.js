@@ -61,25 +61,33 @@
   }
 
   function pct(value) {
-    const number = Math.round(value * 1000) / 10;
-    return `${Number.isInteger(number) ? number : number.toFixed(1)}%`;
+    return `${(Number(value) * 100).toFixed(2)}%`;
   }
 
   function signedPct(value) {
-    const n = Math.round(value * 1000) / 10;
-    const body = Number.isInteger(n) ? String(n) : n.toFixed(1);
-    return n > 0 ? `+${body}%` : `${body}%`;
+    const n = Number(value) * 100;
+    const body = n.toFixed(2);
+    if (n > 0) return `+${body}%`;
+    return `${body}%`;
+  }
+
+  function intNum(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return 0;
+    return n < 0 ? Math.ceil(n) : Math.floor(n);
   }
 
   function signedPlain(value) {
-    return value > 0 ? `+${value}` : String(value);
+    const n = intNum(value);
+    return n > 0 ? `+${n}` : String(n);
   }
 
   function gainText(key, value, asPct) {
     if (asPct) return signedPct(value);
     if (key === "regenInterval") {
-      if (value < 0) return `${value}行動（速くなる）`;
-      if (value > 0) return `+${value}行動（遅くなる）`;
+      const n = intNum(value);
+      if (n < 0) return `${n}行動（速くなる）`;
+      if (n > 0) return `+${n}行動（遅くなる）`;
       return "±0";
     }
     return signedPlain(value);
@@ -87,13 +95,13 @@
 
   function formatStat(key, stats, hp, kind) {
     if (kind === "current") {
-      const current = hp == null ? stats.maxHp : Math.max(0, Math.round(hp));
-      return `${current} / ${stats.maxHp}`;
+      const current = hp == null ? stats.maxHp : Math.max(0, intNum(hp));
+      return `${current} / ${intNum(stats.maxHp)}`;
     }
-    if (kind === "interval") return `${stats.regenInterval}行動ごと`;
+    if (kind === "interval") return `${intNum(stats.regenInterval)}行動ごと`;
     if (kind === "pct") return pct(stats[key]);
     if (kind === "signedPct") return signedPct(stats[key]);
-    return String(stats[key]);
+    return String(intNum(stats[key]));
   }
 
   function syncTitle() {
@@ -172,19 +180,17 @@
     const level = state.skills[id] || 0;
     const lines = skill.describe(Math.max(1, level || 1));
     return `
-      <article class="offer-card ${ui.detail ? "is-detail" : ""}">
-        <div class="offer-body">
-          <header class="offer-top">
+      <article class="skill-card offer-card ${ui.detail ? "is-detail" : ""}">
+        <div class="skill-body">
+          <header class="skill-top">
             <strong>${esc(skill.name)}</strong>
-            <span class="offer-meta">${level ? `Lv.${level}→${level + 1}` : "新規"}</span>
+            <span class="skill-meta">${level ? `Lv.${level}→${level + 1}` : "新規"} · ${skill.cooldown}行</span>
           </header>
-          <p class="offer-blurb">${esc(skill.blurb)}</p>
-          <p class="offer-cd">再使用まで ${skill.cooldown}行動</p>
-          <p class="gain-label">1段階ごとの上昇</p>
+          ${ui.detail ? `<p class="skill-blurb">${esc(skill.blurb)}</p>` : ""}
           ${gainList(skill)}
           ${
             ui.detail
-              ? `<div class="offer-detail">
+              ? `<div class="skill-detail">
                   ${lines.map((line) => `<p>${esc(line)}</p>`).join("")}
                   <p class="trade">${esc(skill.tradeoff)}</p>
                 </div>`
@@ -192,6 +198,33 @@
           }
         </div>
         <button type="button" class="btn btn-primary" data-action="pick" data-skill="${id}">獲得</button>
+      </article>
+    `;
+  }
+
+  function ownedSkillCard(id, state) {
+    const skill = W.SKILL_BY_ID[id];
+    if (!skill) return "";
+    const level = state.skills[id] || 0;
+    const lines = skill.describe(Math.max(1, level));
+    return `
+      <article class="skill-card owned-card ${ui.detail ? "is-detail" : ""}">
+        <header class="skill-top">
+          <strong>${esc(skill.name)}</strong>
+          <span class="skill-meta">Lv.${level} · ${skill.cooldown}行</span>
+        </header>
+        ${
+          ui.detail
+            ? `
+              <p class="skill-blurb">${esc(skill.blurb)}</p>
+              ${gainList(skill)}
+              <div class="skill-detail">
+                ${lines.map((line) => `<p>${esc(line)}</p>`).join("")}
+                <p class="trade">${esc(skill.tradeoff)}</p>
+              </div>
+            `
+            : `<p class="skill-brief">${esc(skill.blurb)}</p>`
+        }
       </article>
     `;
   }
@@ -244,9 +277,8 @@
   function renderPrep() {
     const state = W.getState();
     const stats = W.computeStats(state.skills);
-    const unused = Object.keys(state.skills).filter(
-      (id) => state.skills[id] > 0 && !state.flow.some((node) => node.skillId === id)
-    );
+    const ownedIds = Object.keys(state.skills).filter((id) => state.skills[id] > 0);
+    const unused = ownedIds.filter((id) => !state.flow.some((node) => node.skillId === id));
 
     const nodes = state.flow
       .map((node, index) => {
@@ -283,7 +315,17 @@
         <section class="pane pane-stats">
           <h2>能力</h2>
           ${playerStatsList(stats)}
-          <p class="tiny">習得 ${Object.keys(state.skills).length}種 · ${ui.detail ? "詳細" : "標準"}</p>
+          <p class="tiny">習得 ${ownedIds.length}種 · ${ui.detail ? "詳細" : "標準"}</p>
+        </section>
+        <section class="pane pane-skills">
+          <h2>習得技</h2>
+          <div class="owned-grid">
+            ${
+              ownedIds.length
+                ? ownedIds.map((id) => ownedSkillCard(id, state)).join("")
+                : `<p class="empty">まだ技がない</p>`
+            }
+          </div>
         </section>
         <section class="pane pane-flow">
           <h2>手順 <span class="tiny">上から判定・外れは通常攻撃</span></h2>
@@ -366,12 +408,12 @@
       <div class="battle-pane">
         <div class="bars">
           <div>
-            <div class="bar-label"><span>あなた</span><span data-hp-label="player">${Math.max(0, Math.round(playerHp))}/${stats.maxHp}</span></div>
+            <div class="bar-label"><span>あなた</span><span data-hp-label="player">${Math.max(0, intNum(playerHp))}/${intNum(stats.maxHp)}</span></div>
             <div class="hp"><span data-bar="player" style="width:${pRate}%"></span></div>
             ${ui.detail ? playerStatsList(stats, playerHp) : ""}
           </div>
           <div>
-            <div class="bar-label"><span>敵</span><span data-hp-label="enemy">${Math.max(0, Math.round(enemyHp))}/${enemy.maxHp}</span></div>
+            <div class="bar-label"><span>敵</span><span data-hp-label="enemy">${Math.max(0, intNum(enemyHp))}/${intNum(enemy.maxHp)}</span></div>
             <div class="hp enemy"><span data-bar="enemy" style="width:${eRate}%"></span></div>
           </div>
         </div>
@@ -474,7 +516,7 @@
       const bar = document.querySelector(`[data-bar="${side}"]`);
       const label = document.querySelector(`[data-hp-label="${side}"]`);
       if (bar) bar.style.width = `${Math.max(0, Math.min(100, (hp / max) * 100))}%`;
-      if (label) label.textContent = `${Math.max(0, Math.round(hp))}/${max}`;
+      if (label) label.textContent = `${Math.max(0, intNum(hp))}/${intNum(max)}`;
     });
   }
 

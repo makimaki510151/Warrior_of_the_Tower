@@ -103,7 +103,7 @@
         const ignore = Math.min(0.6, scaled(0.28, 0.01, level));
         return [
           multText(1.22, 0.05, level),
-          `敵の防御を${Math.round(ignore * 100)}%無視する。次は+1%。`,
+          `敵の防御を${Math.floor(ignore * 100)}%無視する。次は+1%。`,
           "使用後、3行動あけると再使用できる。",
         ];
       },
@@ -173,7 +173,7 @@
         const cost = scaled(0.08, 0.003, level);
         return [
           multText(2.02, 0.08, level),
-          `自分の最大体力の${Math.round(cost * 1000) / 10}%を失う。防御無視や軽減は乗らない。`,
+          `自分の最大体力の${Math.floor(cost * 1000) / 10}%を失う。防御無視や軽減は乗らない。`,
           "習得のたびに防御が下がり、受けるダメージも増える。",
         ];
       },
@@ -195,7 +195,7 @@
         const ratio = scaled(0.34, 0.015, level);
         return [
           multText(1.02, 0.04, level),
-          `与ダメージの${Math.round(ratio * 100)}%を基礎に回復する。回復効率がさらにかかる。`,
+          `与ダメージの${Math.floor(ratio * 100)}%を基礎に回復する。回復効率がさらにかかる。`,
         ];
       },
       use(ctx, level) {
@@ -266,7 +266,7 @@
         const down = scaled(0.16, 0.01, level);
         return [
           multText(0.78, 0.03, level),
-          `敵の防御の働きを${Math.round(down * 100)}%下げる（敵の3行動）。`,
+          `敵の防御の働きを${Math.floor(down * 100)}%下げる（敵の3行動）。`,
           "この低下に、自分の補助効率は乗らない。",
         ];
       },
@@ -325,7 +325,7 @@
       },
       use(ctx, level) {
         const r = ctx.damage(scaled(0.5, 0.025, level));
-        const dot = Math.max(1, Math.round(ctx.effectiveAtk(ctx.player) * scaled(0.26, 0.02, level)));
+        const dot = Math.max(1, Math.floor(ctx.effectiveAtk(ctx.player) * scaled(0.26, 0.02, level)));
         ctx.addEffect(ctx.enemy, {
           id: "venom",
           kind: "dot",
@@ -374,7 +374,7 @@
       describe(level) {
         const rate = scaled(0.42, 0.02, level);
         return [
-          `次の3行動、防御の働き+${Math.round(rate * 100)}%。防御力補助効率がさらにかかる。`,
+          `次の3行動、防御の働き+${Math.floor(rate * 100)}%。防御力補助効率がさらにかかる。`,
           "この行動では攻撃しない。",
         ];
       },
@@ -401,7 +401,7 @@
       describe(level) {
         const rate = scaled(0.26, 0.015, level);
         return [
-          `次の2行動、受けるダメージを${Math.round(rate * 100)}%減らす。`,
+          `次の2行動、受けるダメージを${Math.floor(rate * 100)}%減らす。`,
           "軽減は防御計算のあとでかかる。上限75%。",
         ];
       },
@@ -428,7 +428,7 @@
         const ratio = scaled(0.5, 0.03, level);
         return [
           "次に受ける打撃を22%軽減し、軽減後の55%前後を相手へ返す。",
-          `返しの割合は今${Math.round(ratio * 100)}%。3行動以内に受けなければ消える。`,
+          `返しの割合は今${Math.floor(ratio * 100)}%。3行動以内に受けなければ消える。`,
           "一度返すと解ける。",
         ];
       },
@@ -459,7 +459,7 @@
         const rate = scaled(0.5, 0.02, level);
         return [
           "現在体力の13%を払い、次の3行動、防御の働きを大きく上げる。",
-          `上昇の基礎は+${Math.round(rate * 100)}%。防御力補助効率がさらにかかる。`,
+          `上昇の基礎は+${Math.floor(rate * 100)}%。防御力補助効率がさらにかかる。`,
           "体力が32%以下のときは手順にあっても飛ばされる。",
         ];
       },
@@ -486,7 +486,7 @@
       describe(level) {
         const rate = scaled(0.15, 0.008, level);
         return [
-          `最大体力の${Math.round(rate * 1000) / 10}%を基礎に、すぐ回復する。`,
+          `最大体力の${Math.floor(rate * 1000) / 10}%を基礎に、すぐ回復する。`,
           "回復効率がさらにかかる。",
         ];
       },
@@ -506,12 +506,12 @@
       describe(level) {
         const each = scaled(0.055, 0.004, level);
         return [
-          `4行動にわたり、行動ごとに最大体力の${Math.round(each * 1000) / 10}%を基礎に回復する。`,
+          `4行動にわたり、行動ごとに最大体力の${Math.floor(each * 1000) / 10}%を基礎に回復する。`,
           "打ち直すと残り時間は更新される。回復効率がかかる。",
         ];
       },
       use(ctx, level) {
-        const each = Math.max(1, Math.round(ctx.player.maxHp * scaled(0.055, 0.004, level)));
+        const each = Math.max(1, Math.floor(ctx.player.maxHp * scaled(0.055, 0.004, level)));
         ctx.addEffect(ctx.player, {
           id: "weave",
           kind: "hot",
@@ -558,7 +558,7 @@
         const rate = scaled(0.09, 0.005, level);
         return [
           "自分の弱体をすべて消す。",
-          `最大体力の${Math.round(rate * 1000) / 10}%を基礎に回復する。`,
+          `最大体力の${Math.floor(rate * 1000) / 10}%を基礎に回復する。`,
           "弱体を1つでも消したときは、さらに最大体力の7%が基礎に加わる。",
         ];
       },
@@ -583,7 +583,7 @@
       describe(level) {
         const rate = scaled(0.22, 0.015, level);
         return [
-          `次の3行動、攻撃の働き+${Math.round(rate * 100)}%。攻撃力補助効率がさらにかかる。`,
+          `次の3行動、攻撃の働き+${Math.floor(rate * 100)}%。攻撃力補助効率がさらにかかる。`,
           "通常攻撃にも、技にも乗る。",
         ];
       },
@@ -609,7 +609,7 @@
       describe(level) {
         const rate = scaled(0.42, 0.03, level);
         return [
-          `次に出す攻撃技の威力を${Math.round(rate * 100)}%上乗せする。`,
+          `次に出す攻撃技の威力を${Math.floor(rate * 100)}%上乗せする。`,
           "通常攻撃では消費しない。攻撃技を出すと一度で消える。",
         ];
       },
@@ -727,7 +727,7 @@
       gain: gain({ maxHp: 5, atk: 1, healEff: 0.03 }),
       describe(level) {
         const ratio = scaled(0.48, 0.02, level);
-        return [multText(0.88, 0.03, level), `与ダメージの${Math.round(ratio * 100)}%を基礎に回復する。`];
+        return [multText(0.88, 0.03, level), `与ダメージの${Math.floor(ratio * 100)}%を基礎に回復する。`];
       },
       use(ctx, level) {
         const r = ctx.damage(scaled(0.88, 0.03, level));
@@ -808,7 +808,7 @@
       gain: gain({ maxHp: 2, atk: 1, def: 2, atkEff: 0.02 }),
       describe(level) {
         const down = scaled(0.24, 0.012, level);
-        return [multText(0.4, 0.02, level), `敵の防御の働きを${Math.round(down * 100)}%下げる（敵の3行動）。`];
+        return [multText(0.4, 0.02, level), `敵の防御の働きを${Math.floor(down * 100)}%下げる（敵の3行動）。`];
       },
       use(ctx, level) {
         const r = ctx.damage(scaled(0.4, 0.02, level));
@@ -836,7 +836,7 @@
       },
       use(ctx, level) {
         const r = ctx.damage(scaled(0.35, 0.02, level));
-        const dot = Math.max(1, Math.round(ctx.effectiveAtk(ctx.player) * scaled(0.2, 0.015, level)));
+        const dot = Math.max(1, Math.floor(ctx.effectiveAtk(ctx.player) * scaled(0.2, 0.015, level)));
         ctx.addEffect(ctx.enemy, {
           id: "plague",
           kind: "dot",
@@ -857,7 +857,7 @@
       gain: gain({ maxHp: 4, def: 3, defEff: 0.02 }),
       describe(level) {
         const down = scaled(0.18, 0.01, level);
-        return [multText(0.55, 0.025, level), `敵の攻撃の働きを${Math.round(down * 100)}%下げる（敵の3行動）。`];
+        return [multText(0.55, 0.025, level), `敵の攻撃の働きを${Math.floor(down * 100)}%下げる（敵の3行動）。`];
       },
       use(ctx, level) {
         const r = ctx.damage(scaled(0.55, 0.025, level));
@@ -881,7 +881,7 @@
       gain: gain({ maxHp: 2, atk: 2, dmgBonus: 0.008 }),
       describe(level) {
         const down = scaled(0.12, 0.01, level);
-        return [multText(0.7, 0.03, level), `敵の被ダメージ軽減を${Math.round(down * 100)}%下げる（敵の3行動）。`];
+        return [multText(0.7, 0.03, level), `敵の被ダメージ軽減を${Math.floor(down * 100)}%下げる（敵の3行動）。`];
       },
       use(ctx, level) {
         const r = ctx.damage(scaled(0.7, 0.03, level));
@@ -951,7 +951,7 @@
       gain: gain({ maxHp: 6, def: 5, defEff: 0.02 }),
       describe(level) {
         const rate = scaled(0.55, 0.025, level);
-        return [`次の2行動、防御の働き+${Math.round(rate * 100)}%。`];
+        return [`次の2行動、防御の働き+${Math.floor(rate * 100)}%。`];
       },
       use(ctx, level) {
         ctx.addEffect(ctx.player, {
@@ -974,7 +974,7 @@
       gain: gain({ maxHp: 5, atk: -2, def: 4, dmgReduction: 0.015 }),
       describe(level) {
         const rate = scaled(0.2, 0.012, level);
-        return [`次の3行動、受けるダメージを${Math.round(rate * 100)}%減らす。`];
+        return [`次の3行動、受けるダメージを${Math.floor(rate * 100)}%減らす。`];
       },
       use(ctx, level) {
         ctx.addEffect(ctx.player, {
@@ -997,7 +997,7 @@
       describe(level) {
         return [
           "次に受ける打撃を28%軽減し、軽減後の一部を返す。",
-          `返しの割合は${Math.round(scaled(0.35, 0.02, level) * 100)}%。`,
+          `返しの割合は${Math.floor(scaled(0.35, 0.02, level) * 100)}%。`,
         ];
       },
       use(ctx, level) {
@@ -1026,7 +1026,7 @@
       describe(level) {
         const rate = scaled(0.35, 0.02, level);
         return [
-          `体力が45%以下のときだけ使える。次の2行動、被ダメージ-${Math.round(rate * 100)}%。`,
+          `体力が45%以下のときだけ使える。次の2行動、被ダメージ-${Math.floor(rate * 100)}%。`,
         ];
       },
       use(ctx, level) {
@@ -1049,7 +1049,7 @@
       gain: gain({ maxHp: 6, healEff: 0.03 }),
       describe(level) {
         const rate = scaled(0.09, 0.006, level);
-        return [`最大体力の${Math.round(rate * 1000) / 10}%を基礎にすぐ回復する。`];
+        return [`最大体力の${Math.floor(rate * 1000) / 10}%を基礎にすぐ回復する。`];
       },
       use(ctx, level) {
         const got = ctx.heal(ctx.player, ctx.player.maxHp * scaled(0.09, 0.006, level));
@@ -1066,10 +1066,10 @@
       gain: gain({ maxHp: 5, def: 1, regenAmount: 1, healEff: 0.02 }),
       describe(level) {
         const each = scaled(0.07, 0.005, level);
-        return [`3行動にわたり、行動ごとに最大体力の${Math.round(each * 1000) / 10}%を基礎に回復する。`];
+        return [`3行動にわたり、行動ごとに最大体力の${Math.floor(each * 1000) / 10}%を基礎に回復する。`];
       },
       use(ctx, level) {
-        const each = Math.max(1, Math.round(ctx.player.maxHp * scaled(0.07, 0.005, level)));
+        const each = Math.max(1, Math.floor(ctx.player.maxHp * scaled(0.07, 0.005, level)));
         ctx.addEffect(ctx.player, {
           id: "bloom",
           kind: "hot",
@@ -1112,7 +1112,7 @@
         const rate = scaled(0.05, 0.004, level);
         return [
           "自分の弱体をすべて消す。",
-          `最大体力の${Math.round(rate * 1000) / 10}%を基礎に回復。弱体を消したとき+5%。`,
+          `最大体力の${Math.floor(rate * 1000) / 10}%を基礎に回復。弱体を消したとき+5%。`,
         ];
       },
       use(ctx, level) {
@@ -1138,7 +1138,7 @@
       },
       describe(level) {
         const rate = scaled(0.22, 0.01, level);
-        return [`体力50%以下のときだけ。最大体力の${Math.round(rate * 1000) / 10}%を基礎に回復する。`];
+        return [`体力50%以下のときだけ。最大体力の${Math.floor(rate * 1000) / 10}%を基礎に回復する。`];
       },
       use(ctx, level) {
         const got = ctx.heal(ctx.player, ctx.player.maxHp * scaled(0.22, 0.01, level));
@@ -1155,7 +1155,7 @@
       gain: gain({ maxHp: 2, atk: 2, atkEff: 0.02 }),
       describe(level) {
         const rate = scaled(0.3, 0.02, level);
-        return [`次の2行動、攻撃の働き+${Math.round(rate * 100)}%。`];
+        return [`次の2行動、攻撃の働き+${Math.floor(rate * 100)}%。`];
       },
       use(ctx, level) {
         ctx.addEffect(ctx.player, {
@@ -1178,7 +1178,7 @@
       gain: gain({ maxHp: 2, atk: 2, speed: 2, atkEff: 0.02 }),
       describe(level) {
         const rate = scaled(0.18, 0.012, level);
-        return [`次の3行動、攻撃の働き+${Math.round(rate * 100)}%。通常攻撃にも乗る。`];
+        return [`次の3行動、攻撃の働き+${Math.floor(rate * 100)}%。通常攻撃にも乗る。`];
       },
       use(ctx, level) {
         ctx.addEffect(ctx.player, {
@@ -1233,15 +1233,15 @@
         stats[key] += (skill.gain[key] || 0) * level;
       });
     });
-    stats.maxHp = Math.max(40, Math.round(stats.maxHp));
-    stats.atk = Math.max(1, Math.round(stats.atk));
-    stats.def = Math.max(0, Math.round(stats.def));
-    stats.regenInterval = Math.max(1, Math.round(stats.regenInterval));
-    stats.regenAmount = Math.max(0, Math.round(stats.regenAmount));
+    stats.maxHp = Math.max(40, Math.floor(stats.maxHp));
+    stats.atk = Math.max(1, Math.floor(stats.atk));
+    stats.def = Math.max(0, Math.floor(stats.def));
+    stats.regenInterval = Math.max(1, Math.floor(stats.regenInterval));
+    stats.regenAmount = Math.max(0, Math.floor(stats.regenAmount));
     stats.healEff = Math.max(0.25, stats.healEff);
     stats.atkEff = Math.max(0.25, stats.atkEff);
     stats.defEff = Math.max(0.25, stats.defEff);
-    stats.speed = Math.max(50, Math.round(stats.speed));
+    stats.speed = Math.max(50, Math.floor(stats.speed));
     stats.dmgReduction = Math.max(-0.3, Math.min(0.45, stats.dmgReduction));
     return stats;
   }
