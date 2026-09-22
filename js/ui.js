@@ -4,6 +4,7 @@
   const ui = {
     screen: "title",
     detail: false,
+    zoom: 1.15,
     speed: 1,
     modal: null,
     help: false,
@@ -13,6 +14,7 @@
 
   let app = null;
   let timer = 0;
+  let logFollow = true;
 
   const STAT_ROWS_CORE = [
     ["maxHp", "体力", "plain"],
@@ -112,6 +114,10 @@
     else document.title = `第${state.floor}層 | 塔の戦士`;
   }
 
+  function applyZoom() {
+    document.documentElement.style.setProperty("--ui-scale", String(ui.zoom));
+  }
+
   function shell(body, footer) {
     const state = W.getState();
     const floor =
@@ -119,6 +125,7 @@
         ? ui.battle.floor
         : state.floor;
     const best = state.bestCleared;
+    const zoomLabel = `${Math.round(ui.zoom * 100)}%`;
     return `
       <div class="shell">
         <header class="bar">
@@ -128,6 +135,9 @@
             ${ui.screen === "title" ? "" : `<span class="chip muted">最高 ${best || "—"}</span>`}
           </div>
           <div class="bar-right">
+            <button type="button" class="btn btn-ghost" data-action="zoom-out" aria-label="文字を小さく">A-</button>
+            <span class="chip muted" title="表示倍率">${zoomLabel}</span>
+            <button type="button" class="btn btn-ghost" data-action="zoom-in" aria-label="文字を大きく">A+</button>
             ${
               ui.screen === "title" || ui.screen === "clear"
                 ? ""
@@ -178,7 +188,8 @@
     const skill = W.SKILL_BY_ID[id];
     if (!skill) return "";
     const level = state.skills[id] || 0;
-    const lines = skill.describe(Math.max(1, level || 1));
+    const stats = W.computeStats(state.skills);
+    const lines = skill.describe(Math.max(1, level || 1), stats);
     return `
       <article class="skill-card offer-card ${ui.detail ? "is-detail" : ""}">
         <div class="skill-body">
@@ -186,7 +197,7 @@
             <strong>${esc(skill.name)}</strong>
             <span class="skill-meta">${level ? `Lv.${level}→${level + 1}` : "新規"} · ${skill.cooldown}行</span>
           </header>
-          ${ui.detail ? `<p class="skill-blurb">${esc(skill.blurb)}</p>` : ""}
+          <p class="skill-blurb">${esc(skill.blurb)}</p>
           ${gainList(skill)}
           ${
             ui.detail
@@ -206,24 +217,27 @@
     const skill = W.SKILL_BY_ID[id];
     if (!skill) return "";
     const level = state.skills[id] || 0;
-    const lines = skill.describe(Math.max(1, level));
+    const stats = W.computeStats(state.skills);
+    const lines = skill.describe(Math.max(1, level), stats);
     return `
       <article class="skill-card owned-card ${ui.detail ? "is-detail" : ""}">
         <header class="skill-top">
           <strong>${esc(skill.name)}</strong>
           <span class="skill-meta">Lv.${level} · ${skill.cooldown}行</span>
         </header>
+        <p class="skill-blurb">${esc(skill.blurb)}</p>
         ${
           ui.detail
             ? `
-              <p class="skill-blurb">${esc(skill.blurb)}</p>
               ${gainList(skill)}
               <div class="skill-detail">
                 ${lines.map((line) => `<p>${esc(line)}</p>`).join("")}
                 <p class="trade">${esc(skill.tradeoff)}</p>
               </div>
             `
-            : `<p class="skill-brief">${esc(skill.blurb)}</p>`
+            : `<div class="skill-detail skill-detail-lite">
+                ${lines.slice(0, 2).map((line) => `<p>${esc(line)}</p>`).join("")}
+              </div>`
         }
       </article>
     `;
@@ -370,6 +384,48 @@
     `);
   }
 
+  function logSideLabel(side) {
+    if (side === "enemy") return "敵";
+    if (side === "player") return "あなた";
+    return "";
+  }
+
+  function formatLogLine(event) {
+    const classes = [event.kind || "system"];
+    if (event.side === "player") classes.push("side-player");
+    if (event.side === "enemy") classes.push("side-enemy");
+    let mark = "";
+    if (event.actionNo > 0) {
+      const who = logSideLabel(event.side);
+      mark = `<span class="log-act">第${event.actionNo}行動${who ? `・${who}` : ""}</span>`;
+    }
+    return `<p class="${esc(classes.join(" "))}">${mark}${esc(event.text)}</p>`;
+  }
+
+  function appendLogLine(log, event) {
+    const wrap = document.createElement("div");
+    wrap.innerHTML = formatLogLine(event);
+    const line = wrap.firstElementChild;
+    if (line) log.appendChild(line);
+  }
+
+  function isLogNearBottom(log) {
+    return log.scrollHeight - log.scrollTop - log.clientHeight < 28;
+  }
+
+  function scrollLogToBottom(log) {
+    if (!log) return;
+    log.scrollTop = log.scrollHeight;
+  }
+
+  function bindLogScroll(log) {
+    if (!log || log.dataset.boundScroll) return;
+    log.dataset.boundScroll = "1";
+    log.addEventListener("scroll", () => {
+      logFollow = isLogNearBottom(log);
+    });
+  }
+
   function renderBattle() {
     const state = W.getState();
     const battle = ui.battle;
@@ -381,7 +437,14 @@
     const enemyHp = latest ? latest.enemyHp : enemy.maxHp;
     const pRate = Math.max(0, Math.min(100, (playerHp / stats.maxHp) * 100));
     const eRate = Math.max(0, Math.min(100, (enemyHp / enemy.maxHp) * 100));
-    const logLines = shown.slice(-8);
+    const currentAct = latest && latest.actionNo > 0 ? latest.actionNo : 0;
+    const totalActs = battle.actions || 0;
+    const actLabel =
+      battle.phase === "done"
+        ? `全${totalActs}行動`
+        : currentAct > 0
+          ? `第${currentAct}行動 / 全${totalActs}行動`
+          : `全${totalActs}行動`;
 
     let foot = "";
     if (battle.phase === "done") {
@@ -417,8 +480,12 @@
             <div class="hp enemy"><span data-bar="enemy" style="width:${eRate}%"></span></div>
           </div>
         </div>
+        <div class="log-head">
+          <span>戦闘ログ</span>
+          <span data-act-label>${actLabel}</span>
+        </div>
         <div class="log" data-log>
-          ${logLines.map((event) => `<p class="${esc(event.kind || "system")}">${esc(event.text)}</p>`).join("")}
+          ${shown.map(formatLogLine).join("")}
         </div>
       </div>
     `,
@@ -482,6 +549,7 @@
   }
 
   function render() {
+    applyZoom();
     let body = "";
     if (ui.screen === "title") body = renderTitle();
     else if (ui.screen === "offer") body = renderOffer();
@@ -491,7 +559,10 @@
     app.innerHTML = `${body}${modal()}`;
     syncTitle();
     const log = document.querySelector("[data-log]");
-    if (log) log.scrollTop = log.scrollHeight;
+    if (log) {
+      bindLogScroll(log);
+      if (logFollow) scrollLogToBottom(log);
+    }
   }
 
   function beginRun() {
@@ -537,13 +608,21 @@
     }
     const event = battle.events[battle.index];
     const log = document.querySelector("[data-log]");
+    const pinned = !log || isLogNearBottom(log);
     if (log) {
-      const line = document.createElement("p");
-      line.className = event.kind || "system";
-      line.textContent = event.text;
-      log.appendChild(line);
-      while (log.children.length > 8) log.removeChild(log.firstChild);
-      log.scrollTop = log.scrollHeight;
+      bindLogScroll(log);
+      appendLogLine(log, event);
+      if (pinned || logFollow) {
+        logFollow = true;
+        scrollLogToBottom(log);
+      }
+    }
+    const actLabel = document.querySelector("[data-act-label]");
+    if (actLabel) {
+      const currentAct = event.actionNo > 0 ? event.actionNo : 0;
+      const totalActs = battle.actions || 0;
+      actLabel.textContent =
+        currentAct > 0 ? `第${currentAct}行動 / 全${totalActs}行動` : `全${totalActs}行動`;
     }
     paintBars(event);
     battle.index += 1;
@@ -577,6 +656,7 @@
       cleared = W.commitWin().cleared;
     }
     stopPlayback();
+    logFollow = true;
     ui.battle = {
       ...result,
       floor: enemy.floor,
@@ -636,6 +716,18 @@
       ui.detail = !ui.detail;
       render();
       if (ui.battle && ui.battle.phase === "playing") play();
+      return;
+    }
+    if (action === "zoom-in") {
+      ui.zoom = Math.min(1.45, Math.round((ui.zoom + 0.1) * 100) / 100);
+      applyZoom();
+      render();
+      return;
+    }
+    if (action === "zoom-out") {
+      ui.zoom = Math.max(1, Math.round((ui.zoom - 0.1) * 100) / 100);
+      applyZoom();
+      render();
       return;
     }
     if (action === "pick") {
@@ -760,6 +852,7 @@
       if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
         ui.speed = 4;
       }
+      applyZoom();
       app.addEventListener("click", onClick);
       app.addEventListener("click", onBackdrop);
       app.addEventListener("change", onChange);
