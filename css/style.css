@@ -317,13 +317,21 @@ select {
 
 .battle-pane {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
   gap: 8px;
   min-height: 0;
   flex: 1;
   overflow: hidden;
 }
 .bars { display: grid; gap: 8px; }
+.log-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 0.9em;
+  color: var(--muted);
+}
 .bar-label {
   display: flex;
   justify-content: space-between;
@@ -347,17 +355,32 @@ select {
 .log {
   min-height: 0;
   overflow: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   padding: 6px 8px;
   border-radius: var(--radius);
   border: 1px solid rgba(109, 87, 56, 0.7);
   background: var(--panel);
   font-size: 0.95em;
+  scroll-behavior: smooth;
 }
 .log p {
-  margin: 0 0 4px;
+  margin: 0 0 6px;
   padding-left: 6px;
   border-left: 2px solid var(--line);
+  line-height: 1.35;
 }
+.log .log-act {
+  display: inline-block;
+  margin-right: 0.45em;
+  font-size: 0.86em;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.log .side-player .log-act { color: var(--gold); }
+.log .side-enemy .log-act { color: #e08a62; }
 .log .attack { border-color: var(--gold); }
 .log .hit, .log .down { border-color: var(--danger); }
 .log .heal { border-color: var(--ok); }

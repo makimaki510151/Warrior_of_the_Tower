@@ -191,12 +191,16 @@
     const keepLog = input.keepLog !== false;
     const levels = input.levels || {};
     const flowchart = input.flowchart || input.flow || [];
+    let currentAction = 0;
+    let currentSide = null;
 
     function pushEvent(text, kind) {
       if (!keepLog) return;
       events.push({
         text,
         kind: kind || "system",
+        actionNo: currentAction || 0,
+        side: currentSide,
         playerHp: player.hp,
         playerMax: player.maxHp,
         enemyHp: enemy.hp,
@@ -527,14 +531,21 @@
         lastSide = "player";
         nextP += 1000 / player.speed;
         actions += 1;
+        currentAction = actions;
+        currentSide = "player";
         if (!takeTurn(player)) break;
       } else {
         lastSide = "enemy";
         nextE += 1000 / enemy.speed;
         actions += 1;
+        currentAction = actions;
+        currentSide = "enemy";
         if (!takeTurn(enemy)) break;
       }
     }
+
+    currentAction = 0;
+    currentSide = null;
 
     let winner;
     let reason;

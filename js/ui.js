@@ -14,6 +14,7 @@
 
   let app = null;
   let timer = 0;
+  let logFollow = true;
 
   const STAT_ROWS_CORE = [
     ["maxHp", "体力", "plain"],
@@ -383,6 +384,48 @@
     `);
   }
 
+  function logSideLabel(side) {
+    if (side === "enemy") return "敵";
+    if (side === "player") return "あなた";
+    return "";
+  }
+
+  function formatLogLine(event) {
+    const classes = [event.kind || "system"];
+    if (event.side === "player") classes.push("side-player");
+    if (event.side === "enemy") classes.push("side-enemy");
+    let mark = "";
+    if (event.actionNo > 0) {
+      const who = logSideLabel(event.side);
+      mark = `<span class="log-act">第${event.actionNo}行動${who ? `・${who}` : ""}</span>`;
+    }
+    return `<p class="${esc(classes.join(" "))}">${mark}${esc(event.text)}</p>`;
+  }
+
+  function appendLogLine(log, event) {
+    const wrap = document.createElement("div");
+    wrap.innerHTML = formatLogLine(event);
+    const line = wrap.firstElementChild;
+    if (line) log.appendChild(line);
+  }
+
+  function isLogNearBottom(log) {
+    return log.scrollHeight - log.scrollTop - log.clientHeight < 28;
+  }
+
+  function scrollLogToBottom(log) {
+    if (!log) return;
+    log.scrollTop = log.scrollHeight;
+  }
+
+  function bindLogScroll(log) {
+    if (!log || log.dataset.boundScroll) return;
+    log.dataset.boundScroll = "1";
+    log.addEventListener("scroll", () => {
+      logFollow = isLogNearBottom(log);
+    });
+  }
+
   function renderBattle() {
     const state = W.getState();
     const battle = ui.battle;
@@ -394,7 +437,14 @@
     const enemyHp = latest ? latest.enemyHp : enemy.maxHp;
     const pRate = Math.max(0, Math.min(100, (playerHp / stats.maxHp) * 100));
     const eRate = Math.max(0, Math.min(100, (enemyHp / enemy.maxHp) * 100));
-    const logLines = shown.slice(-8);
+    const currentAct = latest && latest.actionNo > 0 ? latest.actionNo : 0;
+    const totalActs = battle.actions || 0;
+    const actLabel =
+      battle.phase === "done"
+        ? `全${totalActs}行動`
+        : currentAct > 0
+          ? `第${currentAct}行動 / 全${totalActs}行動`
+          : `全${totalActs}行動`;
 
     let foot = "";
     if (battle.phase === "done") {
@@ -430,8 +480,12 @@
             <div class="hp enemy"><span data-bar="enemy" style="width:${eRate}%"></span></div>
           </div>
         </div>
+        <div class="log-head">
+          <span>戦闘ログ</span>
+          <span data-act-label>${actLabel}</span>
+        </div>
         <div class="log" data-log>
-          ${logLines.map((event) => `<p class="${esc(event.kind || "system")}">${esc(event.text)}</p>`).join("")}
+          ${shown.map(formatLogLine).join("")}
         </div>
       </div>
     `,
@@ -505,7 +559,10 @@
     app.innerHTML = `${body}${modal()}`;
     syncTitle();
     const log = document.querySelector("[data-log]");
-    if (log) log.scrollTop = log.scrollHeight;
+    if (log) {
+      bindLogScroll(log);
+      if (logFollow) scrollLogToBottom(log);
+    }
   }
 
   function beginRun() {
@@ -551,13 +608,21 @@
     }
     const event = battle.events[battle.index];
     const log = document.querySelector("[data-log]");
+    const pinned = !log || isLogNearBottom(log);
     if (log) {
-      const line = document.createElement("p");
-      line.className = event.kind || "system";
-      line.textContent = event.text;
-      log.appendChild(line);
-      while (log.children.length > 8) log.removeChild(log.firstChild);
-      log.scrollTop = log.scrollHeight;
+      bindLogScroll(log);
+      appendLogLine(log, event);
+      if (pinned || logFollow) {
+        logFollow = true;
+        scrollLogToBottom(log);
+      }
+    }
+    const actLabel = document.querySelector("[data-act-label]");
+    if (actLabel) {
+      const currentAct = event.actionNo > 0 ? event.actionNo : 0;
+      const totalActs = battle.actions || 0;
+      actLabel.textContent =
+        currentAct > 0 ? `第${currentAct}行動 / 全${totalActs}行動` : `全${totalActs}行動`;
     }
     paintBars(event);
     battle.index += 1;
@@ -591,6 +656,7 @@
       cleared = W.commitWin().cleared;
     }
     stopPlayback();
+    logFollow = true;
     ui.battle = {
       ...result,
       floor: enemy.floor,
