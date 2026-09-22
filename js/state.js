@@ -1,46 +1,36 @@
 (function (root) {
   const W = root.Wot || (root.Wot = {});
-  const KEY = "wot-save-v1";
-  const MAX_FLOW = 8;
+  const KEY = "wot-save-v2";
+  const MAX_FLOW = 6;
 
   function blank(best) {
     return {
-      v: 1,
+      v: 2,
       floor: 1,
-      points: 3,
       bestCleared: best || 0,
       clearedTower: false,
+      runSeed: (Math.random() * 0xffffffff) >>> 0 || 1,
       skills: {},
       flow: [],
+      offer: null,
+      pendingPick: true,
     };
   }
 
   let state = blank(0);
 
-  function rewardFor(floor) {
-    return 3 + Math.floor((Math.max(1, floor) - 1) / 5);
-  }
-
   function save() {
     try {
       localStorage.setItem(KEY, JSON.stringify(state));
     } catch (err) {
-      /* プライベートモードなどでは保存できない。進行はその場限りになる。 */
+      /* ignore */
     }
   }
 
-  function sanitize(data) {
-    const skills = {};
-    const rawSkills = data.skills && typeof data.skills === "object" ? data.skills : {};
-    Object.keys(rawSkills).forEach((id) => {
-      const level = Math.floor(Number(rawSkills[id]));
-      if (W.SKILL_BY_ID[id] && level > 0) skills[id] = level;
-    });
-
+  function sanitizeFlow(skills, rawFlow) {
     const seen = {};
     const flow = [];
-    const rawFlow = Array.isArray(data.flow) ? data.flow : [];
-    rawFlow.forEach((node) => {
+    (Array.isArray(rawFlow) ? rawFlow : []).forEach((node) => {
       if (!node || seen[node.skillId] || !skills[node.skillId]) return;
       const meta = W.CONDITION_BY_TYPE[node.cond && node.cond.type] || W.CONDITION_BY_TYPE.always;
       const cond = { type: meta.type };
@@ -54,30 +44,61 @@
       seen[node.skillId] = true;
       flow.push({ skillId: node.skillId, cond });
     });
+    return flow.slice(0, MAX_FLOW);
+  }
+
+  function sanitize(data) {
+    const skills = {};
+    const rawSkills = data.skills && typeof data.skills === "object" ? data.skills : {};
+    Object.keys(rawSkills).forEach((id) => {
+      const level = Math.floor(Number(rawSkills[id]));
+      if (W.SKILL_BY_ID[id] && level > 0) skills[id] = level;
+    });
 
     let floor = Math.floor(Number(data.floor) || 1);
     floor = Math.min(100, Math.max(1, floor));
     const clearedTower = !!data.clearedTower;
     if (clearedTower) floor = 100;
 
+    const pendingPick = data.pendingPick !== false && !clearedTower;
+    let offer = Array.isArray(data.offer)
+      ? data.offer.filter((id) => W.SKILL_BY_ID[id]).slice(0, W.OFFER_COUNT)
+      : null;
+    if (pendingPick && (!offer || offer.length < W.OFFER_COUNT)) {
+      offer = null;
+    }
+
     return {
-      v: 1,
+      v: 2,
       floor,
-      points: Math.max(0, Math.floor(Number(data.points) || 0)),
       bestCleared: Math.max(0, Math.min(100, Math.floor(Number(data.bestCleared) || 0))),
       clearedTower,
+      runSeed: (Number(data.runSeed) >>> 0) || 1,
       skills,
-      flow: flow.slice(0, MAX_FLOW),
+      flow: sanitizeFlow(skills, data.flow),
+      offer,
+      pendingPick,
     };
+  }
+
+  function ensureOffer() {
+    if (!state.pendingPick || state.clearedTower) return state.offer;
+    if (state.offer && state.offer.length === W.OFFER_COUNT) return state.offer;
+    const seed = (state.runSeed ^ (state.floor * 2654435761)) >>> 0;
+    state.offer = W.rollOffer(seed, W.OFFER_COUNT);
+    save();
+    return state.offer;
   }
 
   function load() {
     try {
-      const raw = localStorage.getItem(KEY);
+      const raw = localStorage.getItem(KEY) || localStorage.getItem("wot-save-v1");
       if (!raw) return false;
       const data = JSON.parse(raw);
-      if (!data || data.v !== 1) return false;
+      if (!data || (data.v !== 1 && data.v !== 2)) return false;
       state = sanitize(data);
+      if (state.pendingPick) ensureOffer();
+      save();
       return true;
     } catch (err) {
       return false;
@@ -86,7 +107,7 @@
 
   function hasSave() {
     try {
-      return !!localStorage.getItem(KEY);
+      return !!(localStorage.getItem(KEY) || localStorage.getItem("wot-save-v1"));
     } catch (err) {
       return false;
     }
@@ -96,37 +117,27 @@
     const opts = options || {};
     const best = opts.keepBest === false ? 0 : state.bestCleared || 0;
     state = blank(best);
-    if (opts.persist !== false) save();
+    if (opts.persist !== false) {
+      ensureOffer();
+      save();
+    }
     return state;
   }
 
-  function planBuy(id, cap) {
-    if (!W.SKILL_BY_ID[id]) return 0;
-    let points = state.points;
-    let level = state.skills[id] || 0;
-    let count = 0;
-    const limit = Math.max(1, cap || 1);
-    while (count < limit) {
-      const cost = W.skillCost(level);
-      if (points < cost) break;
-      points -= cost;
-      level += 1;
-      count += 1;
+  function pickSkill(id) {
+    if (!state.pendingPick || !state.offer || !state.offer.includes(id)) return false;
+    if (!W.SKILL_BY_ID[id]) return false;
+    state.skills[id] = (state.skills[id] || 0) + 1;
+    state.offer = null;
+    state.pendingPick = false;
+    if (
+      state.flow.length < MAX_FLOW &&
+      !state.flow.some((node) => node.skillId === id)
+    ) {
+      state.flow.push({ skillId: id, cond: { type: "always" } });
     }
-    return count;
-  }
-
-  function buy(id, times) {
-    const count = planBuy(id, times || 1);
-    if (!count) return 0;
-    let level = state.skills[id] || 0;
-    for (let i = 0; i < count; i += 1) {
-      state.points -= W.skillCost(level);
-      level += 1;
-    }
-    state.skills[id] = level;
     save();
-    return count;
+    return true;
   }
 
   function addNode(skillId) {
@@ -181,26 +192,31 @@
 
   function commitWin() {
     const floor = state.floor;
-    const reward = rewardFor(floor);
-    state.points += reward;
     state.bestCleared = Math.max(state.bestCleared || 0, floor);
     const cleared = floor >= 100;
     state.clearedTower = cleared;
-    if (!cleared) state.floor += 1;
+    if (!cleared) {
+      state.floor += 1;
+      state.pendingPick = true;
+      state.offer = null;
+      ensureOffer();
+    } else {
+      state.pendingPick = false;
+      state.offer = null;
+    }
     save();
-    return { reward, cleared, floor };
+    return { cleared, floor };
   }
 
   W.MAX_FLOW = MAX_FLOW;
-  W.rewardFor = rewardFor;
   W.getState = function getState() {
     return state;
   };
   W.load = load;
   W.hasSave = hasSave;
   W.newRun = newRun;
-  W.planBuy = planBuy;
-  W.buy = buy;
+  W.ensureOffer = ensureOffer;
+  W.pickSkill = pickSkill;
   W.addNode = addNode;
   W.updateNode = updateNode;
   W.moveNode = moveNode;

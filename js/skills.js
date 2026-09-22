@@ -647,6 +647,571 @@
         ctx.log(`${ctx.p}加速。技の再使用が早まる。`, "buff");
       },
     },
+    {
+      id: "jab",
+      name: "刺突",
+      group: "攻撃",
+      blurb: "ごく軽い一撃。再使用が早い。",
+      tradeoff: "単発は弱い。連続で当てる前提。",
+      cooldown: 1,
+      gain: gain({ maxHp: 1, atk: 1, speed: 8 }),
+      describe(level) {
+        return [multText(1.05, 0.03, level)];
+      },
+      use(ctx, level) {
+        const r = ctx.damage(scaled(1.05, 0.03, level));
+        ctx.log(`${ctx.p}刺突。${ctx.enemy.name}に${r.dmg}のダメージ。`, "attack");
+      },
+    },
+    {
+      id: "cleave",
+      name: "薙ぎ",
+      group: "攻撃",
+      blurb: "体力が多い敵ほど通りやすい。",
+      tradeoff: "削れた相手には普通以下。",
+      cooldown: 2,
+      gain: gain({ maxHp: 3, atk: 2, def: 1 }),
+      describe(level) {
+        return [
+          `敵の体力割合が高いほど強い。満タン付近で攻撃×${scaled(1.55, 0.05, level).toFixed(2)}。`,
+          `尽きかけでは攻撃×${scaled(0.7, 0.02, level).toFixed(2)}。`,
+        ];
+      },
+      use(ctx, level) {
+        const rate = ctx.enemy.hp / ctx.enemy.maxHp;
+        const mult = scaled(0.7, 0.02, level) + rate * scaled(0.85, 0.03, level);
+        const r = ctx.damage(mult);
+        ctx.log(`${ctx.p}薙ぎ。${ctx.enemy.name}に${r.dmg}のダメージ。`, "attack");
+      },
+    },
+    {
+      id: "crush",
+      name: "圧打",
+      group: "攻撃",
+      blurb: "防御をかなり無視する重い一撃。",
+      tradeoff: "間隔が長く、素の防御は上がらない。",
+      cooldown: 4,
+      gain: gain({ maxHp: 4, atk: 3, atkEff: 0.02 }),
+      describe(level) {
+        return [multText(1.35, 0.05, level), "敵の防御を45%無視する。"];
+      },
+      use(ctx, level) {
+        const r = ctx.damage(scaled(1.35, 0.05, level), { ignore: 0.45 });
+        ctx.log(`${ctx.p}圧打。${ctx.enemy.name}に${r.dmg}のダメージ。`, "attack");
+      },
+    },
+    {
+      id: "burst",
+      name: "爆裂",
+      group: "攻撃",
+      blurb: "自分の体力を削って大ダメージ。",
+      tradeoff: "捨て身より即時の代償は軽いが、威力もやや劣る。",
+      cooldown: 3,
+      gain: gain({ atk: 4, maxHp: 2, dmgReduction: -0.008 }),
+      describe(level) {
+        return [multText(1.88, 0.07, level), "自分の最大体力の6%を失う。"];
+      },
+      use(ctx, level) {
+        const r = ctx.damage(scaled(1.88, 0.07, level));
+        const cost = ctx.hurt(ctx.player, ctx.player.maxHp * 0.06, "self");
+        ctx.log(`${ctx.p}爆裂。${ctx.enemy.name}に${r.dmg}のダメージ。自分も${cost}削った。`, "attack");
+      },
+    },
+    {
+      id: "drain",
+      name: "吸命",
+      group: "攻撃",
+      blurb: "吸血より回復寄り。火力は落ちる。",
+      tradeoff: "通らない相手では回復も薄い。",
+      cooldown: 2,
+      gain: gain({ maxHp: 5, atk: 1, healEff: 0.03 }),
+      describe(level) {
+        const ratio = scaled(0.48, 0.02, level);
+        return [multText(0.88, 0.03, level), `与ダメージの${Math.round(ratio * 100)}%を基礎に回復する。`];
+      },
+      use(ctx, level) {
+        const r = ctx.damage(scaled(0.88, 0.03, level));
+        const got = ctx.heal(ctx.player, r.dmg * scaled(0.48, 0.02, level));
+        ctx.log(`${ctx.p}吸命。${ctx.enemy.name}に${r.dmg}のダメージ。${got}回復した。`, "attack");
+      },
+    },
+    {
+      id: "ambush",
+      name: "奇襲",
+      group: "攻撃",
+      blurb: "戦闘序盤に強い。長引くと弱い。",
+      tradeoff: "開幕専用に近い。",
+      cooldown: 2,
+      gain: gain({ maxHp: 2, atk: 3, speed: 5 }),
+      describe(level) {
+        return [
+          `自分の行動が3回目までなら攻撃×${scaled(1.7, 0.06, level).toFixed(2)}。`,
+          `それ以降は攻撃×${scaled(0.75, 0.02, level).toFixed(2)}。`,
+        ];
+      },
+      use(ctx, level) {
+        const early = ctx.player.actionCount <= 3;
+        const mult = early ? scaled(1.7, 0.06, level) : scaled(0.75, 0.02, level);
+        const r = ctx.damage(mult);
+        ctx.log(`${ctx.p}奇襲。${early ? "先手を取り、" : "時機を逸し、"}${ctx.enemy.name}に${r.dmg}のダメージ。`, "attack");
+      },
+    },
+    {
+      id: "reprise",
+      name: "返し刃",
+      group: "攻撃",
+      blurb: "直前にダメージを受けていれば強い。",
+      tradeoff: "無傷だと弱い。",
+      cooldown: 2,
+      gain: gain({ maxHp: 3, atk: 2, def: 2 }),
+      describe(level) {
+        return [
+          `直前にダメージを受けていれば攻撃×${scaled(1.75, 0.06, level).toFixed(2)}。`,
+          `受けていなければ攻撃×${scaled(0.72, 0.02, level).toFixed(2)}。`,
+        ];
+      },
+      use(ctx, level) {
+        const hit = ctx.sawHit;
+        const mult = hit ? scaled(1.75, 0.06, level) : scaled(0.72, 0.02, level);
+        const r = ctx.damage(mult);
+        ctx.log(`${ctx.p}返し刃。${hit ? "反撃し、" : "空振りに近く、"}${ctx.enemy.name}に${r.dmg}のダメージ。`, "attack");
+      },
+    },
+    {
+      id: "overpower",
+      name: "圧倒",
+      group: "攻撃",
+      blurb: "自分の攻撃が敵の防御を上回るとき強い。",
+      tradeoff: "硬い相手には破城や貫打に負ける。",
+      cooldown: 2,
+      gain: gain({ maxHp: 2, atk: 4, atkEff: 0.02 }),
+      describe(level) {
+        return [
+          `自分の攻撃が敵の防御より高ければ攻撃×${scaled(1.6, 0.05, level).toFixed(2)}。`,
+          `そうでなければ攻撃×${scaled(0.85, 0.02, level).toFixed(2)}。`,
+        ];
+      },
+      use(ctx, level) {
+        const win = ctx.effectiveAtk(ctx.player) > ctx.effectiveDef(ctx.enemy);
+        const mult = win ? scaled(1.6, 0.05, level) : scaled(0.85, 0.02, level);
+        const r = ctx.damage(mult);
+        ctx.log(`${ctx.p}圧倒。${win ? "押し切り、" : "弾かれ、"}${ctx.enemy.name}に${r.dmg}のダメージ。`, "attack");
+      },
+    },
+    {
+      id: "rift",
+      name: "裂甲",
+      group: "崩し",
+      blurb: "崩甲より防御低下は大きいが、ダメージはほぼない。",
+      tradeoff: "単体では削れない。",
+      cooldown: 3,
+      gain: gain({ maxHp: 2, atk: 1, def: 2, atkEff: 0.02 }),
+      describe(level) {
+        const down = scaled(0.24, 0.012, level);
+        return [multText(0.4, 0.02, level), `敵の防御の働きを${Math.round(down * 100)}%下げる（敵の3行動）。`];
+      },
+      use(ctx, level) {
+        const r = ctx.damage(scaled(0.4, 0.02, level));
+        ctx.addEffect(ctx.enemy, {
+          id: "rift",
+          kind: "defPct",
+          value: -scaled(0.24, 0.012, level),
+          turns: 3,
+          negative: true,
+        });
+        ctx.log(`${ctx.p}裂甲。${ctx.enemy.name}に${r.dmg}のダメージ。防御を大きく下げた。`, "attack");
+      },
+    },
+    {
+      id: "plague",
+      name: "疫刃",
+      group: "崩し",
+      blurb: "毒刃より長い毒。直後の威力はさらに低い。",
+      tradeoff: "短期決戦ではほぼ役に立たない。",
+      cooldown: 3,
+      gain: gain({ maxHp: 2, atk: 2, speed: 2, healEff: -0.02 }),
+      describe(level) {
+        const ratio = scaled(0.2, 0.015, level);
+        return [multText(0.35, 0.02, level), `6行動のあいだ、行動ごとに攻撃×${ratio.toFixed(2)}の毒。`];
+      },
+      use(ctx, level) {
+        const r = ctx.damage(scaled(0.35, 0.02, level));
+        const dot = Math.max(1, Math.round(ctx.effectiveAtk(ctx.player) * scaled(0.2, 0.015, level)));
+        ctx.addEffect(ctx.enemy, {
+          id: "plague",
+          kind: "dot",
+          value: dot,
+          turns: 6,
+          negative: true,
+        });
+        ctx.log(`${ctx.p}疫刃。${ctx.enemy.name}に${r.dmg}のダメージ。長い毒が回る。`, "attack");
+      },
+    },
+    {
+      id: "sap",
+      name: "削気",
+      group: "崩し",
+      blurb: "敵の攻撃の働きを下げる。",
+      tradeoff: "ダメージは弱い。刺客向き。",
+      cooldown: 3,
+      gain: gain({ maxHp: 4, def: 3, defEff: 0.02 }),
+      describe(level) {
+        const down = scaled(0.18, 0.01, level);
+        return [multText(0.55, 0.025, level), `敵の攻撃の働きを${Math.round(down * 100)}%下げる（敵の3行動）。`];
+      },
+      use(ctx, level) {
+        const r = ctx.damage(scaled(0.55, 0.025, level));
+        ctx.addEffect(ctx.enemy, {
+          id: "sap",
+          kind: "atkPct",
+          value: -scaled(0.18, 0.01, level),
+          turns: 3,
+          negative: true,
+        });
+        ctx.log(`${ctx.p}削気。${ctx.enemy.name}に${r.dmg}のダメージ。攻撃の働きを下げた。`, "attack");
+      },
+    },
+    {
+      id: "expose",
+      name: "露呈",
+      group: "崩し",
+      blurb: "敵の被ダメージ軽減を下げ、少し削る。",
+      tradeoff: "軽減がない相手にはただの弱い攻撃。",
+      cooldown: 3,
+      gain: gain({ maxHp: 2, atk: 2, dmgBonus: 0.008 }),
+      describe(level) {
+        const down = scaled(0.12, 0.01, level);
+        return [multText(0.7, 0.03, level), `敵の被ダメージ軽減を${Math.round(down * 100)}%下げる（敵の3行動）。`];
+      },
+      use(ctx, level) {
+        const r = ctx.damage(scaled(0.7, 0.03, level));
+        ctx.addEffect(ctx.enemy, {
+          id: "expose",
+          kind: "dr",
+          value: -scaled(0.12, 0.01, level),
+          turns: 3,
+          negative: true,
+        });
+        ctx.log(`${ctx.p}露呈。${ctx.enemy.name}に${r.dmg}のダメージ。守りを開いた。`, "attack");
+      },
+    },
+    {
+      id: "silence",
+      name: "封脈",
+      group: "崩し",
+      blurb: "枯渇より短いが、即時ダメージはやや高い。",
+      tradeoff: "再生しない相手には過剰。",
+      cooldown: 2,
+      gain: gain({ maxHp: 2, atk: 2, regenAmount: 1 }),
+      describe(level) {
+        return [multText(0.9, 0.035, level), "敵の自動回復を、敵の2行動のあいだ止める。"];
+      },
+      use(ctx, level) {
+        const r = ctx.damage(scaled(0.9, 0.035, level));
+        ctx.addEffect(ctx.enemy, {
+          id: "silence",
+          kind: "noRegen",
+          value: 1,
+          turns: 2,
+          negative: true,
+        });
+        ctx.log(`${ctx.p}封脈。${ctx.enemy.name}に${r.dmg}のダメージ。自動回復を短く封じた。`, "attack");
+      },
+    },
+    {
+      id: "mark",
+      name: "印刻",
+      group: "崩し",
+      blurb: "弱体を付けたあと、弱点と組むための印。",
+      tradeoff: "単独では弱い。",
+      cooldown: 2,
+      gain: gain({ maxHp: 1, atk: 2, speed: 3 }),
+      describe(level) {
+        return [multText(0.6, 0.025, level), "敵に軽微な攻撃低下を付ける（敵の2行動）。弱体判定に乗る。"];
+      },
+      use(ctx, level) {
+        const r = ctx.damage(scaled(0.6, 0.025, level));
+        ctx.addEffect(ctx.enemy, {
+          id: "mark",
+          kind: "atkPct",
+          value: -scaled(0.08, 0.005, level),
+          turns: 2,
+          negative: true,
+        });
+        ctx.log(`${ctx.p}印刻。${ctx.enemy.name}に${r.dmg}のダメージ。印を刻んだ。`, "attack");
+      },
+    },
+    {
+      id: "bulwark",
+      name: "防壁",
+      group: "守り",
+      blurb: "鉄身より短いが、上昇幅は大きい。",
+      tradeoff: "攻撃しない。",
+      cooldown: 3,
+      gain: gain({ maxHp: 6, def: 5, defEff: 0.02 }),
+      describe(level) {
+        const rate = scaled(0.55, 0.025, level);
+        return [`次の2行動、防御の働き+${Math.round(rate * 100)}%。`];
+      },
+      use(ctx, level) {
+        ctx.addEffect(ctx.player, {
+          id: "bulwark",
+          kind: "defPct",
+          value: scaled(0.55, 0.025, level),
+          turns: 2,
+          scale: "def",
+        });
+        ctx.log(`${ctx.p}防壁。短いあいだ、防御の働きが大きく上がった。`, "buff");
+      },
+    },
+    {
+      id: "aegis",
+      name: "聖壁",
+      group: "守り",
+      blurb: "堅守より長い割合軽減。攻撃力は下がる。",
+      tradeoff: "火力が落ちる。",
+      cooldown: 4,
+      gain: gain({ maxHp: 5, atk: -2, def: 4, dmgReduction: 0.015 }),
+      describe(level) {
+        const rate = scaled(0.2, 0.012, level);
+        return [`次の3行動、受けるダメージを${Math.round(rate * 100)}%減らす。`];
+      },
+      use(ctx, level) {
+        ctx.addEffect(ctx.player, {
+          id: "aegis",
+          kind: "dr",
+          value: scaled(0.2, 0.012, level),
+          turns: 3,
+        });
+        ctx.log(`${ctx.p}聖壁。打撃をいなす壁を張った。`, "buff");
+      },
+    },
+    {
+      id: "mirror",
+      name: "鏡面",
+      group: "守り",
+      blurb: "反射より返しは弱いが、軽減はやや厚い。",
+      tradeoff: "一度返すと解ける。",
+      cooldown: 3,
+      gain: gain({ maxHp: 4, def: 4, speed: 2 }),
+      describe(level) {
+        return [
+          "次に受ける打撃を28%軽減し、軽減後の一部を返す。",
+          `返しの割合は${Math.round(scaled(0.35, 0.02, level) * 100)}%。`,
+        ];
+      },
+      use(ctx, level) {
+        ctx.addEffect(ctx.player, {
+          id: "mirror",
+          kind: "reflect",
+          value: scaled(0.35, 0.02, level),
+          reduction: 0.28,
+          once: true,
+          turns: 3,
+        });
+        ctx.log(`${ctx.p}鏡面。次の一撃を受ける構えを取った。`, "buff");
+      },
+    },
+    {
+      id: "endure",
+      name: "耐忍",
+      group: "守り",
+      blurb: "体力が少ないときだけ使える短い軽減。",
+      tradeoff: "余裕があるときは飛ばされる。",
+      cooldown: 3,
+      gain: gain({ maxHp: 8, def: 2, defEff: 0.03 }),
+      available(ctx) {
+        return ctx.player.hp / ctx.player.maxHp <= 0.45;
+      },
+      describe(level) {
+        const rate = scaled(0.35, 0.02, level);
+        return [
+          `体力が45%以下のときだけ使える。次の2行動、被ダメージ-${Math.round(rate * 100)}%。`,
+        ];
+      },
+      use(ctx, level) {
+        ctx.addEffect(ctx.player, {
+          id: "endure",
+          kind: "dr",
+          value: scaled(0.35, 0.02, level),
+          turns: 2,
+        });
+        ctx.log(`${ctx.p}耐忍。死線で体を固めた。`, "buff");
+      },
+    },
+    {
+      id: "salve",
+      name: "軟膏",
+      group: "回復",
+      blurb: "応急より軽い即時回復。再使用は早い。",
+      tradeoff: "大きな穴は塞げない。",
+      cooldown: 2,
+      gain: gain({ maxHp: 6, healEff: 0.03 }),
+      describe(level) {
+        const rate = scaled(0.09, 0.006, level);
+        return [`最大体力の${Math.round(rate * 1000) / 10}%を基礎にすぐ回復する。`];
+      },
+      use(ctx, level) {
+        const got = ctx.heal(ctx.player, ctx.player.maxHp * scaled(0.09, 0.006, level));
+        ctx.log(`${ctx.p}軟膏。体力が${got}回復した。`, "heal");
+      },
+    },
+    {
+      id: "bloom",
+      name: "芽吹き",
+      group: "回復",
+      blurb: "再生より短い継続回復。",
+      tradeoff: "総量は再生に負ける。",
+      cooldown: 3,
+      gain: gain({ maxHp: 5, def: 1, regenAmount: 1, healEff: 0.02 }),
+      describe(level) {
+        const each = scaled(0.07, 0.005, level);
+        return [`3行動にわたり、行動ごとに最大体力の${Math.round(each * 1000) / 10}%を基礎に回復する。`];
+      },
+      use(ctx, level) {
+        const each = Math.max(1, Math.round(ctx.player.maxHp * scaled(0.07, 0.005, level)));
+        ctx.addEffect(ctx.player, {
+          id: "bloom",
+          kind: "hot",
+          value: each,
+          turns: 3,
+        });
+        ctx.log(`${ctx.p}芽吹き。短い再生が始まった。`, "heal");
+      },
+    },
+    {
+      id: "tide",
+      name: "潮汐",
+      group: "回復",
+      blurb: "脈動より強い自動回復増強。速度は下がる。",
+      tradeoff: "即時回復はない。",
+      cooldown: 4,
+      gain: gain({ maxHp: 7, regenAmount: 3, speed: -3 }),
+      describe(level) {
+        return [`次の5行動、自動回復量+${scaled(8, 1.2, level).toFixed(0)}。`];
+      },
+      use(ctx, level) {
+        ctx.addEffect(ctx.player, {
+          id: "tide",
+          kind: "regenFlat",
+          value: scaled(8, 1.2, level),
+          turns: 5,
+        });
+        ctx.log(`${ctx.p}潮汐。自動回復が大きくなった。`, "heal");
+      },
+    },
+    {
+      id: "cleanse",
+      name: "祓い",
+      group: "回復",
+      blurb: "浄化より回復は少ないが、弱体除去は同じ。",
+      tradeoff: "弱体がないと応急に負ける。",
+      cooldown: 2,
+      gain: gain({ maxHp: 5, def: 1, healEff: 0.02 }),
+      describe(level) {
+        const rate = scaled(0.05, 0.004, level);
+        return [
+          "自分の弱体をすべて消す。",
+          `最大体力の${Math.round(rate * 1000) / 10}%を基礎に回復。弱体を消したとき+5%。`,
+        ];
+      },
+      use(ctx, level) {
+        const removed = ctx.cleanse(ctx.player);
+        const rate = scaled(0.05, 0.004, level) + (removed > 0 ? 0.05 : 0);
+        const got = ctx.heal(ctx.player, ctx.player.maxHp * rate);
+        ctx.log(
+          `${ctx.p}祓い。${removed > 0 ? `弱体を${removed}つ払い、` : ""}体力が${got}回復した。`,
+          "heal"
+        );
+      },
+    },
+    {
+      id: "secondwind",
+      name: "息吹",
+      group: "回復",
+      blurb: "体力が半分以下のときだけ大きく戻す。",
+      tradeoff: "余裕があるときは使えない。",
+      cooldown: 4,
+      gain: gain({ maxHp: 9, healEff: 0.04 }),
+      available(ctx) {
+        return ctx.player.hp / ctx.player.maxHp <= 0.5;
+      },
+      describe(level) {
+        const rate = scaled(0.22, 0.01, level);
+        return [`体力50%以下のときだけ。最大体力の${Math.round(rate * 1000) / 10}%を基礎に回復する。`];
+      },
+      use(ctx, level) {
+        const got = ctx.heal(ctx.player, ctx.player.maxHp * scaled(0.22, 0.01, level));
+        ctx.log(`${ctx.p}息吹。体力が${got}回復した。`, "heal");
+      },
+    },
+    {
+      id: "warcry",
+      name: "戦吼",
+      group: "補助",
+      blurb: "鼓舞より短い攻撃上昇。",
+      tradeoff: "持続が短い。",
+      cooldown: 2,
+      gain: gain({ maxHp: 2, atk: 2, atkEff: 0.02 }),
+      describe(level) {
+        const rate = scaled(0.3, 0.02, level);
+        return [`次の2行動、攻撃の働き+${Math.round(rate * 100)}%。`];
+      },
+      use(ctx, level) {
+        ctx.addEffect(ctx.player, {
+          id: "warcry",
+          kind: "atkPct",
+          value: scaled(0.3, 0.02, level),
+          turns: 2,
+          scale: "atk",
+        });
+        ctx.log(`${ctx.p}戦吼。攻撃の働きが短く上がった。`, "buff");
+      },
+    },
+    {
+      id: "keen",
+      name: "鋭気",
+      group: "補助",
+      blurb: "集中より弱いが、通常攻撃にも乗る一時強化。",
+      tradeoff: "技専用の集中には単発で負ける。",
+      cooldown: 3,
+      gain: gain({ maxHp: 2, atk: 2, speed: 2, atkEff: 0.02 }),
+      describe(level) {
+        const rate = scaled(0.18, 0.012, level);
+        return [`次の3行動、攻撃の働き+${Math.round(rate * 100)}%。通常攻撃にも乗る。`];
+      },
+      use(ctx, level) {
+        ctx.addEffect(ctx.player, {
+          id: "keen",
+          kind: "atkPct",
+          value: scaled(0.18, 0.012, level),
+          turns: 3,
+          scale: "atk",
+        });
+        ctx.log(`${ctx.p}鋭気。刃が軽く研がれた。`, "buff");
+      },
+    },
+    {
+      id: "tempo",
+      name: "拍子",
+      group: "補助",
+      blurb: "加速より短い再使用促進。",
+      tradeoff: "ダメージはない。",
+      cooldown: 3,
+      gain: gain({ maxHp: 2, speed: 7, atk: 1 }),
+      describe(level) {
+        return ["次の2行動の終わりに、他の技の再使用カウントが余分に1進む。レベルでは中身は変わらない。"];
+      },
+      use(ctx) {
+        ctx.addEffect(ctx.player, {
+          id: "tempo",
+          kind: "cdHaste",
+          value: 1,
+          turns: 2,
+        });
+        ctx.log(`${ctx.p}拍子。技の再使用がわずかに早まる。`, "buff");
+      },
+    },
   ];
 
   const GROUPS = ["攻撃", "崩し", "守り", "回復", "補助"];
@@ -656,6 +1221,7 @@
   });
 
   const STAT_KEYS = Object.keys(BASE_STATS);
+  const OFFER_COUNT = 5;
 
   function computeStats(levels) {
     const stats = { ...BASE_STATS };
@@ -680,15 +1246,35 @@
     return stats;
   }
 
-  function skillCost(currentLevel) {
-    return 3 + (currentLevel || 0);
+  function mulberry32(seed) {
+    let t = seed >>> 0;
+    return function next() {
+      t += 0x6d2b79f5;
+      let r = Math.imul(t ^ (t >>> 15), 1 | t);
+      r ^= r + Math.imul(r ^ (r >>> 7), 61 | r);
+      return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  function rollOffer(seed, count) {
+    const n = Math.min(count || OFFER_COUNT, SKILLS.length);
+    const rand = mulberry32(seed >>> 0 || 1);
+    const pool = SKILLS.map((skill) => skill.id);
+    for (let i = pool.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(rand() * (i + 1));
+      const tmp = pool[i];
+      pool[i] = pool[j];
+      pool[j] = tmp;
+    }
+    return pool.slice(0, n);
   }
 
   W.BASE_STATS = BASE_STATS;
   W.SKILLS = SKILLS;
   W.SKILL_GROUPS = GROUPS;
   W.SKILL_BY_ID = BY_ID;
+  W.OFFER_COUNT = OFFER_COUNT;
   W.computeStats = computeStats;
-  W.skillCost = skillCost;
+  W.rollOffer = rollOffer;
   W.scaled = scaled;
 })(typeof window !== "undefined" ? window : globalThis);

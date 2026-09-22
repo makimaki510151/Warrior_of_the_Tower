@@ -123,8 +123,13 @@
     },
   ];
 
+  /** 階層 n の敵は常に同じ。並びは ARCHETYPES を (n-1) で巡回し、10の倍数は番人化。 */
+  function archetypeForFloor(floor) {
+    return ARCHETYPES[(floor - 1) % ARCHETYPES.length];
+  }
+
   function createEnemy(floor) {
-    const arch = ARCHETYPES[(floor - 1) % ARCHETYPES.length];
+    const arch = archetypeForFloor(floor);
     const boss = floor % 10 === 0;
     const hpMul = arch.hp * (boss ? CURVE.bossHp : 1);
     const atkMul = arch.atk * (boss ? CURVE.bossAtk : 1);
@@ -167,5 +172,6 @@
 
   W.CURVE = CURVE;
   W.ARCHETYPES = ARCHETYPES;
+  W.archetypeForFloor = archetypeForFloor;
   W.createEnemy = createEnemy;
 })(typeof window !== "undefined" ? window : globalThis);
