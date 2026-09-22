@@ -4,7 +4,6 @@
   const ui = {
     screen: "title",
     detail: false,
-    expanded: null,
     speed: 1,
     modal: null,
     help: false,
@@ -15,10 +14,40 @@
   let app = null;
   let timer = 0;
 
-  const CORE_GAINS = [
-    ["maxHp", "体", false],
-    ["atk", "攻", false],
-    ["def", "防", false],
+  const STAT_ROWS_CORE = [
+    ["maxHp", "体力", "plain"],
+    ["atk", "攻撃力", "plain"],
+    ["def", "防御力", "plain"],
+  ];
+
+  const STAT_ROWS_DETAIL = [
+    ["currentHp", "現在体力", "current"],
+    ["maxHp", "最大体力", "plain"],
+    ["regenInterval", "自動体力回復速度", "interval"],
+    ["regenAmount", "自動体力回復量", "plain"],
+    ["healEff", "体力回復効率", "pct"],
+    ["atkEff", "攻撃力補助効率", "pct"],
+    ["defEff", "防御力補助効率", "pct"],
+    ["speed", "行動速度", "plain"],
+    ["dmgBonus", "与ダメージ補正", "signedPct"],
+    ["dmgReduction", "被ダメージ軽減", "signedPct"],
+  ];
+
+  const GAIN_CORE = [
+    ["maxHp", "体力", false],
+    ["atk", "攻撃力", false],
+    ["def", "防御力", false],
+  ];
+
+  const GAIN_EXTRA = [
+    ["regenInterval", "自動体力回復速度", false],
+    ["regenAmount", "自動体力回復量", false],
+    ["healEff", "体力回復効率", true],
+    ["atkEff", "攻撃力補助効率", true],
+    ["defEff", "防御力補助効率", true],
+    ["speed", "行動速度", false],
+    ["dmgBonus", "与ダメージ補正", true],
+    ["dmgReduction", "被ダメージ軽減", true],
   ];
 
   function esc(value) {
@@ -36,20 +65,35 @@
     return `${Number.isInteger(number) ? number : number.toFixed(1)}%`;
   }
 
-  function signed(value, asPct) {
-    if (asPct) {
-      const n = Math.round(value * 1000) / 10;
-      const body = Number.isInteger(n) ? String(n) : n.toFixed(1);
-      return n > 0 ? `+${body}%` : `${body}%`;
-    }
+  function signedPct(value) {
+    const n = Math.round(value * 1000) / 10;
+    const body = Number.isInteger(n) ? String(n) : n.toFixed(1);
+    return n > 0 ? `+${body}%` : `${body}%`;
+  }
+
+  function signedPlain(value) {
     return value > 0 ? `+${value}` : String(value);
   }
 
-  function coreGainLine(skill) {
-    return CORE_GAINS.map(([key, short, asPct]) => {
-      const v = skill.gain[key] || 0;
-      return `${short}${signed(v, asPct)}`;
-    }).join(" ");
+  function gainText(key, value, asPct) {
+    if (asPct) return signedPct(value);
+    if (key === "regenInterval") {
+      if (value < 0) return `${value}行動（速くなる）`;
+      if (value > 0) return `+${value}行動（遅くなる）`;
+      return "±0";
+    }
+    return signedPlain(value);
+  }
+
+  function formatStat(key, stats, hp, kind) {
+    if (kind === "current") {
+      const current = hp == null ? stats.maxHp : Math.max(0, Math.round(hp));
+      return `${current} / ${stats.maxHp}`;
+    }
+    if (kind === "interval") return `${stats.regenInterval}行動ごと`;
+    if (kind === "pct") return pct(stats[key]);
+    if (kind === "signedPct") return signedPct(stats[key]);
+    return String(stats[key]);
   }
 
   function syncTitle() {
@@ -79,9 +123,11 @@
             ${
               ui.screen === "title" || ui.screen === "clear"
                 ? ""
-                : `<button type="button" class="btn btn-ghost btn-sm" data-action="toggle-detail">${ui.detail ? "詳細" : "標準"}</button>`
+                : `<button type="button" class="btn btn-ghost" data-action="toggle-detail" aria-pressed="${ui.detail}">${
+                    ui.detail ? "標準に切替" : "詳細に切替"
+                  }</button>`
             }
-            <button type="button" class="btn btn-ghost btn-sm" data-action="help">?</button>
+            <button type="button" class="btn btn-ghost" data-action="help">遊び方</button>
           </div>
         </header>
         <main class="main main-${ui.screen}">${body}</main>
@@ -90,28 +136,33 @@
     `;
   }
 
-  function compactStats(stats, hp) {
-    const current = hp == null ? stats.maxHp : Math.max(0, Math.round(hp));
-    if (!ui.detail) {
-      return `
-        <div class="stat-row">
-          <span>体 <b>${stats.maxHp}</b></span>
-          <span>攻 <b>${stats.atk}</b></span>
-          <span>防 <b>${stats.def}</b></span>
-        </div>
-      `;
-    }
+  function playerStatsList(stats, hp) {
+    const rows = ui.detail ? STAT_ROWS_DETAIL : STAT_ROWS_CORE;
     return `
-      <div class="stat-dense">
-        <span>現在 ${current}/${stats.maxHp}</span>
-        <span>回復 ${stats.regenAmount}/${stats.regenInterval}行</span>
-        <span>回効 ${pct(stats.healEff)}</span>
-        <span>攻効 ${pct(stats.atkEff)}</span>
-        <span>防効 ${pct(stats.defEff)}</span>
-        <span>速 ${stats.speed}</span>
-        <span>与D ${signed(stats.dmgBonus, true)}</span>
-        <span>被減 ${signed(stats.dmgReduction, true)}</span>
-      </div>
+      <dl class="stat-list">
+        ${rows
+          .map(
+            ([key, label, kind]) =>
+              `<div><dt>${label}</dt><dd>${esc(formatStat(key, stats, hp, kind))}</dd></div>`
+          )
+          .join("")}
+      </dl>
+    `;
+  }
+
+  function gainList(skill) {
+    const rows = ui.detail
+      ? [...GAIN_CORE, ...GAIN_EXTRA.filter(([key]) => skill.gain[key])]
+      : GAIN_CORE;
+    return `
+      <ul class="gains">
+        ${rows
+          .map(([key, label, asPct]) => {
+            const value = skill.gain[key] || 0;
+            return `<li><span>${label}</span><b>${esc(gainText(key, value, asPct))}</b></li>`;
+          })
+          .join("")}
+      </ul>
     `;
   }
 
@@ -119,27 +170,28 @@
     const skill = W.SKILL_BY_ID[id];
     if (!skill) return "";
     const level = state.skills[id] || 0;
-    const open = ui.expanded === id;
     const lines = skill.describe(Math.max(1, level || 1));
     return `
-      <article class="offer-card ${open ? "is-open" : ""}">
-        <button type="button" class="offer-main" data-action="expand-offer" data-skill="${id}">
-          <div class="offer-top">
+      <article class="offer-card ${ui.detail ? "is-detail" : ""}">
+        <div class="offer-body">
+          <header class="offer-top">
             <strong>${esc(skill.name)}</strong>
-            <span>${level ? `Lv.${level}→${level + 1}` : "新規"} · ${skill.cooldown}行</span>
-          </div>
+            <span class="offer-meta">${level ? `Lv.${level}→${level + 1}` : "新規"}</span>
+          </header>
           <p class="offer-blurb">${esc(skill.blurb)}</p>
-          <p class="offer-gain">${esc(coreGainLine(skill))}</p>
-        </button>
-        ${
-          open && ui.detail
-            ? `<div class="offer-detail">
-                ${lines.map((line) => `<p>${esc(line)}</p>`).join("")}
-                <p class="trade">${esc(skill.tradeoff)}</p>
-              </div>`
-            : ""
-        }
-        <button type="button" class="btn btn-primary btn-sm" data-action="pick" data-skill="${id}">獲得</button>
+          <p class="offer-cd">再使用まで ${skill.cooldown}行動</p>
+          <p class="gain-label">1段階ごとの上昇</p>
+          ${gainList(skill)}
+          ${
+            ui.detail
+              ? `<div class="offer-detail">
+                  ${lines.map((line) => `<p>${esc(line)}</p>`).join("")}
+                  <p class="trade">${esc(skill.tradeoff)}</p>
+                </div>`
+              : ""
+          }
+        </div>
+        <button type="button" class="btn btn-primary" data-action="pick" data-skill="${id}">獲得</button>
       </article>
     `;
   }
@@ -149,7 +201,7 @@
     W.ensureOffer();
     const offer = state.offer || [];
     return shell(`
-      <p class="hint">技を1つ選ぶ（${W.SKILLS.length}種から${offer.length}）</p>
+      <p class="hint">技を1つ選ぶ（${W.SKILLS.length}種から${offer.length}） · いま${ui.detail ? "詳細" : "標準"}表示</p>
       <div class="offer-grid">
         ${offer.map((id) => offerCard(id, state)).join("")}
       </div>
@@ -163,9 +215,30 @@
       .filter(Boolean)
       .map((skill) => {
         const used = state.flow.some((node) => node.skillId === skill.id && skill.id !== currentId);
-        return `<option value="${skill.id}" ${skill.id === currentId ? "selected" : ""} ${used ? "disabled" : ""}>${esc(skill.name)} ${state.skills[skill.id]}${used ? "*" : ""}</option>`;
+        return `<option value="${skill.id}" ${skill.id === currentId ? "selected" : ""} ${used ? "disabled" : ""}>${esc(skill.name)} Lv.${state.skills[skill.id]}${used ? "（使用中）" : ""}</option>`;
       })
       .join("");
+  }
+
+  function valueField(meta, index, value) {
+    const unit = meta.unit || "";
+    return `
+      <div class="value-field">
+        <label class="sr" for="val-${index}">数値</label>
+        <input
+          id="val-${index}"
+          type="number"
+          inputmode="numeric"
+          data-bind="node-value"
+          data-index="${index}"
+          min="${meta.min}"
+          max="${meta.max}"
+          step="${meta.step}"
+          value="${value}"
+        />
+        <span class="value-unit">${esc(unit)}</span>
+      </div>
+    `;
   }
 
   function renderPrep() {
@@ -189,15 +262,11 @@
                   `<option value="${cond.type}" ${cond.type === meta.type ? "selected" : ""}>${esc(cond.label)}</option>`
               ).join("")}
             </select>
-            ${
-              meta.value
-                ? `<input type="range" data-bind="node-value" data-index="${index}" min="${meta.min}" max="${meta.max}" step="${meta.step}" value="${value}" />`
-                : ""
-            }
+            ${meta.value ? valueField(meta, index, value) : `<span class="value-spacer"></span>`}
             <div class="flow-mini">
-              <button type="button" class="btn btn-ghost btn-xs" data-action="move-node" data-index="${index}" data-dir="-1" ${index === 0 ? "disabled" : ""}>↑</button>
-              <button type="button" class="btn btn-ghost btn-xs" data-action="move-node" data-index="${index}" data-dir="1" ${index === state.flow.length - 1 ? "disabled" : ""}>↓</button>
-              <button type="button" class="btn btn-ghost btn-xs" data-action="remove-node" data-index="${index}">×</button>
+              <button type="button" class="btn btn-ghost btn-icon" data-action="move-node" data-index="${index}" data-dir="-1" ${index === 0 ? "disabled" : ""} aria-label="上へ">↑</button>
+              <button type="button" class="btn btn-ghost btn-icon" data-action="move-node" data-index="${index}" data-dir="1" ${index === state.flow.length - 1 ? "disabled" : ""} aria-label="下へ">↓</button>
+              <button type="button" class="btn btn-ghost btn-icon" data-action="remove-node" data-index="${index}" aria-label="外す">×</button>
             </div>
           </li>
         `;
@@ -211,10 +280,10 @@
     return shell(
       `
       <div class="prep-grid">
-        <section class="pane">
+        <section class="pane pane-stats">
           <h2>能力</h2>
-          ${compactStats(stats)}
-          <p class="tiny">習得 ${Object.keys(state.skills).length}種</p>
+          ${playerStatsList(stats)}
+          <p class="tiny">習得 ${Object.keys(state.skills).length}種 · ${ui.detail ? "詳細" : "標準"}</p>
         </section>
         <section class="pane pane-flow">
           <h2>手順 <span class="tiny">上から判定・外れは通常攻撃</span></h2>
@@ -226,7 +295,7 @@
             state.flow.length < W.MAX_FLOW && addable
               ? `<div class="add-row">
                   <select data-new-skill>${addable}</select>
-                  <button type="button" class="btn btn-ghost btn-sm" data-action="add-node">追加</button>
+                  <button type="button" class="btn btn-ghost" data-action="add-node">追加</button>
                 </div>`
               : ""
           }
@@ -281,13 +350,13 @@
       } else {
         foot = `<footer class="foot result lose">
           <span>敗北</span>
-          <button type="button" class="btn btn-primary btn-sm" data-action="rebuild">手順を組み直す</button>
-          <button type="button" class="btn btn-danger btn-sm" data-action="give-up">諦める</button>
+          <button type="button" class="btn btn-primary" data-action="rebuild">手順を組み直す</button>
+          <button type="button" class="btn btn-danger" data-action="give-up">諦める</button>
         </footer>`;
       }
     } else {
       foot = `<footer class="foot">
-        <button type="button" class="btn btn-ghost btn-sm" data-action="speed">${ui.speed}x</button>
+        <button type="button" class="btn btn-ghost" data-action="speed">${ui.speed}x</button>
         <button type="button" class="btn btn-primary" data-action="skip">結果へ</button>
       </footer>`;
     }
@@ -299,7 +368,7 @@
           <div>
             <div class="bar-label"><span>あなた</span><span data-hp-label="player">${Math.max(0, Math.round(playerHp))}/${stats.maxHp}</span></div>
             <div class="hp"><span data-bar="player" style="width:${pRate}%"></span></div>
-            ${ui.detail ? compactStats(stats, playerHp) : ""}
+            ${ui.detail ? playerStatsList(stats, playerHp) : ""}
           </div>
           <div>
             <div class="bar-label"><span>敵</span><span data-hp-label="enemy">${Math.max(0, Math.round(enemyHp))}/${enemy.maxHp}</span></div>
@@ -340,6 +409,7 @@
               <li>同じ技を重ねても伸びは一定。完全上位互換はない。</li>
               <li>手順は上から判定。外れは通常攻撃。</li>
               <li>敵の詳細は出ない。階層ごとの相手は固定。</li>
+              <li>標準／詳細で表示量を切り替えられる。</li>
               <li>敗北時は手順の組み直しか諦め。</li>
             </ul>
             <button type="button" class="btn btn-primary" data-action="close-modal">閉じる</button>
@@ -370,7 +440,6 @@
   }
 
   function render() {
-    const state = W.getState();
     let body = "";
     if (ui.screen === "title") body = renderTitle();
     else if (ui.screen === "offer") body = renderOffer();
@@ -387,7 +456,6 @@
     W.newRun();
     ui.hasSave = true;
     ui.screen = "offer";
-    ui.expanded = null;
     ui.modal = null;
     ui.help = false;
     ui.battle = null;
@@ -528,15 +596,8 @@
       if (ui.battle && ui.battle.phase === "playing") play();
       return;
     }
-    if (action === "expand-offer") {
-      const id = button.dataset.skill;
-      ui.expanded = ui.expanded === id ? null : id;
-      render();
-      return;
-    }
     if (action === "pick") {
       if (W.pickSkill(button.dataset.skill)) {
-        ui.expanded = null;
         ui.screen = "prep";
         render();
       }
@@ -625,8 +686,11 @@
       return;
     }
     if (el.dataset.bind === "node-value") {
-      W.updateNode(Number(el.dataset.index), { value: Number(el.value) });
-      render();
+      const index = Number(el.dataset.index);
+      W.updateNode(index, { value: Number(el.value) });
+      const node = W.getState().flow[index];
+      if (node && node.cond && node.cond.value != null) el.value = String(node.cond.value);
+      return;
     }
   }
 
