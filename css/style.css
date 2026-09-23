@@ -359,38 +359,39 @@ h1, h2, .brand { font-family: var(--serif); }
   display: grid;
   place-items: center;
   padding: 16px;
-  background: rgba(8, 6, 5, 0.72);
+  background: rgba(8, 6, 5, 0.88);
 }
-.card-zoom {
+.skill-card.card-zoom {
   width: min(420px, 100%);
   max-height: min(82dvh, 720px);
   overflow: auto;
   cursor: pointer;
   transform: none !important;
-  opacity: 1;
+  opacity: 1 !important;
   isolation: isolate;
-  background: var(--panel);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+  background-color: #1e1914 !important;
+  background-image: none !important;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.65);
   border-color: rgba(212, 175, 106, 0.95);
 }
 /* 通常カードの半透明グラデを打ち消し、拡大時は不透明な色面にする */
-.card-zoom.group-attack {
-  background: linear-gradient(90deg, #3a241f, var(--panel) 40%);
+.skill-card.card-zoom.group-attack {
+  background-image: linear-gradient(90deg, #3a241f, #1e1914 42%) !important;
 }
-.card-zoom.group-break {
-  background: linear-gradient(90deg, #2c2436, var(--panel) 40%);
+.skill-card.card-zoom.group-break {
+  background-image: linear-gradient(90deg, #2c2436, #1e1914 42%) !important;
 }
-.card-zoom.group-guard {
-  background: linear-gradient(90deg, #1f2a33, var(--panel) 40%);
+.skill-card.card-zoom.group-guard {
+  background-image: linear-gradient(90deg, #1f2a33, #1e1914 42%) !important;
 }
-.card-zoom.group-heal {
-  background: linear-gradient(90deg, #1f2e22, var(--panel) 40%);
+.skill-card.card-zoom.group-heal {
+  background-image: linear-gradient(90deg, #1f2e22, #1e1914 42%) !important;
 }
-.card-zoom.group-buff {
-  background: linear-gradient(90deg, #33291c, var(--panel) 40%);
+.skill-card.card-zoom.group-buff {
+  background-image: linear-gradient(90deg, #33291c, #1e1914 42%) !important;
 }
-.card-zoom.group-other {
-  background: var(--panel);
+.skill-card.card-zoom.group-other {
+  background-image: none !important;
 }
 .card-zoom .skill-blurb,
 .card-zoom .skill-detail,
