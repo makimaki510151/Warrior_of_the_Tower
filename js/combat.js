@@ -275,8 +275,9 @@
     function log(text, kind) {
       let line = text;
       if (amped && kind === "attack") {
-        line = text.includes("〕") ? text.replace("〕", "〕集中が乗り、") : `集中が乗り、${text}`;
-        amped = false;
+        const label = `${amped}が乗り、`;
+        line = text.includes("〕") ? text.replace("〕", `〕${label}`) : `${label}${text}`;
+        amped = null;
       }
       pushEvent(line, kind);
       if (trailer) {
@@ -285,7 +286,7 @@
       }
     }
 
-    let amped = false;
+    let amped = null;
     let trailer = null;
     const ctx = {
       player,
@@ -325,8 +326,13 @@
       },
       addEffect(unit, effect) {
         const next = { ...effect, fresh: unit === ctx.actor };
-        if (next.scale === "atk" && next.value > 0) next.value *= unit.atkEff;
-        if (next.scale === "def" && next.value > 0) next.value *= unit.defEff;
+        if (next.value > 0) {
+          // 攻撃力バフ（割合・技威力上乗せ）には必ず攻撃力補助効率を乗せる
+          if (next.kind === "atkPct" || next.kind === "skillAmp") next.value *= unit.atkEff;
+          else if (next.scale === "atk") next.value *= unit.atkEff;
+          if (next.kind === "defPct") next.value *= unit.defEff;
+          else if (next.scale === "def") next.value *= unit.defEff;
+        }
         unit.effects = unit.effects.filter((item) => item.id !== next.id);
         unit.effects.push(next);
       },
@@ -354,7 +360,10 @@
       if (dealt > 0) defender.tookHit = true;
       if (amp) {
         attacker.effects = attacker.effects.filter((effect) => effect !== amp);
-        if (attacker === player) amped = true;
+        if (attacker === player) {
+          const skill = W.SKILL_BY_ID[amp.id];
+          amped = (skill && skill.name) || "構え";
+        }
       }
       if (reflect && reflect.once) {
         defender.effects = defender.effects.filter((effect) => effect !== reflect);
@@ -385,10 +394,15 @@
           log(`${unit.name}の再生で${healed.got}回復した。${ctx.overNote(healed.over)}`, "heal");
         }
       }
+      let regenHaste = 0;
+      unit.effects.forEach((effect) => {
+        if (effect.kind === "regenHaste") regenHaste += effect.value;
+      });
+      const regenEvery = Math.max(1, unit.regenInterval - regenHaste);
       const blocked = unit.effects.some((effect) => effect.kind === "noRegen");
       if (!blocked && (unit.regenAmount > 0 || extraRegen > 0)) {
         unit.regenCounter += 1;
-        if (unit.regenCounter >= unit.regenInterval) {
+        if (unit.regenCounter >= regenEvery) {
           unit.regenCounter = 0;
           const healed = ctx.heal(unit, unit.regenAmount + extraRegen);
           if (healed.got > 0 || healed.over > 0) {

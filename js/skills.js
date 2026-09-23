@@ -126,10 +126,12 @@
     const next = scaled(base, step, level + 1);
     let cur = `+${pctNowLabel(now)}`;
     if (stats) {
-      const flat = Math.floor(Math.max(1, stats.atk) * (1 + (stats.dmgBonus || 0)) * now);
+      const flat = Math.floor(
+        Math.max(1, stats.atk) * (1 + (stats.dmgBonus || 0)) * now * (stats.atkEff || 1)
+      );
       cur = `+${pctNowLabel(now)}(+${flat})`;
     }
-    return `次に出す攻撃技の威力を${cur}上乗せする。${growthTail(
+    return `次に出す攻撃技の威力を${cur}上乗せする（攻撃力補助効率も乗る）。${growthTail(
       `+${pctNowLabel(next)}`,
       pctStepLabel(step)
     )}`;
@@ -1312,6 +1314,292 @@
         ctx.log(`${ctx.p}拍子。技の待ちが少し早く進む。`, "buff");
       },
     },
+    {
+      id: "latebloom",
+      name: "晩成",
+      group: "攻撃",
+      blurb: "初期は弱いが、重ねるほど威力が伸びる大器晩成の一撃。",
+      tradeoff: "1枚目は通常攻撃以下。重複とステータス伸びが前提。",
+      cooldown: 2,
+      gain: gain({ maxHp: 10, atk: 6, def: 2, atkEff: 0.02 }),
+      describe(level, stats) {
+        return [
+          multText(0.52, 0.12, level, stats),
+          "初期値は低い。レベルが上がるほど威力が大きく伸びる。",
+        ];
+      },
+      use(ctx, level) {
+        const r = ctx.damage(scaled(0.52, 0.12, level));
+        ctx.log(`${ctx.p}晩成。${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}`, "attack");
+      },
+    },
+    {
+      id: "apexblow",
+      name: "極撃",
+      group: "攻撃",
+      blurb: "初期は控えめな大技。重複で頂点が跳ね上がる。",
+      tradeoff: "間隔が長い。低レベルでは強打に負ける。",
+      cooldown: 4,
+      gain: gain({ maxHp: 8, atk: 7, atkEff: 0.04, dmgBonus: 0.01 }),
+      describe(level, stats) {
+        return [
+          multText(0.85, 0.16, level, stats),
+          "再使用は遅い。重ねて育てるほど単発の頂点が伸びる。",
+        ];
+      },
+      use(ctx, level) {
+        const r = ctx.damage(scaled(0.85, 0.16, level));
+        ctx.log(`${ctx.p}極撃。${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}`, "attack");
+      },
+    },
+    {
+      id: "stackmight",
+      name: "積威",
+      group: "補助",
+      blurb: "弱い攻撃バフから始まり、重ねるほど厚くなる。",
+      tradeoff: "1枚目の上昇は薄い。攻撃力補助効率と重複が本題。",
+      cooldown: 3,
+      gain: gain({ maxHp: 5, atk: 5, atkEff: 0.07, speed: 1 }),
+      describe(level, stats) {
+        return [
+          `次の3行動、${atkBuffText(0.08, 0.04, level, stats)}`,
+          "初期の上昇は小さい。レベルと補助効率で育つ。",
+        ];
+      },
+      use(ctx, level) {
+        ctx.addEffect(ctx.player, {
+          id: "stackmight",
+          kind: "atkPct",
+          value: scaled(0.08, 0.04, level),
+          turns: 3,
+          scale: "atk",
+        });
+        ctx.log(`${ctx.p}積威。攻撃力がわずかに、しかし着実に上がった。`, "buff");
+      },
+    },
+    {
+      id: "temper",
+      name: "錬鋭",
+      group: "補助",
+      blurb: "次の攻撃技への上乗せは最初は薄い。重複で鋭くなる。",
+      tradeoff: "集中より初手は弱い。育つと上乗せが大きい。",
+      cooldown: 2,
+      gain: gain({ maxHp: 4, atk: 4, atkEff: 0.09, def: 1 }),
+      describe(level, stats) {
+        return [
+          ampText(0.12, 0.07, level, stats),
+          "通常攻撃では消費しない。攻撃技を出すと一度で消える。",
+        ];
+      },
+      use(ctx, level) {
+        ctx.addEffect(ctx.player, {
+          id: "temper",
+          kind: "skillAmp",
+          value: scaled(0.12, 0.07, level),
+          turns: null,
+        });
+        ctx.log(`${ctx.p}錬鋭。次の攻撃技へ、薄い刃を重ねた。`, "buff");
+      },
+    },
+    {
+      id: "thickshield",
+      name: "厚盾",
+      group: "守り",
+      blurb: "初期の防御上昇は薄いが、重ねると鉄壁になる。",
+      tradeoff: "攻撃しない。低レベルでは鉄身に劣る。",
+      cooldown: 3,
+      gain: gain({ maxHp: 14, def: 7, defEff: 0.05, atk: -1 }),
+      describe(level, stats) {
+        return [
+          `次の3行動、${defBuffText(0.12, 0.05, level, stats)}`,
+          "この行動では攻撃しない。重複で守りと体力が大きく伸びる。",
+        ];
+      },
+      use(ctx, level) {
+        ctx.addEffect(ctx.player, {
+          id: "thickshield",
+          kind: "defPct",
+          value: scaled(0.12, 0.05, level),
+          turns: 3,
+          scale: "def",
+        });
+        ctx.log(`${ctx.p}厚盾。盾が少し厚くなった。`, "buff");
+      },
+    },
+    {
+      id: "spring",
+      name: "泉湧",
+      group: "回復",
+      blurb: "しばらく自動回復量を底上げする。即時回復はない。",
+      tradeoff: "戦闘が短いと間に合わない。攻撃は下がる。",
+      cooldown: 5,
+      gain: gain({ maxHp: 7, regenAmount: 3, atk: -2, healEff: 0.01 }),
+      describe(level, stats) {
+        const extra = scaled(4, 1.5, level);
+        const next = scaled(4, 1.5, level + 1);
+        return [
+          `次の4行動、自動回復量+${extra.toFixed(1)}。${growthTail(`+${next.toFixed(1)}`, "1.5")}`,
+          "即時回復はない。自動回復量そのものも習得で伸びる。",
+        ];
+      },
+      use(ctx, level) {
+        ctx.addEffect(ctx.player, {
+          id: "spring",
+          kind: "regenFlat",
+          value: scaled(4, 1.5, level),
+          turns: 4,
+        });
+        ctx.log(`${ctx.p}泉湧。自動回復が厚くなり始めた。`, "heal");
+      },
+    },
+    {
+      id: "quickpulse",
+      name: "速脈",
+      group: "補助",
+      blurb: "自動回復の間隔を一時的に短くする。",
+      tradeoff: "回復量そのものは増やさない。量がないと効果は薄い。",
+      cooldown: 4,
+      gain: gain({ maxHp: 5, regenInterval: -1, regenAmount: 1, speed: 2, atk: -1 }),
+      describe(level, stats) {
+        const cut = Math.min(2, Math.floor(scaled(1, 0.25, level)));
+        const nextCut = Math.min(2, Math.floor(scaled(1, 0.25, level + 1)));
+        const every = stats ? Math.max(1, (stats.regenInterval || 4) - cut) : null;
+        return [
+          `次の4行動、自動回復までの必要行動が${cut}回分短くなる${
+            every != null ? `（今なら${every}行動ごと）` : ""
+          }。`,
+          `次の強化で短縮${nextCut}回（段階+0.25、表示は切り捨て、上限2回）。`,
+          "短縮は下限1行動まで。自動回復量が0だと意味が薄い。",
+        ];
+      },
+      use(ctx, level) {
+        const cut = Math.min(2, Math.floor(scaled(1, 0.25, level)));
+        ctx.addEffect(ctx.player, {
+          id: "quickpulse",
+          kind: "regenHaste",
+          value: cut,
+          turns: 4,
+        });
+        ctx.log(`${ctx.p}速脈。傷の塞がりが早くなる。`, "buff");
+      },
+    },
+    {
+      id: "lifeblood",
+      name: "生命刃",
+      group: "攻撃",
+      blurb: "自動回復量が高いほど通る一撃。",
+      tradeoff: "回復を捨てた構成では弱い。",
+      cooldown: 2,
+      gain: gain({ maxHp: 6, regenAmount: 2, atk: 2, healEff: 0.01 }),
+      describe(level, stats) {
+        const base = scaled(0.62, 0.03, level);
+        const per = scaled(0.035, 0.008, level);
+        const regen = stats ? Math.max(0, stats.regenAmount || 0) : 0;
+        const now = base + regen * per;
+        const nextBase = scaled(0.62, 0.03, level + 1);
+        const nextPer = scaled(0.035, 0.008, level + 1);
+        return [
+          `基礎は${atkMult(base, stats)}。自動回復量1ごとに威力+${per.toFixed(3)}。`,
+          stats
+            ? `今の自動回復量${regen}なら${atkMult(now, stats)}。`
+            : "自動回復量に応じて威力が上乗せされる。",
+          growthTail(
+            `基礎×${nextBase.toFixed(2)}／+${nextPer.toFixed(3)}毎`,
+            `0.03／0.008`
+          ),
+        ];
+      },
+      use(ctx, level) {
+        const base = scaled(0.62, 0.03, level);
+        const per = scaled(0.035, 0.008, level);
+        const mult = base + Math.max(0, ctx.player.regenAmount || 0) * per;
+        const r = ctx.damage(mult);
+        ctx.log(`${ctx.p}生命刃。${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}`, "attack");
+      },
+    },
+    {
+      id: "revitalize",
+      name: "回春",
+      group: "回復",
+      blurb: "自動回復量を基礎に、すぐ戻してから脈を残す。",
+      tradeoff: "自動回復量が低いとほぼ効かない。攻撃は下がる。",
+      cooldown: 5,
+      gain: gain({ maxHp: 6, regenAmount: 3, atk: -3, healEff: 0.02, regenInterval: -1 }),
+      describe(level, stats) {
+        const mult = scaled(1.1, 0.2, level);
+        const next = scaled(1.1, 0.2, level + 1);
+        const flat = scaled(2, 0.8, level);
+        const nextFlat = scaled(2, 0.8, level + 1);
+        const regen = stats ? Math.max(0, stats.regenAmount || 0) : 0;
+        const expect = stats ? Math.floor(regen * mult * (stats.healEff || 1)) : null;
+        return [
+          `自動回復量×${mult.toFixed(2)}を基礎にすぐ回復する${
+            expect != null ? `（今なら約${expect}）` : ""
+          }。${growthTail(`×${next.toFixed(2)}`, "0.20")}`,
+          `その後3行動、自動回復量+${flat.toFixed(1)}。${growthTail(
+            `+${nextFlat.toFixed(1)}`,
+            "0.8"
+          )}`,
+        ];
+      },
+      use(ctx, level) {
+        const mult = scaled(1.1, 0.2, level);
+        const healed = ctx.heal(ctx.player, Math.max(0, ctx.player.regenAmount) * mult);
+        ctx.addEffect(ctx.player, {
+          id: "revitalize",
+          kind: "regenFlat",
+          value: scaled(2, 0.8, level),
+          turns: 3,
+        });
+        ctx.log(
+          `${ctx.p}回春。体力が${healed.got}回復した。${ctx.overNote(healed.over)}自動回復が続く。`,
+          "heal"
+        );
+      },
+    },
+    {
+      id: "cycle",
+      name: "循環",
+      group: "補助",
+      blurb: "自動回復量に応じて、短い攻撃上昇を得る。",
+      tradeoff: "回復量が少ないとバフが薄い。ダメージはない。",
+      cooldown: 3,
+      gain: gain({ maxHp: 5, regenAmount: 2, atkEff: 0.04, atk: 1, speed: 1 }),
+      describe(level, stats) {
+        const per = scaled(0.012, 0.004, level);
+        const nextPer = scaled(0.012, 0.004, level + 1);
+        const regen = stats ? Math.max(0, stats.regenAmount || 0) : 0;
+        const rate = Math.min(0.55, regen * per);
+        const flat =
+          stats && rate > 0
+            ? Math.floor(Math.max(1, stats.atk) * rate * (stats.atkEff || 1))
+            : null;
+        return [
+          `次の2行動、自動回復量×${per.toFixed(3)}分の攻撃力上昇（上限55%、攻撃力補助効率も乗る）${
+            flat != null ? `。今なら+${pctNowLabel(rate)}(+${flat})` : ""
+          }。`,
+          growthTail(`係数${nextPer.toFixed(3)}`, "0.004"),
+          "この行動では攻撃しない。",
+        ];
+      },
+      use(ctx, level) {
+        const per = scaled(0.012, 0.004, level);
+        const rate = Math.min(0.55, Math.max(0, ctx.player.regenAmount || 0) * per);
+        if (rate > 0) {
+          ctx.addEffect(ctx.player, {
+            id: "cycle",
+            kind: "atkPct",
+            value: rate,
+            turns: 2,
+            scale: "atk",
+          });
+        }
+        ctx.log(
+          `${ctx.p}循環。${rate > 0 ? "回復の勢いが刃へ回った。" : "回す勢いが足りなかった。"}`,
+          "buff"
+        );
+      },
+    },
   ];
 
   const GROUPS = ["攻撃", "崩し", "守り", "回復", "補助"];
@@ -1329,8 +1617,11 @@
       const level = levels[id] || 0;
       const skill = BY_ID[id];
       if (!skill || level <= 0) return;
+      // 2枚目以降は基礎gainに15%分を上乗せし、重複でステータスが少し伸びる
+      const stacks = Math.max(0, level - 1);
       STAT_KEYS.forEach((key) => {
-        stats[key] += (skill.gain[key] || 0) * level;
+        const g = skill.gain[key] || 0;
+        stats[key] += g * level + g * stacks * 0.15;
       });
     });
     stats.maxHp = Math.max(40, Math.floor(stats.maxHp));
