@@ -432,7 +432,6 @@
     }
 
     function playerAct() {
-      player.actionCount += 1;
       const waiting = [];
       for (let i = 0; i < flowchart.length; i += 1) {
         const node = flowchart[i];
@@ -463,7 +462,6 @@
     }
 
     function enemyAct() {
-      enemy.actionCount += 1;
       if (enemy.boss && enemy.actionCount % 4 === 0) {
         enemyAttack(1.5, "大振り");
         return;
@@ -537,7 +535,7 @@
           turns: 3,
           negative: true,
         });
-        log(`${enemy.name}の呪い。攻撃と回復の働きが落ちた。`, "dot");
+        log(`${enemy.name}の呪い。攻撃力と回復の効きが落ちた。`, "dot");
         return;
       }
       if (enemy.pattern === "regen") {
@@ -569,6 +567,9 @@
 
     function takeTurn(unit) {
       ctx.actor = unit;
+      unit.actionCount += 1;
+      currentAction = unit.actionCount;
+      currentSide = unit === player ? "player" : "enemy";
       if (!startTurn(unit)) return false;
       if (unit === player) {
         ctx.sawHit = player.tookHit;
@@ -595,15 +596,11 @@
         lastSide = "player";
         nextP += 1000 / player.speed;
         actions += 1;
-        currentAction = actions;
-        currentSide = "player";
         if (!takeTurn(player)) break;
       } else {
         lastSide = "enemy";
         nextE += 1000 / enemy.speed;
         actions += 1;
-        currentAction = actions;
-        currentSide = "enemy";
         if (!takeTurn(enemy)) break;
       }
     }
@@ -643,6 +640,8 @@
       reason,
       events,
       actions,
+      playerActions: player.actionCount,
+      enemyActions: enemy.actionCount,
       playerHp: player.hp,
       playerMax: player.maxHp,
       enemyHp: enemy.hp,

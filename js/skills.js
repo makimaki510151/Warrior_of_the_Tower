@@ -67,7 +67,7 @@
   function cooldownReuseText(skips) {
     const n = Math.max(0, Math.floor(Number(skips) || 0));
     if (n === 0) return "使った直後から、また使える。";
-    return `使ったあと、自分の行動を${n}回空けるとまた使える（敵の行動は数えない）。`;
+    return `使ったあと、自分の行動を${n}回空けるとまた使える。`;
   }
 
   function cooldownShort(skips) {
@@ -300,7 +300,7 @@
         const down = scaled(0.16, 0.01, level);
         return [
           multText(0.78, 0.03, level, stats),
-          `敵の防御の働きを${Math.floor(down * 100)}%下げる（敵の3行動）。`,
+          `敵の防御力を${Math.floor(down * 100)}%下げる（敵の3行動）。`,
           "この低下に、自分の補助効率は乗らない。",
         ];
       },
@@ -314,7 +314,7 @@
           turns: 3,
           negative: true,
         });
-        ctx.log(`${ctx.p}崩甲。${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}防御の働きを下げた。`, "attack");
+        ctx.log(`${ctx.p}崩甲。${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}防御力を下げた。`, "attack");
       },
     },
     {
@@ -408,7 +408,7 @@
       describe(level, stats) {
         const rate = scaled(0.42, 0.02, level);
         return [
-          `次の3行動、防御の働き+${Math.floor(rate * 100)}%。防御力補助効率がさらにかかる。`,
+          `次の3行動、一時的な防御力+${Math.floor(rate * 100)}%（防御力補助効率も乗る）。`,
           "この行動では攻撃しない。",
         ];
       },
@@ -421,7 +421,7 @@
           turns: 3,
           scale: "def",
         });
-        ctx.log(`${ctx.p}鉄身。防御の働きが上がった。`, "buff");
+        ctx.log(`${ctx.p}鉄身。防御力が上がった。`, "buff");
       },
     },
     {
@@ -492,8 +492,8 @@
       describe(level, stats) {
         const rate = scaled(0.5, 0.02, level);
         return [
-          "現在体力の13%を払い、次の3行動、防御の働きを大きく上げる。",
-          `上昇の基礎は+${Math.floor(rate * 100)}%。防御力補助効率がさらにかかる。`,
+          "現在体力の13%を払い、次の3行動、防御力を大きく上げる。",
+          `上昇の基礎は+${Math.floor(rate * 100)}%（防御力補助効率も乗る）。`,
           "体力が32%以下のときは手順にあっても飛ばされる。",
         ];
       },
@@ -507,7 +507,7 @@
           turns: 3,
           scale: "def",
         });
-        ctx.log(`${ctx.p}血誓。${cost}を払った。${ctx.overNote(hurt.over)}防御の働きが上がった。`, "buff");
+        ctx.log(`${ctx.p}血誓。${cost}を払った。${ctx.overNote(hurt.over)}防御力が上がった。`, "buff");
       },
     },
     {
@@ -613,14 +613,14 @@
       id: "rally",
       name: "鼓舞",
       group: "補助",
-      blurb: "しばらく攻撃の働きが上がる。一撃の伸びは集中より小さい。",
+      blurb: "しばらく攻撃力が上がる。一撃の伸びは集中より小さい。",
       tradeoff: "通常攻撃にも乗るが、捨て身のような単発は集中に劣る。",
       cooldown: 3,
       gain: gain({ maxHp: 4, atk: 1, def: 2, atkEff: 0.03, speed: 2 }),
       describe(level, stats) {
         const rate = scaled(0.22, 0.015, level);
         return [
-          `次の3行動、攻撃の働き+${Math.floor(rate * 100)}%。攻撃力補助効率がさらにかかる。`,
+          `次の3行動、一時的な攻撃力+${Math.floor(rate * 100)}%（攻撃力補助効率も乗る）。`,
           "通常攻撃にも、技にも乗る。",
         ];
       },
@@ -632,7 +632,7 @@
           turns: 3,
           scale: "atk",
         });
-        ctx.log(`${ctx.p}鼓舞。攻撃の働きが上がった。`, "buff");
+        ctx.log(`${ctx.p}鼓舞。攻撃力が上がった。`, "buff");
       },
     },
     {
@@ -847,7 +847,7 @@
       gain: gain({ maxHp: 2, atk: 1, def: 2, atkEff: 0.02 }),
       describe(level, stats) {
         const down = scaled(0.24, 0.012, level);
-        return [multText(0.4, 0.02, level, stats), `敵の防御の働きを${Math.floor(down * 100)}%下げる（敵の3行動）。`];
+        return [multText(0.4, 0.02, level, stats), `敵の防御力を${Math.floor(down * 100)}%下げる（敵の3行動）。`];
       },
       use(ctx, level) {
         const r = ctx.damage(scaled(0.4, 0.02, level));
@@ -890,13 +890,13 @@
       id: "sap",
       name: "削気",
       group: "崩し",
-      blurb: "敵の攻撃の働きを下げる。",
+      blurb: "敵の攻撃力を下げる。",
       tradeoff: "ダメージは弱い。刺客向き。",
       cooldown: 3,
       gain: gain({ maxHp: 4, def: 3, defEff: 0.02 }),
       describe(level, stats) {
         const down = scaled(0.18, 0.01, level);
-        return [multText(0.55, 0.025, level, stats), `敵の攻撃の働きを${Math.floor(down * 100)}%下げる（敵の3行動）。`];
+        return [multText(0.55, 0.025, level, stats), `敵の攻撃力を${Math.floor(down * 100)}%下げる（敵の3行動）。`];
       },
       use(ctx, level) {
         const r = ctx.damage(scaled(0.55, 0.025, level));
@@ -907,7 +907,7 @@
           turns: 3,
           negative: true,
         });
-        ctx.log(`${ctx.p}削気。${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}攻撃の働きを下げた。`, "attack");
+        ctx.log(`${ctx.p}削気。${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}攻撃力を下げた。`, "attack");
       },
     },
     {
@@ -990,7 +990,7 @@
       gain: gain({ maxHp: 6, def: 5, defEff: 0.02 }),
       describe(level, stats) {
         const rate = scaled(0.55, 0.025, level);
-        return [`次の2行動、防御の働き+${Math.floor(rate * 100)}%。`];
+        return [`次の2行動、一時的な防御力+${Math.floor(rate * 100)}%。`];
       },
       use(ctx, level) {
         ctx.addEffect(ctx.player, {
@@ -1000,7 +1000,7 @@
           turns: 2,
           scale: "def",
         });
-        ctx.log(`${ctx.p}防壁。短いあいだ、防御の働きが大きく上がった。`, "buff");
+        ctx.log(`${ctx.p}防壁。短いあいだ、防御力が大きく上がった。`, "buff");
       },
     },
     {
@@ -1197,7 +1197,7 @@
       gain: gain({ maxHp: 2, atk: 2, atkEff: 0.02 }),
       describe(level, stats) {
         const rate = scaled(0.3, 0.02, level);
-        return [`次の2行動、攻撃の働き+${Math.floor(rate * 100)}%。`];
+        return [`次の2行動、一時的な攻撃力+${Math.floor(rate * 100)}%。`];
       },
       use(ctx, level) {
         ctx.addEffect(ctx.player, {
@@ -1207,7 +1207,7 @@
           turns: 2,
           scale: "atk",
         });
-        ctx.log(`${ctx.p}戦吼。攻撃の働きが短く上がった。`, "buff");
+        ctx.log(`${ctx.p}戦吼。攻撃力が短く上がった。`, "buff");
       },
     },
     {
@@ -1220,7 +1220,7 @@
       gain: gain({ maxHp: 2, atk: 2, speed: 2, atkEff: 0.02 }),
       describe(level, stats) {
         const rate = scaled(0.18, 0.012, level);
-        return [`次の3行動、攻撃の働き+${Math.floor(rate * 100)}%。通常攻撃にも乗る。`];
+        return [`次の3行動、一時的な攻撃力+${Math.floor(rate * 100)}%。通常攻撃にも乗る。`];
       },
       use(ctx, level) {
         ctx.addEffect(ctx.player, {

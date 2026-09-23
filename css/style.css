@@ -128,6 +128,23 @@ h1, h2, .brand { font-family: var(--serif); }
   border-radius: var(--radius);
   background: var(--panel);
 }
+.skill-card.is-interactive {
+  cursor: pointer;
+  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+  transform-origin: center center;
+}
+.skill-card.is-interactive:hover,
+.skill-card.is-interactive:focus-visible {
+  transform: scale(1.035);
+  border-color: rgba(212, 175, 106, 0.95);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.35);
+  z-index: 2;
+}
+@media (prefers-reduced-motion: reduce) {
+  .skill-card.is-interactive { transition: none; }
+  .skill-card.is-interactive:hover,
+  .skill-card.is-interactive:focus-visible { transform: none; }
+}
 .offer-card {
   min-height: 0;
   max-height: 100%;
@@ -188,6 +205,38 @@ h1, h2, .brand { font-family: var(--serif); }
 .skill-detail p { margin: 0 0 2px; }
 .skill-detail .trade { color: #d9a39c; }
 
+.card-zoom-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(8, 6, 5, 0.72);
+}
+.card-zoom {
+  width: min(420px, 100%);
+  max-height: min(82dvh, 720px);
+  overflow: auto;
+  cursor: pointer;
+  transform: none !important;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  border-color: rgba(212, 175, 106, 0.95);
+}
+.card-zoom .skill-blurb,
+.card-zoom .skill-detail,
+.card-zoom .skill-detail-lite {
+  display: block;
+  -webkit-line-clamp: unset;
+  overflow: visible;
+}
+.card-zoom-hint {
+  margin: 8px 0 0;
+  font-size: 0.82em;
+  color: var(--muted);
+  text-align: center;
+}
+
 .owned-grid {
   display: flex;
   flex-direction: column;
@@ -223,11 +272,12 @@ h1, h2, .brand { font-family: var(--serif); }
   gap: 4px;
   margin: 0;
 }
-.stat-list div {
-  display: flex;
-  justify-content: space-between;
+.stat-list div,
+.stat-list .stat-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
   align-items: baseline;
-  gap: 8px;
+  gap: 4px 8px;
   padding: 4px 0;
   border-bottom: 1px solid rgba(255, 244, 220, 0.06);
 }
@@ -241,6 +291,38 @@ h1, h2, .brand { font-family: var(--serif); }
   font-family: var(--serif);
   font-size: 1.05em;
   white-space: nowrap;
+}
+.stat-label {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  padding: 0;
+  cursor: help;
+  text-decoration: underline dotted rgba(212, 175, 106, 0.7);
+  text-underline-offset: 2px;
+}
+.stat-label:hover,
+.stat-row.is-pinned .stat-label {
+  color: var(--gold);
+}
+.stat-tip {
+  grid-column: 1 / -1;
+  display: none;
+  margin: 0;
+  padding: 4px 6px;
+  border-radius: var(--radius);
+  background: rgba(40, 30, 22, 0.95);
+  border: 1px solid rgba(109, 87, 56, 0.7);
+  color: var(--text);
+  font-size: 0.82em;
+  line-height: 1.35;
+}
+.stat-row:hover .stat-tip,
+.stat-row.is-pinned .stat-tip,
+.stat-row:focus-within .stat-tip {
+  display: block;
 }
 
 .flow-list {

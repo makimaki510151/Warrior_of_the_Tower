@@ -10,6 +10,8 @@
     help: false,
     battle: null,
     hasSave: false,
+    expandedCard: null,
+    pinnedStat: null,
   };
 
   let app = null;
@@ -36,6 +38,21 @@
     ["dmgBonus", "与ダメージ補正", "signedPct"],
     ["dmgReduction", "被ダメージ軽減", "signedPct"],
   ];
+
+  const STAT_HELP = {
+    currentHp: "いま残っている体力。0になると敗北する。",
+    maxHp: "体力の上限。技や成長で増える。",
+    atk: "与えるダメージの土台。高いほど敵を削りやすい。",
+    def: "受けるダメージを抑える土台。高いほど削られにくい。",
+    regenInterval: "自動回復が起きるまでの、自分の行動回数。短いほど回復が早い。",
+    regenAmount: "自動回復で一度に戻る量の目安。",
+    healEff: "回復技や自動回復の効き具合。高いほど回復が多い。",
+    atkEff: "一時的に攻撃力を上げる効果の乗りやすさ。",
+    defEff: "一時的に防御力を上げる効果の乗りやすさ。",
+    speed: "行動の速さ。高いほど自分の行動の順番が回りやすい。",
+    dmgBonus: "与えるダメージ全体への補正。",
+    dmgReduction: "受けるダメージ全体を減らす補正。",
+  };
 
   const GAIN_CORE = [
     ["maxHp", "体力", false],
@@ -156,15 +173,28 @@
     `;
   }
 
-  function playerStatsList(stats, hp) {
+  function playerStatsList(stats, hp, opts) {
     const rows = ui.detail ? STAT_ROWS_DETAIL : STAT_ROWS_CORE;
+    const withTips = !!(opts && opts.tips);
     return `
-      <dl class="stat-list">
+      <dl class="stat-list ${withTips ? "has-tips" : ""}">
         ${rows
-          .map(
-            ([key, label, kind]) =>
-              `<div><dt>${label}</dt><dd>${esc(formatStat(key, stats, hp, kind))}</dd></div>`
-          )
+          .map(([key, label, kind]) => {
+            const help = STAT_HELP[key] || "";
+            if (!withTips) {
+              return `<div><dt>${label}</dt><dd>${esc(formatStat(key, stats, hp, kind))}</dd></div>`;
+            }
+            const pinned = ui.pinnedStat === key ? " is-pinned" : "";
+            return `<div class="stat-row${pinned}" data-stat-key="${esc(key)}">
+              <dt>
+                <button type="button" class="stat-label" data-action="stat-tip" data-stat="${esc(key)}" aria-expanded="${
+                  ui.pinnedStat === key ? "true" : "false"
+                }">${esc(label)}</button>
+              </dt>
+              <dd>${esc(formatStat(key, stats, hp, kind))}</dd>
+              <p class="stat-tip">${esc(help)}</p>
+            </div>`;
+          })
           .join("")}
       </dl>
     `;
@@ -194,33 +224,71 @@
     return [...filtered, W.cooldownReuseText(skill.cooldown)];
   }
 
+  function skillCardInner(skill, state, kind) {
+    const sourceKind = kind === "zoom" && ui.expandedCard ? ui.expandedCard.kind : kind;
+    const level = state.skills[skill.id] || 0;
+    const stats = W.computeStats(state.skills);
+    const lines = describeLines(skill, Math.max(1, level || 1), stats);
+    const showFull = ui.detail || kind === "zoom";
+    const meta =
+      sourceKind === "offer"
+        ? `${level ? `Lv.${level}→${level + 1}` : "新規"} · ${W.cooldownShort(skill.cooldown)}`
+        : `Lv.${level} · ${W.cooldownShort(skill.cooldown)}`;
+    let bodyExtra = "";
+    if (sourceKind === "offer") {
+      bodyExtra += gainList(skill);
+    } else if (showFull) {
+      bodyExtra += gainList(skill);
+    }
+    if (showFull) {
+      bodyExtra += `<div class="skill-detail">
+        ${lines.map((line) => `<p>${esc(line)}</p>`).join("")}
+        <p class="trade">${esc(skill.tradeoff)}</p>
+      </div>`;
+    } else {
+      bodyExtra += `<div class="skill-detail skill-detail-lite">
+        ${
+          sourceKind === "owned"
+            ? lines
+                .slice(0, -1)
+                .slice(0, 1)
+                .map((line) => `<p>${esc(line)}</p>`)
+                .join("")
+            : ""
+        }
+        <p class="skill-cd">${esc(W.cooldownReuseText(skill.cooldown))}</p>
+      </div>`;
+    }
+    return `
+      <div class="skill-body">
+        <header class="skill-top">
+          <strong>${esc(skill.name)}</strong>
+          <span class="skill-meta">${esc(meta)}</span>
+        </header>
+        <p class="skill-blurb">${esc(skill.blurb)}</p>
+        ${bodyExtra}
+      </div>
+      ${
+        sourceKind === "offer"
+          ? `<button type="button" class="btn btn-primary" data-action="pick" data-skill="${esc(skill.id)}">獲得</button>`
+          : ""
+      }
+    `;
+  }
+
   function offerCard(id, state) {
     const skill = W.SKILL_BY_ID[id];
     if (!skill) return "";
-    const level = state.skills[id] || 0;
-    const stats = W.computeStats(state.skills);
-    const lines = describeLines(skill, level || 1, stats);
     return `
-      <article class="skill-card offer-card ${ui.detail ? "is-detail" : ""}">
-        <div class="skill-body">
-          <header class="skill-top">
-            <strong>${esc(skill.name)}</strong>
-            <span class="skill-meta">${level ? `Lv.${level}→${level + 1}` : "新規"} · ${esc(W.cooldownShort(skill.cooldown))}</span>
-          </header>
-          <p class="skill-blurb">${esc(skill.blurb)}</p>
-          ${gainList(skill)}
-          ${
-            ui.detail
-              ? `<div class="skill-detail">
-                  ${lines.map((line) => `<p>${esc(line)}</p>`).join("")}
-                  <p class="trade">${esc(skill.tradeoff)}</p>
-                </div>`
-              : `<div class="skill-detail skill-detail-lite">
-                  <p class="skill-cd">${esc(W.cooldownReuseText(skill.cooldown))}</p>
-                </div>`
-          }
-        </div>
-        <button type="button" class="btn btn-primary" data-action="pick" data-skill="${id}">獲得</button>
+      <article
+        class="skill-card offer-card is-interactive ${ui.detail ? "is-detail" : ""}"
+        data-card-kind="offer"
+        data-card-id="${esc(id)}"
+        role="button"
+        tabindex="0"
+        aria-label="${esc(skill.name)}の詳細を開く"
+      >
+        ${skillCardInner(skill, state, "offer")}
       </article>
     `;
   }
@@ -228,35 +296,32 @@
   function ownedSkillCard(id, state) {
     const skill = W.SKILL_BY_ID[id];
     if (!skill) return "";
-    const level = state.skills[id] || 0;
-    const stats = W.computeStats(state.skills);
-    const lines = describeLines(skill, level, stats);
     return `
-      <article class="skill-card owned-card ${ui.detail ? "is-detail" : ""}">
-        <header class="skill-top">
-          <strong>${esc(skill.name)}</strong>
-          <span class="skill-meta">Lv.${level} · ${esc(W.cooldownShort(skill.cooldown))}</span>
-        </header>
-        <p class="skill-blurb">${esc(skill.blurb)}</p>
-        ${
-          ui.detail
-            ? `
-              ${gainList(skill)}
-              <div class="skill-detail">
-                ${lines.map((line) => `<p>${esc(line)}</p>`).join("")}
-                <p class="trade">${esc(skill.tradeoff)}</p>
-              </div>
-            `
-            : `<div class="skill-detail skill-detail-lite">
-                ${lines
-                  .slice(0, -1)
-                  .slice(0, 1)
-                  .map((line) => `<p>${esc(line)}</p>`)
-                  .join("")}
-                <p class="skill-cd">${esc(W.cooldownReuseText(skill.cooldown))}</p>
-              </div>`
-        }
+      <article
+        class="skill-card owned-card is-interactive ${ui.detail ? "is-detail" : ""}"
+        data-card-kind="owned"
+        data-card-id="${esc(id)}"
+        role="button"
+        tabindex="0"
+        aria-label="${esc(skill.name)}の詳細を開く"
+      >
+        ${skillCardInner(skill, state, "owned")}
       </article>
+    `;
+  }
+
+  function cardZoomOverlay() {
+    if (!ui.expandedCard) return "";
+    const state = W.getState();
+    const skill = W.SKILL_BY_ID[ui.expandedCard.id];
+    if (!skill) return "";
+    return `
+      <div class="card-zoom-backdrop" data-action="close-card-zoom">
+        <article class="skill-card card-zoom" data-card-zoom data-card-id="${esc(skill.id)}" role="dialog" aria-modal="true">
+          ${skillCardInner(skill, state, "zoom")}
+          <p class="card-zoom-hint">もう一度クリック、または外側クリックで閉じる</p>
+        </article>
+      </div>
     `;
   }
 
@@ -345,8 +410,8 @@
       <div class="prep-grid">
         <section class="pane pane-stats">
           <h2>能力</h2>
-          ${playerStatsList(stats)}
-          <p class="tiny">習得 ${ownedIds.length}種 · ${ui.detail ? "詳細" : "標準"}</p>
+          ${playerStatsList(stats, null, { tips: true })}
+          <p class="tiny">習得 ${ownedIds.length}種 · ${ui.detail ? "詳細" : "標準"} · 能力名で説明</p>
         </section>
         <section class="pane pane-skills">
           <h2>習得技</h2>
@@ -412,11 +477,21 @@
     if (event.side === "player") classes.push("side-player");
     if (event.side === "enemy") classes.push("side-enemy");
     let mark = "";
-    if (event.actionNo > 0) {
+    if (event.actionNo > 0 && event.side) {
       const who = logSideLabel(event.side);
-      mark = `<span class="log-act">第${event.actionNo}行動${who ? `・${who}` : ""}</span>`;
+      mark = `<span class="log-act">${esc(who)}第${event.actionNo}行動</span>`;
     }
     return `<p class="${esc(classes.join(" "))}">${mark}${esc(event.text)}</p>`;
+  }
+
+  function formatActLabel(battle, latest) {
+    const p = battle.playerActions || 0;
+    const e = battle.enemyActions || 0;
+    if (latest && latest.actionNo > 0 && latest.side) {
+      const who = logSideLabel(latest.side);
+      return `${who}第${latest.actionNo}行動（あなた${p} / 敵${e}）`;
+    }
+    return `あなた${p}行動 / 敵${e}行動`;
   }
 
   function appendLogLine(log, event) {
@@ -454,14 +529,7 @@
     const enemyHp = latest ? latest.enemyHp : enemy.maxHp;
     const pRate = Math.max(0, Math.min(100, (playerHp / stats.maxHp) * 100));
     const eRate = Math.max(0, Math.min(100, (enemyHp / enemy.maxHp) * 100));
-    const currentAct = latest && latest.actionNo > 0 ? latest.actionNo : 0;
-    const totalActs = battle.actions || 0;
-    const actLabel =
-      battle.phase === "done"
-        ? `全${totalActs}行動`
-        : currentAct > 0
-          ? `第${currentAct}行動 / 全${totalActs}行動`
-          : `全${totalActs}行動`;
+    const actLabel = formatActLabel(battle, latest);
 
     let foot = "";
     if (battle.phase === "done") {
@@ -534,8 +602,10 @@
               <li>約${W.SKILLS.length}種の技から毎回5つ提示。1つだけ獲得／強化。</li>
               <li>同じ技を重ねても伸びは一定。完全上位互換はない。</li>
               <li>手順は上から判定。外れは通常攻撃。</li>
-              <li>再使用は「自分の行動を何回空けるか」。敵の行動は数えない。</li>
+              <li>再使用は「自分の行動を何回空けるか」。</li>
+              <li>戦闘ログの行動番号は、あなたと敵で別々に数える。</li>
               <li>使用条件は体力・序盤／終盤・直前の行動・強化弱体などから選ぶ。</li>
+              <li>技カードはクリックで拡大表示。能力名に触れると説明が出る。</li>
               <li>敵の詳細は出ない。階層ごとの相手は固定。</li>
               <li>標準／詳細で表示量を切り替えられる。</li>
               <li>敗北時は手順の組み直しか諦め。</li>
@@ -575,7 +645,7 @@
     else if (ui.screen === "prep") body = renderPrep();
     else if (ui.screen === "battle") body = renderBattle();
     else if (ui.screen === "clear") body = renderClear();
-    app.innerHTML = `${body}${modal()}`;
+    app.innerHTML = `${body}${modal()}${cardZoomOverlay()}`;
     syncTitle();
     const log = document.querySelector("[data-log]");
     if (log) {
@@ -637,16 +707,16 @@
       }
     }
     const actLabel = document.querySelector("[data-act-label]");
-    if (actLabel) {
-      const currentAct = event.actionNo > 0 ? event.actionNo : 0;
-      const totalActs = battle.actions || 0;
-      actLabel.textContent =
-        currentAct > 0 ? `第${currentAct}行動 / 全${totalActs}行動` : `全${totalActs}行動`;
-    }
+    if (actLabel) actLabel.textContent = formatActLabel(battle, event);
     paintBars(event);
+    if (W.sfx) W.sfx.forEvent(event.kind);
     battle.index += 1;
     if (battle.index >= battle.events.length) {
       battle.phase = "done";
+      if (W.sfx) {
+        if (battle.winner === "player") W.sfx.win();
+        else W.sfx.lose();
+      }
       render();
       return;
     }
@@ -686,6 +756,7 @@
     };
     ui.screen = "battle";
     render();
+    if (W.sfx) W.sfx.start();
     play();
   }
 
@@ -696,133 +767,206 @@
     render();
   }
 
-  function onClick(event) {
-    const button = event.target.closest("[data-action]");
-    if (!button || button.disabled) return;
-    const action = button.dataset.action;
+  function closeCardZoom(playSound) {
+    if (!ui.expandedCard) return;
+    ui.expandedCard = null;
+    if (playSound && W.sfx) W.sfx.collapse();
+    render();
+  }
 
-    if (action === "start") {
-      beginRun();
+  function toggleCardZoom(kind, id) {
+    if (ui.expandedCard && ui.expandedCard.kind === kind && ui.expandedCard.id === id) {
+      closeCardZoom(true);
       return;
     }
-    if (action === "continue") {
-      enterRunScreen();
+    ui.expandedCard = { kind, id };
+    if (W.sfx) W.sfx.expand();
+    render();
+  }
+
+  function onClick(event) {
+    if (W.sfx) W.sfx.unlock();
+
+    const zoomCard = event.target.closest("[data-card-zoom]");
+    if (ui.expandedCard && event.target.closest("[data-action='close-card-zoom']") && !zoomCard) {
+      closeCardZoom(true);
       return;
     }
-    if (action === "restart") {
-      ui.modal = "restart";
-      ui.help = false;
-      render();
+    if (ui.expandedCard && zoomCard && !event.target.closest("[data-action]")) {
+      closeCardZoom(true);
       return;
     }
-    if (action === "confirm-restart") {
-      beginRun();
-      return;
-    }
-    if (action === "help") {
-      ui.help = true;
-      ui.modal = null;
-      render();
-      return;
-    }
-    if (action === "close-modal") {
-      ui.help = false;
-      ui.modal = null;
-      render();
-      return;
-    }
-    if (action === "toggle-detail") {
-      ui.detail = !ui.detail;
-      render();
-      if (ui.battle && ui.battle.phase === "playing") play();
-      return;
-    }
-    if (action === "zoom-in") {
-      ui.zoom = Math.min(1.45, Math.round((ui.zoom + 0.1) * 100) / 100);
-      applyZoom();
-      render();
-      return;
-    }
-    if (action === "zoom-out") {
-      ui.zoom = Math.max(1, Math.round((ui.zoom - 0.1) * 100) / 100);
-      applyZoom();
-      render();
-      return;
-    }
-    if (action === "pick") {
-      if (W.pickSkill(button.dataset.skill)) {
+
+    const button = event.target.closest("[data-action]");
+    if (button && !button.disabled) {
+      const action = button.dataset.action;
+
+      if (action === "close-card-zoom") {
+        closeCardZoom(true);
+        return;
+      }
+      if (action === "stat-tip") {
+        const key = button.dataset.stat;
+        ui.pinnedStat = ui.pinnedStat === key ? null : key;
+        if (W.sfx) W.sfx.tip();
+        render();
+        return;
+      }
+      if (action === "start") {
+        if (W.sfx) W.sfx.ui();
+        beginRun();
+        return;
+      }
+      if (action === "continue") {
+        if (W.sfx) W.sfx.ui();
+        enterRunScreen();
+        return;
+      }
+      if (action === "restart") {
+        if (W.sfx) W.sfx.ui();
+        ui.modal = "restart";
+        ui.help = false;
+        render();
+        return;
+      }
+      if (action === "confirm-restart") {
+        if (W.sfx) W.sfx.ui();
+        beginRun();
+        return;
+      }
+      if (action === "help") {
+        if (W.sfx) W.sfx.ui();
+        ui.help = true;
+        ui.modal = null;
+        render();
+        return;
+      }
+      if (action === "close-modal") {
+        if (W.sfx) W.sfx.ui();
+        ui.help = false;
+        ui.modal = null;
+        render();
+        return;
+      }
+      if (action === "toggle-detail") {
+        if (W.sfx) W.sfx.ui();
+        ui.detail = !ui.detail;
+        render();
+        if (ui.battle && ui.battle.phase === "playing") play();
+        return;
+      }
+      if (action === "zoom-in") {
+        if (W.sfx) W.sfx.ui();
+        ui.zoom = Math.min(1.45, Math.round((ui.zoom + 0.1) * 100) / 100);
+        applyZoom();
+        render();
+        return;
+      }
+      if (action === "zoom-out") {
+        if (W.sfx) W.sfx.ui();
+        ui.zoom = Math.max(1, Math.round((ui.zoom - 0.1) * 100) / 100);
+        applyZoom();
+        render();
+        return;
+      }
+      if (action === "pick") {
+        if (W.pickSkill(button.dataset.skill)) {
+          ui.expandedCard = null;
+          if (W.sfx) W.sfx.pick();
+          ui.screen = "prep";
+          render();
+        }
+        return;
+      }
+      if (action === "add-node") {
+        if (W.sfx) W.sfx.ui();
+        const select = document.querySelector("[data-new-skill]");
+        if (select) W.addNode(select.value);
+        render();
+        return;
+      }
+      if (action === "remove-node") {
+        if (W.sfx) W.sfx.ui();
+        W.removeNode(Number(button.dataset.index));
+        render();
+        return;
+      }
+      if (action === "move-node") {
+        if (W.sfx) W.sfx.ui();
+        W.moveNode(Number(button.dataset.index), Number(button.dataset.dir));
+        render();
+        return;
+      }
+      if (action === "fight") {
+        startBattle();
+        return;
+      }
+      if (action === "speed") {
+        if (W.sfx) W.sfx.ui();
+        ui.speed = ui.speed === 4 ? 1 : ui.speed * 2;
+        button.textContent = `${ui.speed}x`;
+        return;
+      }
+      if (action === "skip") {
+        if (!ui.battle) return;
+        if (W.sfx) W.sfx.ui();
+        stopPlayback();
+        ui.battle.index = ui.battle.events.length;
+        ui.battle.phase = "done";
+        if (W.sfx) {
+          if (ui.battle.winner === "player") W.sfx.win();
+          else W.sfx.lose();
+        }
+        render();
+        return;
+      }
+      if (action === "next-floor") {
+        if (W.sfx) W.sfx.ui();
+        ui.battle = null;
+        ui.screen = "offer";
+        W.ensureOffer();
+        render();
+        return;
+      }
+      if (action === "to-clear") {
+        if (W.sfx) W.sfx.ui();
+        ui.battle = null;
+        ui.screen = "clear";
+        render();
+        return;
+      }
+      if (action === "rebuild") {
+        if (W.sfx) W.sfx.ui();
+        ui.battle = null;
         ui.screen = "prep";
         render();
+        return;
+      }
+      if (action === "give-up") {
+        if (W.sfx) W.sfx.ui();
+        ui.modal = "giveup";
+        render();
+        return;
+      }
+      if (action === "confirm-give-up") {
+        if (W.sfx) W.sfx.ui();
+        W.giveUp();
+        ui.modal = null;
+        ui.battle = null;
+        ui.screen = "offer";
+        render();
+        return;
+      }
+      if (action === "climb-again") {
+        if (W.sfx) W.sfx.ui();
+        beginRun();
       }
       return;
     }
-    if (action === "add-node") {
-      const select = document.querySelector("[data-new-skill]");
-      if (select) W.addNode(select.value);
-      render();
-      return;
-    }
-    if (action === "remove-node") {
-      W.removeNode(Number(button.dataset.index));
-      render();
-      return;
-    }
-    if (action === "move-node") {
-      W.moveNode(Number(button.dataset.index), Number(button.dataset.dir));
-      render();
-      return;
-    }
-    if (action === "fight") {
-      startBattle();
-      return;
-    }
-    if (action === "speed") {
-      ui.speed = ui.speed === 4 ? 1 : ui.speed * 2;
-      button.textContent = `${ui.speed}x`;
-      return;
-    }
-    if (action === "skip") {
-      if (!ui.battle) return;
-      stopPlayback();
-      ui.battle.index = ui.battle.events.length;
-      ui.battle.phase = "done";
-      render();
-      return;
-    }
-    if (action === "next-floor") {
-      ui.battle = null;
-      ui.screen = "offer";
-      W.ensureOffer();
-      render();
-      return;
-    }
-    if (action === "to-clear") {
-      ui.battle = null;
-      ui.screen = "clear";
-      render();
-      return;
-    }
-    if (action === "rebuild") {
-      ui.battle = null;
-      ui.screen = "prep";
-      render();
-      return;
-    }
-    if (action === "give-up") {
-      ui.modal = "giveup";
-      render();
-      return;
-    }
-    if (action === "confirm-give-up") {
-      W.giveUp();
-      ui.modal = null;
-      ui.battle = null;
-      ui.screen = "offer";
-      render();
-      return;
-    }
-    if (action === "climb-again") {
-      beginRun();
+
+    const card = event.target.closest("[data-card-id].is-interactive");
+    if (card && !event.target.closest("[data-action]")) {
+      toggleCardZoom(card.dataset.cardKind, card.dataset.cardId);
     }
   }
 
@@ -849,9 +993,14 @@
 
   function onKey(event) {
     if (event.key !== "Escape") return;
+    if (ui.expandedCard) {
+      closeCardZoom(true);
+      return;
+    }
     if (!ui.modal && !ui.help) return;
     ui.modal = null;
     ui.help = false;
+    if (W.sfx) W.sfx.ui();
     render();
   }
 
@@ -859,8 +1008,14 @@
     if (event.target.classList && event.target.classList.contains("modal")) {
       ui.modal = null;
       ui.help = false;
+      if (W.sfx) W.sfx.ui();
       render();
     }
+  }
+
+  function onPointerOver(event) {
+    const card = event.target.closest(".skill-card.is-interactive");
+    if (card && W.sfx) W.sfx.hover();
   }
 
   W.ui = {
@@ -875,6 +1030,7 @@
       app.addEventListener("click", onClick);
       app.addEventListener("click", onBackdrop);
       app.addEventListener("change", onChange);
+      app.addEventListener("pointerover", onPointerOver);
       document.addEventListener("keydown", onKey);
     },
     render,
