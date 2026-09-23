@@ -2,6 +2,7 @@
   const W = root.Wot || (root.Wot = {});
   const KEY = "wot-save-v2";
   const MAX_FLOW = 10;
+  const MAX_CONDS = 3;
 
   function blank(best) {
     return {
@@ -29,22 +30,33 @@
     }
   }
 
+  function sanitizeCond(raw) {
+    const meta = W.CONDITION_BY_TYPE[raw && raw.type] || W.CONDITION_BY_TYPE.always;
+    const cond = { type: meta.type };
+    if (meta.value) {
+      let value = Number(raw && raw.value);
+      if (!Number.isFinite(value)) value = meta.def;
+      const steps = Math.round((value - meta.min) / meta.step);
+      value = meta.min + steps * meta.step;
+      cond.value = Math.min(meta.max, Math.max(meta.min, value));
+    }
+    return cond;
+  }
+
   function sanitizeFlow(skills, rawFlow) {
     const seen = {};
     const flow = [];
     (Array.isArray(rawFlow) ? rawFlow : []).forEach((node) => {
       if (!node || seen[node.skillId] || !skills[node.skillId]) return;
-      const meta = W.CONDITION_BY_TYPE[node.cond && node.cond.type] || W.CONDITION_BY_TYPE.always;
-      const cond = { type: meta.type };
-      if (meta.value) {
-        let value = Number(node.cond && node.cond.value);
-        if (!Number.isFinite(value)) value = meta.def;
-        const steps = Math.round((value - meta.min) / meta.step);
-        value = meta.min + steps * meta.step;
-        cond.value = Math.min(meta.max, Math.max(meta.min, value));
+      let rawConds = Array.isArray(node.conds) ? node.conds : null;
+      if (!rawConds || !rawConds.length) {
+        rawConds = [node.cond || { type: "always" }];
       }
+      const conds = rawConds.map(sanitizeCond).slice(0, MAX_CONDS);
+      if (!conds.length) conds.push({ type: "always" });
+      const join = node.join === "or" ? "or" : "and";
       seen[node.skillId] = true;
-      flow.push({ skillId: node.skillId, cond });
+      flow.push({ skillId: node.skillId, join, conds, cond: conds[0] });
     });
     return flow.slice(0, MAX_FLOW);
   }
@@ -162,7 +174,12 @@
       state.flow.length < MAX_FLOW &&
       !state.flow.some((node) => node.skillId === id)
     ) {
-      state.flow.push({ skillId: id, cond: { type: "always" } });
+      state.flow.push({
+        skillId: id,
+        join: "and",
+        conds: [{ type: "always" }],
+        cond: { type: "always" },
+      });
     }
     save();
     return true;
@@ -178,34 +195,70 @@
     if (state.flow.some((node) => node.skillId === skillId)) return false;
     const at = Math.max(0, Math.min(state.flow.length, Number(index)));
     if (!Number.isFinite(at)) return false;
-    state.flow.splice(at, 0, { skillId, cond: { type: "always" } });
+    state.flow.splice(at, 0, {
+      skillId,
+      join: "and",
+      conds: [{ type: "always" }],
+      cond: { type: "always" },
+    });
     save();
     return true;
+  }
+
+  function syncNodeCondMirror(node) {
+    if (!node.conds || !node.conds.length) {
+      node.conds = [{ type: "always" }];
+    }
+    if (node.join !== "or") node.join = "and";
+    node.cond = node.conds[0];
   }
 
   function updateNode(index, patch) {
     const node = state.flow[index];
     if (!node) return false;
+    if (!Array.isArray(node.conds) || !node.conds.length) {
+      node.conds = [node.cond || { type: "always" }];
+    }
     if (patch.skillId) {
       if (!(state.skills[patch.skillId] > 0)) return false;
       if (state.flow.some((item, i) => i !== index && item.skillId === patch.skillId)) return false;
       node.skillId = patch.skillId;
     }
+    if (patch.join === "and" || patch.join === "or") {
+      node.join = patch.join;
+    }
+    if (patch.addCond) {
+      if (node.conds.length >= MAX_CONDS) return false;
+      node.conds.push({ type: "always" });
+    }
+    if (patch.removeCondIndex != null) {
+      const ri = Number(patch.removeCondIndex);
+      if (!Number.isFinite(ri) || ri < 0 || ri >= node.conds.length) return false;
+      if (node.conds.length <= 1) return false;
+      node.conds.splice(ri, 1);
+    }
+    const condIndex =
+      patch.condIndex != null && Number.isFinite(Number(patch.condIndex))
+        ? Math.max(0, Math.min(node.conds.length - 1, Number(patch.condIndex)))
+        : 0;
     if (patch.condType) {
       const meta = W.CONDITION_BY_TYPE[patch.condType] || W.CONDITION_BY_TYPE.always;
-      node.cond = { type: meta.type };
-      if (meta.value) node.cond.value = meta.def;
+      const next = { type: meta.type };
+      if (meta.value) next.value = meta.def;
+      node.conds[condIndex] = next;
     }
-    if (patch.value != null && node.cond) {
-      const meta = W.CONDITION_BY_TYPE[node.cond.type];
+    if (patch.value != null) {
+      const target = node.conds[condIndex];
+      const meta = W.CONDITION_BY_TYPE[target && target.type];
       if (meta && meta.value) {
         let value = Number(patch.value);
         if (!Number.isFinite(value)) value = meta.def;
         const steps = Math.round((value - meta.min) / meta.step);
         value = meta.min + steps * meta.step;
-        node.cond.value = Math.min(meta.max, Math.max(meta.min, value));
+        target.value = Math.min(meta.max, Math.max(meta.min, value));
       }
     }
+    syncNodeCondMirror(node);
     save();
     return true;
   }
@@ -244,6 +297,7 @@
   }
 
   W.MAX_FLOW = MAX_FLOW;
+  W.MAX_CONDS = MAX_CONDS;
   W.getState = function getState() {
     return state;
   };

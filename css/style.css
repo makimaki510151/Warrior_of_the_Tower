@@ -589,11 +589,12 @@ h1, h2, .brand { font-family: var(--serif); }
   grid-template-columns: 20px minmax(0, 1fr) auto;
   grid-template-rows: auto auto;
   gap: 6px;
-  align-items: center;
+  align-items: start;
 }
 .flow-item .idx {
   grid-column: 1;
   grid-row: 1;
+  margin-top: 6px;
 }
 .flow-item select[data-bind="node-skill"] {
   grid-column: 2;
@@ -603,16 +604,34 @@ h1, h2, .brand { font-family: var(--serif); }
   grid-column: 3;
   grid-row: 1;
 }
-.flow-item select[data-bind="node-cond"] {
-  grid-column: 2;
+.flow-item .flow-conds {
+  grid-column: 1 / -1;
   grid-row: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cond-join select {
+  width: 100%;
+  font-size: 12px;
+}
+.cond-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 6px;
+  align-items: center;
+}
+.cond-row select[data-bind="node-cond"] {
   min-width: 0;
 }
-.flow-item .value-field,
-.flow-item .value-spacer {
-  grid-column: 3;
-  grid-row: 2;
+.cond-row .value-field,
+.cond-row .value-spacer {
   justify-self: stretch;
+}
+.btn-cond-add {
+  align-self: flex-start;
+  font-size: 12px;
+  padding: 4px 8px;
 }
 .idx {
   width: 20px;
@@ -1077,17 +1096,16 @@ select {
 
   .flow-item {
     grid-template-columns: 22px minmax(0, 1fr);
-    grid-template-rows: auto auto auto auto;
+    grid-template-rows: auto auto auto;
     gap: 6px;
     padding: 8px 0;
     border-bottom: 1px solid rgba(255, 244, 220, 0.06);
   }
   .flow-item .idx { grid-column: 1; grid-row: 1; }
   .flow-item select[data-bind="node-skill"] { grid-column: 2; grid-row: 1; }
-  .flow-item select[data-bind="node-cond"] { grid-column: 1 / -1; grid-row: 2; }
   .flow-item .flow-mini {
     grid-column: 1 / -1;
-    grid-row: 3;
+    grid-row: 2;
     justify-content: stretch;
     gap: 8px;
   }
@@ -1096,12 +1114,29 @@ select {
     min-width: 0;
     min-height: 44px;
   }
-  .flow-item .value-field,
-  .flow-item .value-spacer {
+  .flow-item .flow-conds {
     grid-column: 1 / -1;
-    grid-row: 4;
+    grid-row: 3;
   }
-  .flow-item .value-spacer { display: none; }
+  .cond-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: auto auto;
+  }
+  .cond-row select[data-bind="node-cond"] {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+  .cond-row .value-field,
+  .cond-row .value-spacer {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .cond-row .btn-icon {
+    grid-column: 2;
+    grid-row: 2;
+    min-height: 40px;
+  }
+  .cond-row .value-spacer { display: none; }
   .value-field input[type="number"] {
     flex: 1;
     width: auto;

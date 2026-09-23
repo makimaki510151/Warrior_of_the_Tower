@@ -490,17 +490,19 @@
       .join("");
   }
 
-  function valueField(meta, index, value) {
+  function valueField(meta, index, condIndex, value) {
     const unit = meta.unit || "";
+    const id = `val-${index}-${condIndex}`;
     return `
       <div class="value-field">
-        <label class="sr" for="val-${index}">数値</label>
+        <label class="sr" for="${id}">数値</label>
         <input
-          id="val-${index}"
+          id="${id}"
           type="number"
           inputmode="numeric"
           data-bind="node-value"
           data-index="${index}"
+          data-cond-index="${condIndex}"
           min="${meta.min}"
           max="${meta.max}"
           step="${meta.step}"
@@ -511,6 +513,49 @@
     `;
   }
 
+  function renderFlowConds(node, index) {
+    const conds = W.nodeConds ? W.nodeConds(node) : node.conds || [node.cond || { type: "always" }];
+    const join = node.join === "or" ? "or" : "and";
+    const maxConds = W.MAX_CONDS || 3;
+    const joinRow =
+      conds.length > 1
+        ? `<div class="cond-join">
+            <label class="sr" for="join-${index}">条件のつなぎ方</label>
+            <select id="join-${index}" data-bind="node-join" data-index="${index}">
+              <option value="and" ${join === "and" ? "selected" : ""}>すべて満たす（かつ）</option>
+              <option value="or" ${join === "or" ? "selected" : ""}>どれか満たす（または）</option>
+            </select>
+          </div>`
+        : "";
+    const rows = conds
+      .map((cond, condIndex) => {
+        const meta = W.CONDITION_BY_TYPE[cond.type] || W.CONDITION_BY_TYPE.always;
+        const value = cond.value == null ? meta.def : cond.value;
+        return `
+          <div class="cond-row">
+            <select data-bind="node-cond" data-index="${index}" data-cond-index="${condIndex}">
+              ${W.CONDITIONS.map(
+                (item) =>
+                  `<option value="${item.type}" ${item.type === meta.type ? "selected" : ""}>${esc(item.label)}</option>`
+              ).join("")}
+            </select>
+            ${meta.value ? valueField(meta, index, condIndex, value) : `<span class="value-spacer"></span>`}
+            ${
+              conds.length > 1
+                ? `<button type="button" class="btn btn-ghost btn-icon" data-action="remove-cond" data-index="${index}" data-cond-index="${condIndex}" aria-label="条件を外す">×</button>`
+                : ""
+            }
+          </div>
+        `;
+      })
+      .join("");
+    const addBtn =
+      conds.length < maxConds
+        ? `<button type="button" class="btn btn-ghost btn-cond-add" data-action="add-cond" data-index="${index}">条件を足す</button>`
+        : "";
+    return `<div class="flow-conds">${joinRow}${rows}${addBtn}</div>`;
+  }
+
   function renderPrep() {
     const state = W.getState();
     const stats = W.computeStats(state.skills);
@@ -519,8 +564,6 @@
 
     const nodes = state.flow
       .map((node, index) => {
-        const meta = W.CONDITION_BY_TYPE[node.cond.type] || W.CONDITION_BY_TYPE.always;
-        const value = node.cond.value == null ? meta.def : node.cond.value;
         return `
           ${flowDropSlot(index, false)}
           <li class="flow-item">
@@ -531,13 +574,7 @@
               <button type="button" class="btn btn-ghost btn-icon" data-action="move-node" data-index="${index}" data-dir="1" ${index === state.flow.length - 1 ? "disabled" : ""} aria-label="下へ">↓</button>
               <button type="button" class="btn btn-ghost btn-icon" data-action="remove-node" data-index="${index}" aria-label="外す">×</button>
             </div>
-            <select data-bind="node-cond" data-index="${index}">
-              ${W.CONDITIONS.map(
-                (cond) =>
-                  `<option value="${cond.type}" ${cond.type === meta.type ? "selected" : ""}>${esc(cond.label)}</option>`
-              ).join("")}
-            </select>
-            ${meta.value ? valueField(meta, index, value) : `<span class="value-spacer"></span>`}
+            ${renderFlowConds(node, index)}
           </li>
         `;
       })
@@ -833,8 +870,9 @@
               <li>手順は最大${W.MAX_FLOW}個。上から判定し、外れは通常攻撃。習得技をドラッグして手順のすき間へ挿入できる。</li>
               <li>再使用は「自分の行動を何回空けるか」。</li>
               <li>戦闘ログの行動番号は、あなたと敵で別々に数える。</li>
-              <li>使用条件は体力・序盤／終盤・直前の行動・強化弱体などから選ぶ。</li>
+              <li>使用条件は体力・序盤／終盤・直前の行動・強化弱体などから選ぶ。1つの技に最大${W.MAX_CONDS || 3}つまで付けられ、「かつ／または」でつなげる。</li>
               <li>比較の言葉: ${(W.COMPARE_RULES_HELP || []).join(" ")}</li>
+              <li>戦闘の倍速は 1／2／4／8／16 倍。</li>
               <li>技カードはクリックで拡大表示。能力名に触れると説明が出る。</li>
               <li>技の候補画面では「能力を見る」でいまのステータスを確認できる。</li>
               <li>敵は序盤だけ弱く、以降は急に強くなる。30層以降は癖の強いビルドが増え、100層は育成と手順が要る。</li>
@@ -1163,8 +1201,24 @@
       }
       if (action === "speed") {
         if (W.sfx) W.sfx.ui();
-        ui.speed = ui.speed === 4 ? 1 : ui.speed * 2;
+        const speeds = [1, 2, 4, 8, 16];
+        const at = speeds.indexOf(ui.speed);
+        ui.speed = speeds[(at + 1) % speeds.length];
         button.textContent = `${ui.speed}x`;
+        return;
+      }
+      if (action === "add-cond") {
+        if (W.sfx) W.sfx.ui();
+        W.updateNode(Number(button.dataset.index), { addCond: true });
+        render();
+        return;
+      }
+      if (action === "remove-cond") {
+        if (W.sfx) W.sfx.ui();
+        W.updateNode(Number(button.dataset.index), {
+          removeCondIndex: Number(button.dataset.condIndex),
+        });
+        render();
         return;
       }
       if (action === "skip") {
@@ -1313,15 +1367,26 @@
       return;
     }
     if (el.dataset.bind === "node-cond") {
-      W.updateNode(Number(el.dataset.index), { condType: el.value });
+      W.updateNode(Number(el.dataset.index), {
+        condType: el.value,
+        condIndex: Number(el.dataset.condIndex || 0),
+      });
+      render();
+      return;
+    }
+    if (el.dataset.bind === "node-join") {
+      W.updateNode(Number(el.dataset.index), { join: el.value });
       render();
       return;
     }
     if (el.dataset.bind === "node-value") {
       const index = Number(el.dataset.index);
-      W.updateNode(index, { value: Number(el.value) });
+      const condIndex = Number(el.dataset.condIndex || 0);
+      W.updateNode(index, { value: Number(el.value), condIndex });
       const node = W.getState().flow[index];
-      if (node && node.cond && node.cond.value != null) el.value = String(node.cond.value);
+      const conds = node && (node.conds || [node.cond]);
+      const cond = conds && conds[condIndex];
+      if (cond && cond.value != null) el.value = String(cond.value);
       return;
     }
   }
