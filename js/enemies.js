@@ -47,6 +47,7 @@
   /**
    * minFloor: この階層から出現プールに入る。
    * 30層以降はビルドの癖が強く、手順とメタ技が要る。
+   * 50層以降は浅い層の均衡型を混ぜず、専用ローテで戦う。
    */
   const ARCHETYPES = [
     {
@@ -278,130 +279,192 @@
       regenInterval: 5,
       regenPct: 0,
     },
-    // ---- 50層以降 ----
+    // ---- 50層以降（専用ローテ・浅い層を混ぜない） ----
     {
       id: "colossus",
       name: "鉄巨像",
       badge: "巨像",
-      hint: "極端に硬く、たまに潰すような一撃を落とす。",
-      special: "5行動ごとに巨圧の一撃。普段は重い踏みつけ。",
+      hint: "守りを起こしてから、地響き→踏み砕き→巨圧の型で潰す。",
+      special: "4行動周期: 鉄壁→地響き→踏み砕き→巨圧。無駄打ちはない。",
       minFloor: 50,
-      hp: 1.55,
-      atk: 0.95,
-      def: 1.75,
-      speed: 68,
+      hp: 1.7,
+      atk: 1.05,
+      def: 1.95,
+      speed: 64,
       regenInterval: 5,
       regenPct: 0,
-      dmgReduction: 0.08,
+      dmgReduction: 0.12,
+      defEff: 1.15,
     },
     {
       id: "phantom",
       name: "幻影剣",
       badge: "幻影",
-      hint: "素早く、ときどき被ダメージをいなす。",
-      special: "3行動ごとに軽減を張り、軽い斬撃を重ねる。",
+      hint: "残像で加速し、二連と急所で削るガラスの剣士。",
+      special: "3行動周期: 残像構え→二連幻斬→急所幻撃。",
       minFloor: 50,
-      hp: 0.78,
-      atk: 1.25,
-      def: 0.6,
-      speed: 136,
+      hp: 0.72,
+      atk: 1.35,
+      def: 0.55,
+      speed: 142,
       regenInterval: 6,
       regenPct: 0,
+      atkEff: 1.1,
+      dmgBonus: 0.04,
     },
     {
       id: "bloodarmor",
       name: "血装兵",
       badge: "血装",
-      hint: "傷つくほど守りが跳ね上がる。",
-      special: "体力が40%以下になると、大きく防御と軽減を張る。",
+      hint: "血で吸い、怒り、装を纏う。瀕死で鉄壁化する。",
+      special: "体力40%以下で血装発動。通常は吸命→血怒→血装殴打の周期。",
       minFloor: 50,
-      hp: 1.2,
-      atk: 1.05,
-      def: 1.2,
-      speed: 90,
-      regenInterval: 4,
-      regenPct: 0.02,
+      hp: 1.28,
+      atk: 1.12,
+      def: 1.28,
+      speed: 92,
+      regenInterval: 3,
+      regenPct: 0.025,
+      healEff: 1.15,
+      defEff: 1.1,
     },
     {
       id: "drainhex",
       name: "吸呪術師",
       badge: "吸呪",
-      hint: "呪いと同時に削り、回復の隙を突く。",
-      special: "3行動ごとに呪い付きの打撃を入れる。",
+      hint: "印→吸命→腐打→大呪。回復と攻撃バフを腐らせる。",
+      special: "4行動周期で呪いと吸収を交互に掛ける。",
       minFloor: 50,
-      hp: 0.95,
-      atk: 1.08,
-      def: 0.85,
-      speed: 106,
+      hp: 0.98,
+      atk: 1.15,
+      def: 0.88,
+      speed: 110,
       regenInterval: 5,
       regenPct: 0,
+      atkEff: 1.08,
+      dmgBonus: 0.03,
     },
     {
       id: "ironthorn",
       name: "鉄茨",
       badge: "茨",
-      hint: "硬い体に茨を纏い、触れると痛い。",
-      special: "3行動ごとに反射構え。普段は茨の打撃。",
+      hint: "逆立→鞭→刺突。触れた相手に刺を残す。",
+      special: "3行動周期: 茨逆立（反射）→茨鞭→鉄茨刺突。",
       minFloor: 50,
-      hp: 1.18,
-      atk: 0.92,
-      def: 1.45,
-      speed: 84,
+      hp: 1.25,
+      atk: 0.98,
+      def: 1.55,
+      speed: 86,
       regenInterval: 5,
       regenPct: 0,
-      dmgReduction: 0.06,
+      dmgReduction: 0.08,
+      defEff: 1.12,
+    },
+    {
+      id: "chrono",
+      name: "時歪み",
+      badge: "時",
+      hint: "自分を早め、あなたを遅らせ、隙間に連撃を入れる。",
+      special: "3行動周期: 加速歪み→足枷→時裂き二連。",
+      minFloor: 50,
+      hp: 0.9,
+      atk: 1.1,
+      def: 0.8,
+      speed: 118,
+      regenInterval: 5,
+      regenPct: 0,
+      atkEff: 1.05,
+    },
+    {
+      id: "soulrend",
+      name: "魂裂き",
+      badge: "魂裂",
+      hint: "与ダメと補助効率を削ぎ、仕上げの裂撃を落とす。",
+      special: "3行動周期: 魂削り→無力化→裂魂撃。",
+      minFloor: 50,
+      hp: 1.05,
+      atk: 1.18,
+      def: 0.95,
+      speed: 102,
+      regenInterval: 5,
+      regenPct: 0,
+      dmgBonus: 0.05,
     },
     // ---- 70層以降 ----
     {
       id: "eclipse",
       name: "蝕みの守護者",
       badge: "蝕",
-      hint: "再生と呪いを併せ持ち、長期戦を嫌う。",
-      special: "自動回復しつつ、4行動ごとに回復封じの呪いを掛ける。",
+      hint: "霧で封じ、脈で戻り、蝕で削る長期戦殺し。",
+      special: "4行動周期: 蝕の霧→再生脈→蝕撃→深蝕。",
       minFloor: 70,
-      hp: 1.3,
-      atk: 1.05,
-      def: 1.2,
-      speed: 94,
+      hp: 1.4,
+      atk: 1.12,
+      def: 1.3,
+      speed: 96,
       regenInterval: 2,
-      regenPct: 0.045,
-      healEff: 1.2,
+      regenPct: 0.055,
+      healEff: 1.25,
+      defEff: 1.1,
     },
     {
       id: "executioner",
       name: "処刑人",
       badge: "処刑",
-      hint: "体力が減った相手に追い打ちが容赦ない。",
-      special: "あなたの体力割合が低いほど、打撃が重くなる。",
+      hint: "目付け→昂揚→処刑。削れた相手を決して逃さない。",
+      special: "3行動周期: 死の目付け→処刑昂揚→処刑斬。",
       minFloor: 70,
-      hp: 0.95,
-      atk: 1.2,
-      def: 0.9,
-      speed: 112,
+      hp: 0.92,
+      atk: 1.32,
+      def: 0.88,
+      speed: 118,
       regenInterval: 5,
       regenPct: 0,
-      dmgBonus: 0.06,
+      dmgBonus: 0.08,
+      atkEff: 1.12,
     },
     {
       id: "bastion",
       name: "要塞核",
       badge: "要塞",
-      hint: "開幕から守りが厚く、崩しを要求する。",
-      special: "開幕に堅守を張り、その後は重い打撃。",
+      hint: "核を顕し、壁を足し、核撃と制圧で押し切る。",
+      special: "4行動周期: 要塞顕現→防壁補強→核撃→制圧。",
       minFloor: 70,
-      hp: 1.45,
-      atk: 0.9,
-      def: 1.85,
-      speed: 70,
-      regenInterval: 4,
-      regenPct: 0.015,
-      dmgReduction: 0.1,
+      hp: 1.55,
+      atk: 0.98,
+      def: 2.0,
+      speed: 68,
+      regenInterval: 3,
+      regenPct: 0.02,
+      dmgReduction: 0.14,
+      defEff: 1.2,
+    },
+    {
+      id: "twinblade",
+      name: "双剣鬼",
+      badge: "双剣",
+      hint: "単発を捨て、常に二刀で押す。",
+      special: "3行動周期: 双閃→交差連撃→終焉二閃。常に二段。",
+      minFloor: 70,
+      hp: 0.88,
+      atk: 1.22,
+      def: 0.75,
+      speed: 128,
+      regenInterval: 6,
+      regenPct: 0,
+      dmgBonus: 0.06,
+      atkEff: 1.15,
     },
   ];
 
   function poolForFloor(floor) {
     const f = Math.max(1, floor || 1);
-    return ARCHETYPES.filter((arch) => (arch.minFloor || 1) <= f);
+    let pool = ARCHETYPES.filter((arch) => (arch.minFloor || 1) <= f);
+    // 50層以降は中深層専用ビルドのみ（浅い／中層のフィラー型を混ぜない）
+    if (f >= 50) {
+      pool = pool.filter((arch) => (arch.minFloor || 1) >= 50);
+    }
+    return pool;
   }
 
   /** 階層 n の敵は常に同じ。利用可能プールを (n-1) で巡回し、10の倍数は番人化。 */
@@ -414,7 +477,10 @@
     const arch = archetypeForFloor(floor);
     const boss = floor % 10 === 0;
     const g = growth(floor);
-    const late = floor >= 30 ? 1 + Math.min(0.12, (floor - 30) * 0.0015) : 1;
+    let late = 1;
+    if (floor >= 70) late = 1.14 + Math.min(0.18, (floor - 70) * 0.004);
+    else if (floor >= 50) late = 1.08 + Math.min(0.12, (floor - 50) * 0.003);
+    else if (floor >= 30) late = 1 + Math.min(0.12, (floor - 30) * 0.0015);
     const hpMul = arch.hp * (boss ? CURVE.bossHp : 1) * late;
     const atkMul = arch.atk * (boss ? CURVE.bossAtk : 1) * late;
     const defMul = arch.def * (boss ? CURVE.bossDef : 1) * late;
@@ -423,13 +489,15 @@
     const def = Math.max(0, Math.round(g.def * defMul));
     const regenPct = arch.regenPct || 0;
     const regenAmount = regenPct ? Math.max(1, Math.round(maxHp * regenPct)) : 0;
-    const bossLine = "数行動ごとに、通常より重い一撃を振るう。";
+    const buildTier = floor >= 70 ? 70 : floor >= 50 ? 50 : floor >= 30 ? 30 : 1;
+    const bossLine = buildTier >= 50 ? "番人として型が一段重い。" : "数行動ごとに、通常より重い一撃を振るう。";
     const tierNote =
-      floor >= 70 ? "（深層ビルド）" : floor >= 50 ? "（中深層ビルド）" : floor >= 30 ? "（中層ビルド）" : "";
+      buildTier >= 70 ? "（深層ローテ）" : buildTier >= 50 ? "（中深層ローテ）" : buildTier >= 30 ? "（中層ビルド）" : "";
     return {
       floor,
       pattern: arch.id,
       boss,
+      buildTier,
       name: boss ? `第${floor}階層の番人` : arch.name,
       badge: boss ? "番人" : arch.badge,
       hint: boss ? `${arch.hint}${bossLine}` : `${arch.hint}${tierNote}`,

@@ -183,6 +183,8 @@
       pain: 0,
       pattern: stats.pattern,
       boss: !!stats.boss,
+      buildTier: stats.buildTier || 1,
+      floor: stats.floor || 1,
     };
   }
 
@@ -691,7 +693,9 @@
     }
 
     function enemyAct() {
-      if (enemy.boss && enemy.actionCount % 4 === 0) {
+      const step = Math.max(0, (enemy.actionCount || 1) - 1);
+      // 50層以降のビルドは専用ローテのみ。浅い番人の雑な大振りは入れない。
+      if (enemy.boss && (enemy.buildTier || 0) < 50 && enemy.actionCount % 4 === 0) {
         enemyAttack(1.5, "大振り");
         return;
       }
@@ -879,144 +883,411 @@
         enemyAttack(0.82, "接触");
         return;
       }
-      if (enemy.pattern === "colossus" && enemy.actionCount % 5 === 0) {
-        enemyAttack(1.95, "巨圧");
-        return;
-      }
+
+      // ---- 50層以降: 専用ローテ（毎手に意味のある行動） ----
       if (enemy.pattern === "colossus") {
-        enemyAttack(0.88, "踏みつけ");
-        return;
-      }
-      if (enemy.pattern === "phantom" && enemy.actionCount % 3 === 0) {
-        ctx.actor = enemy;
-        ctx.addEffect(enemy, {
-          id: "phantom-dr",
-          kind: "dr",
-          value: 0.28,
-          turns: 2,
-        });
-        enemyAttack(0.95, "幻斬");
+        const phase = step % 4;
+        if (phase === 0) {
+          ctx.actor = enemy;
+          ctx.addEffect(enemy, {
+            id: "colossus-wall",
+            kind: "defPct",
+            value: enemy.boss ? 0.4 : 0.32,
+            turns: 3,
+            scale: "def",
+          });
+          ctx.addEffect(enemy, {
+            id: "colossus-dr",
+            kind: "dr",
+            value: enemy.boss ? 0.18 : 0.12,
+            turns: 3,
+          });
+          log(`${enemy.name}は鉄壁を起こした。`, "buff");
+          return;
+        }
+        if (phase === 1) {
+          const hit = applyHit(ctx, enemy, player, 1.05, { amp: false });
+          ctx.actor = enemy;
+          ctx.addEffect(player, {
+            id: "colossus-slow",
+            kind: "speedPct",
+            value: -0.12,
+            turns: 2,
+            negative: true,
+          });
+          log(`${enemy.name}の地響き。あなたに${hit.dmg}のダメージ。${ctx.overNote(hit.over)}足元が重い。`, "hit");
+          return;
+        }
+        if (phase === 2) {
+          enemyAttack(enemy.boss ? 1.55 : 1.4, "踏み砕き");
+          return;
+        }
+        enemyAttack(enemy.boss ? 2.25 : 2.05, "巨圧");
         return;
       }
       if (enemy.pattern === "phantom") {
-        enemyAttack(1.05, "残像斬");
-        return;
-      }
-      if (
-        enemy.pattern === "bloodarmor" &&
-        enemy.hp / enemy.maxHp <= 0.4 &&
-        !enemy.effects.some((e) => e.id === "bloodarmor")
-      ) {
-        ctx.actor = enemy;
-        ctx.addEffect(enemy, {
-          id: "bloodarmor",
-          kind: "defPct",
-          value: 0.42,
-          turns: 5,
-          scale: "def",
-        });
-        ctx.addEffect(enemy, {
-          id: "bloodarmor-dr",
-          kind: "dr",
-          value: 0.2,
-          turns: 5,
-        });
-        log(`${enemy.name}は血の装を纏った。`, "buff");
+        const phase = step % 3;
+        if (phase === 0) {
+          ctx.actor = enemy;
+          ctx.addEffect(enemy, {
+            id: "phantom-dr",
+            kind: "dr",
+            value: 0.3,
+            turns: 2,
+          });
+          ctx.addEffect(enemy, {
+            id: "phantom-spd",
+            kind: "speedPct",
+            value: 0.18,
+            turns: 3,
+          });
+          enemyAttack(0.85, "残像斬");
+          return;
+        }
+        if (phase === 1) {
+          enemyAttack(0.82, "二連幻斬・表");
+          if (player.hp > 0) enemyAttack(0.82, "二連幻斬・裏");
+          return;
+        }
+        enemyAttack(enemy.boss ? 1.55 : 1.4, "急所幻撃");
         return;
       }
       if (enemy.pattern === "bloodarmor") {
-        enemyAttack(1.0, "血撃");
-        return;
-      }
-      if (enemy.pattern === "drainhex" && enemy.actionCount % 3 === 0) {
-        const hit = applyHit(ctx, enemy, player, 1.05, { amp: false });
-        ctx.actor = enemy;
-        ctx.addEffect(player, {
-          id: "drainhex-atk",
-          kind: "atkPct",
-          value: -0.2,
-          turns: 3,
-          negative: true,
-        });
-        ctx.addEffect(player, {
-          id: "drainhex-heal",
-          kind: "healDown",
-          value: 0.28,
-          turns: 3,
-          negative: true,
-        });
-        log(`${enemy.name}の吸呪。あなたに${hit.dmg}のダメージ。${ctx.overNote(hit.over)}呪いが回る。`, "dot");
+        if (
+          enemy.hp / enemy.maxHp <= 0.4 &&
+          !enemy.effects.some((e) => e.id === "bloodarmor")
+        ) {
+          ctx.actor = enemy;
+          ctx.addEffect(enemy, {
+            id: "bloodarmor",
+            kind: "defPct",
+            value: enemy.boss ? 0.5 : 0.42,
+            turns: 5,
+            scale: "def",
+          });
+          ctx.addEffect(enemy, {
+            id: "bloodarmor-dr",
+            kind: "dr",
+            value: enemy.boss ? 0.24 : 0.2,
+            turns: 5,
+          });
+          log(`${enemy.name}は血の装を纏った。`, "buff");
+          return;
+        }
+        const phase = step % 3;
+        if (phase === 0) {
+          const hit = applyHit(ctx, enemy, player, 1.05, { amp: false });
+          const healed = ctx.heal(enemy, hit.dmg * 0.42);
+          log(
+            `${enemy.name}の吸命撃。あなたに${hit.dmg}のダメージ。${ctx.overNote(hit.over)}${
+              healed.got > 0 ? `${enemy.name}は${healed.got}回復した。` : ""
+            }${ctx.overNote(healed.over)}`,
+            "hit"
+          );
+          return;
+        }
+        if (phase === 1) {
+          ctx.actor = enemy;
+          ctx.addEffect(enemy, {
+            id: "bloodarmor-rage",
+            kind: "atkPct",
+            value: 0.28,
+            turns: 3,
+            scale: "atk",
+          });
+          enemyAttack(1.1, "血怒");
+          return;
+        }
+        enemyAttack(1.2, "血装殴打");
         return;
       }
       if (enemy.pattern === "drainhex") {
-        enemyAttack(0.92, "呪打");
-        return;
-      }
-      if (enemy.pattern === "ironthorn" && enemy.actionCount % 3 === 0) {
+        const phase = step % 4;
         ctx.actor = enemy;
-        ctx.addEffect(enemy, {
-          id: "ironthorn-reflect",
-          kind: "reflect",
-          value: 0.55,
-          reduction: 0.15,
-          once: true,
-          turns: 3,
+        if (phase === 0) {
+          ctx.addEffect(player, {
+            id: "drainhex-atk",
+            kind: "atkPct",
+            value: -0.22,
+            turns: 3,
+            negative: true,
+          });
+          ctx.addEffect(player, {
+            id: "drainhex-heal",
+            kind: "healDown",
+            value: 0.3,
+            turns: 3,
+            negative: true,
+          });
+          log(`${enemy.name}は呪印を押した。攻撃と回復の効きが落ちた。`, "dot");
+          return;
+        }
+        if (phase === 1) {
+          const hit = applyHit(ctx, enemy, player, 1.08, { amp: false });
+          const healed = ctx.heal(enemy, hit.dmg * 0.3);
+          log(
+            `${enemy.name}の吸命打。あなたに${hit.dmg}のダメージ。${ctx.overNote(hit.over)}${
+              healed.got > 0 ? `${enemy.name}は${healed.got}回復した。` : ""
+            }${ctx.overNote(healed.over)}`,
+            "hit"
+          );
+          return;
+        }
+        if (phase === 2) {
+          const hit = applyHit(ctx, enemy, player, 1.0, { amp: false });
+          ctx.addEffect(player, {
+            id: "drainhex-eff",
+            kind: "healEffFlat",
+            value: -0.2,
+            turns: 3,
+            negative: true,
+          });
+          log(`${enemy.name}の腐打。あなたに${hit.dmg}のダメージ。${ctx.overNote(hit.over)}回復効率が削れた。`, "hit");
+          return;
+        }
+        const hit = applyHit(ctx, enemy, player, enemy.boss ? 1.35 : 1.2, { amp: false });
+        ctx.addEffect(player, {
+          id: "drainhex-heal",
+          kind: "healDown",
+          value: 0.38,
+          turns: 4,
+          negative: true,
         });
-        log(`${enemy.name}は茨を逆立てた。`, "buff");
+        log(`${enemy.name}の大呪。あなたに${hit.dmg}のダメージ。${ctx.overNote(hit.over)}深い呪いが残る。`, "dot");
         return;
       }
       if (enemy.pattern === "ironthorn") {
-        enemyAttack(0.9, "茨打");
+        const phase = step % 3;
+        if (phase === 0) {
+          ctx.actor = enemy;
+          ctx.addEffect(enemy, {
+            id: "ironthorn-reflect",
+            kind: "reflect",
+            value: enemy.boss ? 0.65 : 0.55,
+            reduction: 0.18,
+            once: true,
+            turns: 3,
+          });
+          log(`${enemy.name}は茨を逆立てた。`, "buff");
+          return;
+        }
+        if (phase === 1) {
+          const hit = applyHit(ctx, enemy, player, 0.95, { amp: false });
+          const dot = Math.max(1, Math.floor(effectiveAtk(enemy) * 0.18));
+          ctx.actor = enemy;
+          ctx.addEffect(player, {
+            id: "ironthorn-dot",
+            kind: "dot",
+            value: dot,
+            turns: 3,
+            negative: true,
+          });
+          log(`${enemy.name}の茨鞭。あなたに${hit.dmg}のダメージ。${ctx.overNote(hit.over)}刺が残る。`, "dot");
+          return;
+        }
+        enemyAttack(enemy.boss ? 1.45 : 1.3, "鉄茨刺突");
         return;
       }
-      if (enemy.pattern === "eclipse" && enemy.actionCount % 4 === 0) {
+      if (enemy.pattern === "chrono") {
+        const phase = step % 3;
         ctx.actor = enemy;
-        ctx.addEffect(player, {
-          id: "eclipse-noregen",
-          kind: "noRegen",
-          value: 1,
-          turns: 3,
-          negative: true,
-        });
-        ctx.addEffect(player, {
-          id: "eclipse-heal",
-          kind: "healDown",
-          value: 0.32,
-          turns: 3,
-          negative: true,
-        });
-        log(`${enemy.name}の蝕。回復が鈍くなり、自動回復も止まった。`, "dot");
+        if (phase === 0) {
+          ctx.addEffect(enemy, {
+            id: "chrono-haste",
+            kind: "speedPct",
+            value: 0.28,
+            turns: 3,
+          });
+          ctx.addEffect(enemy, {
+            id: "chrono-amp",
+            kind: "dmgBonus",
+            value: 0.1,
+            turns: 3,
+          });
+          log(`${enemy.name}は時間を歪めて加速した。`, "buff");
+          return;
+        }
+        if (phase === 1) {
+          ctx.addEffect(player, {
+            id: "chrono-slow",
+            kind: "speedPct",
+            value: -0.22,
+            turns: 3,
+            negative: true,
+          });
+          enemyAttack(0.95, "足枷の一撃");
+          return;
+        }
+        enemyAttack(0.88, "時裂き・一");
+        if (player.hp > 0) enemyAttack(0.88, "時裂き・二");
+        return;
+      }
+      if (enemy.pattern === "soulrend") {
+        const phase = step % 3;
+        ctx.actor = enemy;
+        if (phase === 0) {
+          const hit = applyHit(ctx, enemy, player, 0.9, { amp: false });
+          ctx.addEffect(player, {
+            id: "soulrend-bonus",
+            kind: "dmgBonus",
+            value: -0.16,
+            turns: 3,
+            negative: true,
+          });
+          log(`${enemy.name}の魂削り。あなたに${hit.dmg}のダメージ。${ctx.overNote(hit.over)}与ダメが落ちた。`, "hit");
+          return;
+        }
+        if (phase === 1) {
+          const hit = applyHit(ctx, enemy, player, 0.95, { amp: false });
+          ctx.addEffect(player, {
+            id: "soulrend-eff",
+            kind: "atkEffFlat",
+            value: -0.22,
+            turns: 3,
+            negative: true,
+          });
+          log(`${enemy.name}の無力化。あなたに${hit.dmg}のダメージ。${ctx.overNote(hit.over)}補助効率が鈍った。`, "hit");
+          return;
+        }
+        enemyAttack(enemy.boss ? 1.7 : 1.5, "裂魂撃");
         return;
       }
       if (enemy.pattern === "eclipse") {
-        enemyAttack(0.95, "蝕撃");
+        const phase = step % 4;
+        ctx.actor = enemy;
+        if (phase === 0) {
+          ctx.addEffect(player, {
+            id: "eclipse-noregen",
+            kind: "noRegen",
+            value: 1,
+            turns: 3,
+            negative: true,
+          });
+          ctx.addEffect(player, {
+            id: "eclipse-heal",
+            kind: "healDown",
+            value: 0.35,
+            turns: 3,
+            negative: true,
+          });
+          log(`${enemy.name}の蝕の霧。回復が鈍くなり、自動回復も止まった。`, "dot");
+          return;
+        }
+        if (phase === 1) {
+          const healed = ctx.heal(enemy, enemy.maxHp * (enemy.boss ? 0.1 : 0.08));
+          log(`${enemy.name}の再生脈。${healed.got}回復した。${ctx.overNote(healed.over)}`, "heal");
+          return;
+        }
+        if (phase === 2) {
+          enemyAttack(1.1, "蝕撃");
+          return;
+        }
+        const hit = applyHit(ctx, enemy, player, enemy.boss ? 1.35 : 1.2, { amp: false });
+        ctx.addEffect(player, {
+          id: "eclipse-heal",
+          kind: "healDown",
+          value: 0.4,
+          turns: 4,
+          negative: true,
+        });
+        log(`${enemy.name}の深蝕。あなたに${hit.dmg}のダメージ。${ctx.overNote(hit.over)}回復がさらに腐った。`, "dot");
         return;
       }
       if (enemy.pattern === "executioner") {
+        const phase = step % 3;
         const low = 1 - player.hp / player.maxHp;
-        enemyAttack(0.9 + low * 1.05, "処刑斬");
-        return;
-      }
-      if (enemy.pattern === "bastion" && enemy.actionCount === 1) {
         ctx.actor = enemy;
-        ctx.addEffect(enemy, {
-          id: "bastion-def",
-          kind: "defPct",
-          value: 0.35,
-          turns: 4,
-          scale: "def",
-        });
-        ctx.addEffect(enemy, {
-          id: "bastion-dr",
-          kind: "dr",
-          value: 0.18,
-          turns: 4,
-        });
-        log(`${enemy.name}は要塞の核を顕した。`, "buff");
+        if (phase === 0) {
+          ctx.addEffect(player, {
+            id: "exec-mark",
+            kind: "dr",
+            value: -0.12,
+            turns: 3,
+            negative: true,
+          });
+          log(`${enemy.name}は死の目付けをした。守りが薄れた。`, "dot");
+          return;
+        }
+        if (phase === 1) {
+          ctx.addEffect(enemy, {
+            id: "exec-amp",
+            kind: "dmgBonus",
+            value: 0.16,
+            turns: 3,
+          });
+          ctx.addEffect(enemy, {
+            id: "exec-atk",
+            kind: "atkPct",
+            value: 0.2,
+            turns: 3,
+            scale: "atk",
+          });
+          log(`${enemy.name}は処刑の昂揚に入った。`, "buff");
+          return;
+        }
+        enemyAttack(0.95 + low * (enemy.boss ? 1.25 : 1.1), "処刑斬");
         return;
       }
       if (enemy.pattern === "bastion") {
-        enemyAttack(0.95, "核撃");
+        const phase = step % 4;
+        ctx.actor = enemy;
+        if (phase === 0) {
+          ctx.addEffect(enemy, {
+            id: "bastion-def",
+            kind: "defPct",
+            value: enemy.boss ? 0.42 : 0.35,
+            turns: 4,
+            scale: "def",
+          });
+          ctx.addEffect(enemy, {
+            id: "bastion-dr",
+            kind: "dr",
+            value: enemy.boss ? 0.22 : 0.18,
+            turns: 4,
+          });
+          log(`${enemy.name}は要塞の核を顕した。`, "buff");
+          return;
+        }
+        if (phase === 1) {
+          ctx.addEffect(enemy, {
+            id: "bastion-wall",
+            kind: "defPct",
+            value: 0.22,
+            turns: 3,
+            scale: "def",
+          });
+          log(`${enemy.name}は防壁を補強した。`, "buff");
+          return;
+        }
+        if (phase === 2) {
+          enemyAttack(enemy.boss ? 1.55 : 1.4, "核撃");
+          return;
+        }
+        const hit = applyHit(ctx, enemy, player, 1.15, { amp: false });
+        ctx.addEffect(player, {
+          id: "bastion-sap",
+          kind: "atkPct",
+          value: -0.18,
+          turns: 3,
+          negative: true,
+        });
+        log(`${enemy.name}の制圧。あなたに${hit.dmg}のダメージ。${ctx.overNote(hit.over)}攻撃が落ちた。`, "hit");
+        return;
+      }
+      if (enemy.pattern === "twinblade") {
+        const phase = step % 3;
+        if (phase === 0) {
+          enemyAttack(0.8, "双閃・右");
+          if (player.hp > 0) enemyAttack(0.8, "双閃・左");
+          return;
+        }
+        if (phase === 1) {
+          enemyAttack(0.9, "交差連撃・一");
+          if (player.hp > 0) enemyAttack(0.95, "交差連撃・二");
+          return;
+        }
+        enemyAttack(enemy.boss ? 1.15 : 1.05, "終焉二閃・一");
+        if (player.hp > 0) enemyAttack(enemy.boss ? 1.15 : 1.05, "終焉二閃・二");
         return;
       }
       if (enemy.pattern === "regen") {
