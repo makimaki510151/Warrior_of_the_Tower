@@ -7,6 +7,7 @@
     speed: 1,
     modal: null,
     help: false,
+    patchNotes: false,
     battle: null,
     hasSave: false,
     expandedCard: null,
@@ -124,12 +125,17 @@
     return String(intNum(stats[key]));
   }
 
+  function gameTitle() {
+    return W.GAME_TITLE || "真・塔の戦士";
+  }
+
   function syncTitle() {
     const state = W.getState();
-    if (ui.screen === "title") document.title = "塔の戦士";
-    else if (ui.screen === "battle" && ui.battle) document.title = `第${ui.battle.floor}層 | 塔の戦士`;
-    else if (ui.screen === "clear") document.title = "頂 | 塔の戦士";
-    else document.title = `第${state.floor}層 | 塔の戦士`;
+    const name = gameTitle();
+    if (ui.screen === "title") document.title = name;
+    else if (ui.screen === "battle" && ui.battle) document.title = `第${ui.battle.floor}層 | ${name}`;
+    else if (ui.screen === "clear") document.title = `頂 | ${name}`;
+    else document.title = `第${state.floor}層 | ${name}`;
   }
 
   function shell(body, footer) {
@@ -143,7 +149,7 @@
       <div class="shell">
         <header class="bar">
           <div class="bar-left">
-            <strong class="brand">塔の戦士</strong>
+            <strong class="brand">${esc(gameTitle())}</strong>
             ${ui.screen === "title" ? "" : `<span class="chip">第${floor}層</span>`}
             ${ui.screen === "title" ? "" : `<span class="chip muted">最高 ${best || "—"}</span>`}
             ${
@@ -160,6 +166,7 @@
                     ui.detail ? "標準に切替" : "詳細に切替"
                   }</button>`
             }
+            <button type="button" class="btn btn-ghost" data-action="patch-notes">更新履歴</button>
             <button type="button" class="btn btn-ghost" data-action="help">遊び方</button>
           </div>
         </header>
@@ -453,10 +460,11 @@
 
   function renderTitle() {
     const state = W.getState();
+    const ver = W.latestPatchVersion ? W.latestPatchVersion() : "";
     return shell(`
       <div class="title-pane">
-        <p class="eyebrow">Warrior of the Tower</p>
-        <h1>塔の戦士</h1>
+        <p class="eyebrow">${esc(W.GAME_TITLE_EN || "True Warrior of the Tower")}</p>
+        <h1>${esc(gameTitle())}</h1>
         <p class="lede">技を1つ選び、手順を組んで自動戦闘で百層を登る。</p>
         <p class="record">${state.bestCleared ? `最高 ${state.bestCleared}層` : "記録なし"}</p>
         <div class="title-actions">
@@ -466,6 +474,9 @@
                  <button type="button" class="btn btn-ghost" data-action="restart">はじめから</button>`
               : `<button type="button" class="btn btn-primary" data-action="start">塔に入る</button>`
           }
+          <button type="button" class="btn btn-ghost" data-action="patch-notes">更新履歴${
+            ver ? ` <span class="tiny">v${esc(ver)}</span>` : ""
+          }</button>
         </div>
       </div>
     `);
@@ -596,7 +607,42 @@
     `);
   }
 
+  function renderPatchNotesBody() {
+    const notes = W.PATCH_NOTES || [];
+    if (!notes.length) return `<p class="muted">まだ更新履歴はありません。</p>`;
+    return notes
+      .map((entry) => {
+        const sections = (entry.sections || [])
+          .map((sec) => {
+            const items = (sec.items || []).map((item) => `<li>${esc(item)}</li>`).join("");
+            return `<h3 class="patch-h">${esc(sec.heading)}</h3><ul class="patch-list">${items}</ul>`;
+          })
+          .join("");
+        return `
+          <article class="patch-entry">
+            <header class="patch-head">
+              <strong>v${esc(entry.version)}</strong>
+              <span class="muted">${esc(entry.date || "")}</span>
+              <p class="patch-title">${esc(entry.title || "")}</p>
+            </header>
+            ${sections}
+          </article>`;
+      })
+      .join("");
+  }
+
   function modal() {
+    if (ui.patchNotes) {
+      return `
+        <div class="modal" role="dialog" aria-modal="true" aria-label="更新履歴">
+          <div class="modal-card modal-card-wide">
+            <h2>更新履歴</h2>
+            <p class="tiny muted">スキル数値や仕様の変更は、できるだけここに細かく書きます。</p>
+            <div class="patch-scroll">${renderPatchNotesBody()}</div>
+            <button type="button" class="btn btn-primary" data-action="close-modal">閉じる</button>
+          </div>
+        </div>`;
+    }
     if (ui.help) {
       return `
         <div class="modal" role="dialog" aria-modal="true">
@@ -606,15 +652,16 @@
               <li>100層突破が目標。戦いは自動。</li>
               <li>約${W.SKILLS.length}種の技から毎回5つ提示。1つだけ獲得／強化。</li>
               <li>階層クリアごとにリロールポイントが1たまる。候補画面で1消費し、5枚を全技から入れ替えられる（上限なし）。</li>
-              <li>同じ技を重ねても伸びは一定。完全上位互換はない。</li>
+              <li>同じ技を重ねると効果とステータスが伸びる。2枚目以降はステータスに追加ボーナス。</li>
               <li>手順は最大${W.MAX_FLOW}個。上から判定し、外れは通常攻撃。</li>
               <li>再使用は「自分の行動を何回空けるか」。</li>
               <li>戦闘ログの行動番号は、あなたと敵で別々に数える。</li>
               <li>使用条件は体力・序盤／終盤・直前の行動・強化弱体などから選ぶ。</li>
               <li>技カードはクリックで拡大表示。能力名に触れると説明が出る。</li>
               <li>敵は序盤だけ弱く、以降は急に強くなる。100層は育成と手順が要る。</li>
-              <li>回復技は少なめで代償が大きい。</li>
+              <li>回復技は少なめで代償が大きい。自動回復に注目した技もある。</li>
               <li>標準／詳細で表示量を切り替えられる。</li>
+              <li>「更新履歴」にパッチノートがある。数値調整はそこに追記される。</li>
               <li>敗北時は手順の組み直しか諦め。</li>
             </ul>
             <button type="button" class="btn btn-primary" data-action="close-modal">閉じる</button>
@@ -660,12 +707,17 @@
     }
   }
 
+  function closeOverlays() {
+    ui.modal = null;
+    ui.help = false;
+    ui.patchNotes = false;
+  }
+
   function beginRun() {
     W.newRun();
     ui.hasSave = true;
     ui.screen = "offer";
-    ui.modal = null;
-    ui.help = false;
+    closeOverlays();
     ui.battle = null;
     render();
   }
@@ -832,6 +884,7 @@
         if (W.sfx) W.sfx.ui();
         ui.modal = "restart";
         ui.help = false;
+        ui.patchNotes = false;
         render();
         return;
       }
@@ -843,14 +896,22 @@
       if (action === "help") {
         if (W.sfx) W.sfx.ui();
         ui.help = true;
+        ui.patchNotes = false;
+        ui.modal = null;
+        render();
+        return;
+      }
+      if (action === "patch-notes") {
+        if (W.sfx) W.sfx.ui();
+        ui.patchNotes = true;
+        ui.help = false;
         ui.modal = null;
         render();
         return;
       }
       if (action === "close-modal") {
         if (W.sfx) W.sfx.ui();
-        ui.help = false;
-        ui.modal = null;
+        closeOverlays();
         render();
         return;
       }
@@ -945,13 +1006,15 @@
       if (action === "give-up") {
         if (W.sfx) W.sfx.ui();
         ui.modal = "giveup";
+        ui.help = false;
+        ui.patchNotes = false;
         render();
         return;
       }
       if (action === "confirm-give-up") {
         if (W.sfx) W.sfx.ui();
         W.giveUp();
-        ui.modal = null;
+        closeOverlays();
         ui.battle = null;
         ui.screen = "offer";
         render();
@@ -997,17 +1060,15 @@
       closeCardZoom(true);
       return;
     }
-    if (!ui.modal && !ui.help) return;
-    ui.modal = null;
-    ui.help = false;
+    if (!ui.modal && !ui.help && !ui.patchNotes) return;
+    closeOverlays();
     if (W.sfx) W.sfx.ui();
     render();
   }
 
   function onBackdrop(event) {
     if (event.target.classList && event.target.classList.contains("modal")) {
-      ui.modal = null;
-      ui.help = false;
+      closeOverlays();
       if (W.sfx) W.sfx.ui();
       render();
     }
