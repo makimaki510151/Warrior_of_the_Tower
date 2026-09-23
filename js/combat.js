@@ -144,6 +144,7 @@
       regenCounter: 0,
       tookHit: false,
       lastAction: null,
+      pain: 0,
       pattern: stats.pattern,
       boss: !!stats.boss,
     };
@@ -369,13 +370,67 @@
         unit.effects = unit.effects.filter((effect) => !effect.negative);
         return before - unit.effects.length;
       },
+      countBuffs(unit) {
+        return unit.effects.filter((effect) => !effect.negative && effect.kind !== "dot").length;
+      },
+      countDebuffs(unit) {
+        return unit.effects.filter((effect) => effect.negative).length;
+      },
+      findEffect(unit, kind) {
+        return unit.effects.find((effect) => effect.kind === kind) || null;
+      },
+      consumeEffect(unit, kind) {
+        const found = unit.effects.find((effect) => effect.kind === kind);
+        if (!found) return null;
+        unit.effects = unit.effects.filter((effect) => effect !== found);
+        return found;
+      },
     };
 
     function applyHit(context, attacker, defender, mult, opts) {
       const amp = opts.amp === false ? null : attacker.effects.find((effect) => effect.kind === "skillAmp");
+      const crescendo = opts.amp === false ? null : attacker.effects.find((effect) => effect.kind === "crescendo");
       let power = mult;
       if (amp) power *= 1 + amp.value;
+      if (crescendo && crescendo.charges > 0) {
+        power *= 1 + crescendo.charges * (crescendo.perCharge || 0);
+      }
       let dealt = rawDamage(attacker, defender, power, opts.ignore || 0);
+      const glow = opts.amp === false ? null : attacker.effects.find((effect) => effect.kind === "overglow");
+      if (glow && glow.value > 0) {
+        dealt += Math.floor(glow.value);
+        attacker.effects = attacker.effects.filter((effect) => effect !== glow);
+      }
+      const absorb = defender.effects.find((effect) => effect.kind === "absorb");
+      let absorbed = 0;
+      if (absorb) {
+        const rate = Math.min(0.95, Math.max(0, absorb.value || 0));
+        const kept = Math.max(1, Math.floor(dealt * (1 - rate)));
+        absorbed = Math.max(0, dealt - kept);
+        dealt = kept;
+        defender.effects = defender.effects.filter((effect) => effect !== absorb);
+        if (absorbed > 0 && absorb.convertHeal) {
+          const healed = ctx.heal(defender, absorbed * absorb.convertHeal);
+          if (healed.got > 0 || healed.over > 0) {
+            trailer = {
+              text: `${defender.name}の虚盾が衝撃を吸い、${healed.got}回復した。${ctx.overNote(healed.over)}`,
+              kind: "heal",
+            };
+          }
+        }
+        if (absorbed > 0 && absorb.convertAtk) {
+          const atkVal = absorb.convertAtk * (defender.atkEff || 1);
+          defender.effects = defender.effects.filter((effect) => effect.id !== "voidguard-atk");
+          defender.effects.push({
+            id: "voidguard-atk",
+            kind: "atkPct",
+            value: atkVal,
+            turns: absorb.convertTurns || 3,
+            fresh: true,
+            scale: "atk",
+          });
+        }
+      }
       const reflect = defender.effects.find((effect) => effect.kind === "reflect");
       let back = 0;
       if (reflect) {
@@ -386,11 +441,18 @@
       defender.hp = Math.max(0, defender.hp - dealt);
       const over = Math.max(0, dealt - hpBefore);
       if (dealt > 0) defender.tookHit = true;
+      if (dealt > 0 && defender === player) defender.pain += dealt;
       if (amp) {
         attacker.effects = attacker.effects.filter((effect) => effect !== amp);
         if (attacker === player) {
           const skill = W.SKILL_BY_ID[amp.id];
           amped = (skill && skill.name) || "構え";
+        }
+      }
+      if (crescendo && crescendo.charges > 0 && opts.amp !== false) {
+        crescendo.charges = 0;
+        if (attacker === player) {
+          amped = amped ? `${amped}／階調` : "階調";
         }
       }
       if (reflect && reflect.once) {
@@ -401,12 +463,13 @@
         attacker.hp = Math.max(0, attacker.hp - back);
         const backOver = Math.max(0, back - atkBefore);
         attacker.tookHit = true;
+        if (attacker === player) attacker.pain += back;
         trailer = {
           text: `${attacker.name}の攻撃に対し、${back}が跳ね返った。${backOver > 0 ? `(${backOver}オーバー)` : ""}`,
           kind: "hit",
         };
       }
-      return { dmg: dealt, over, amped: !!amp, reflect: back };
+      return { dmg: dealt, over, amped: !!amp, reflect: back, absorbed };
     }
 
     function startTurn(unit) {
@@ -452,6 +515,23 @@
       return unit.hp > 0;
     }
 
+    function explodeDoom(unit, effect) {
+      if (!effect || effect.kind !== "doom") return;
+      const source = unit === enemy ? player : enemy;
+      const mult = effect.mult || 1;
+      const bonus = Math.max(0, Math.floor(effect.stored || 0));
+      const base = rawDamage(source, unit, mult, 0);
+      const dealt = base + bonus;
+      const before = unit.hp;
+      unit.hp = Math.max(0, unit.hp - dealt);
+      const over = Math.max(0, dealt - before);
+      if (dealt > 0) unit.tookHit = true;
+      log(
+        `${unit.name}の終焔の印が弾け、${dealt}のダメージ。${over > 0 ? `(${over}オーバー)` : ""}`,
+        "attack"
+      );
+    }
+
     function endTurn(unit) {
       let hasteExtra = 0;
       unit.effects.forEach((effect) => {
@@ -472,11 +552,24 @@
           return true;
         }
         effect.turns -= 1;
-        return effect.turns > 0;
+        if (effect.turns <= 0) {
+          if (effect.kind === "doom") explodeDoom(unit, effect);
+          return false;
+        }
+        return true;
       });
     }
 
     function startCooldown(unit, id, skips) {
+      // 無限廊: 残チャージがあれば再使用待ちを飛ばす（付与した直後の自分は除く）
+      const free = unit.effects.find((effect) => effect.kind === "freeCast" && !effect.fresh && effect.value > 0);
+      if (free) {
+        free.value -= 1;
+        if (free.value <= 0) {
+          unit.effects = unit.effects.filter((effect) => effect !== free);
+        }
+        return;
+      }
       let kick = 0;
       unit.effects.forEach((effect) => {
         // 今この行動で付いた拍子は、自分自身の再使用には掛けない
@@ -505,6 +598,14 @@
         }
         ctx.p = `〔${conditionLabel(node.cond)}〕`;
         skill.use(ctx, level);
+        // 階調: 補助技以外の技を使うたびにチャージが乗る
+        if (skill.id !== "crescendo") {
+          const cresc = player.effects.find((effect) => effect.kind === "crescendo");
+          if (cresc) {
+            const cap = cresc.cap || 6;
+            cresc.charges = Math.min(cap, (cresc.charges || 0) + 1);
+          }
+        }
         startCooldown(player, skill.id, skill.cooldown);
         player.lastAction = "skill";
         return;
