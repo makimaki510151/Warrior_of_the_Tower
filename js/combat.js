@@ -3,6 +3,22 @@
 
   const MAX_ACTIONS = 220;
 
+  /**
+   * 比較の言葉と判定の対応（ゲーム全体で統一）
+   * - 以上 … その値を含む（>=）
+   * - 以下 … その値を含む（<=）
+   * - 未満 … その値を含まない（<）
+   * - より高い／より低い／より速い … その値を含まない（> または <）
+   * - まで … その値を含む（<=）／から … その値を含む（>=）
+   * - 以内 … その値を含む（<=）／を超える … その値を含まない（>）
+   * 二つに分けるときは「以下（<=）」と「より高い（>）」のように、境界がどちらか一方だけに入るようにする。
+   */
+  const COMPARE_RULES_HELP = [
+    "以上＝その値を含む。以下＝その値を含む。未満＝その値を含まない。",
+    "より高い／より低い／より速い＝その値を含まない（同じなら成り立たない）。",
+    "まで＝その回数を含む。から＝その回数を含む。以内＝その差を含む。を超える＝含まない。",
+  ];
+
   const CONDITIONS = [
     { type: "always", label: "常に使う", text: () => "常に" },
     {
@@ -51,13 +67,13 @@
     },
     {
       type: "hpWorseThanEnemy",
-      label: "自分の方が体力割合が低い",
-      text: () => "自分の体力割合が敵より低い",
+      label: "自分の体力割合が敵以下",
+      text: () => "自分の体力割合が敵以下",
     },
     {
       type: "hpBetterThanEnemy",
-      label: "自分の方が体力割合が高い",
-      text: () => "自分の体力割合が敵以上",
+      label: "自分の体力割合が敵より高い",
+      text: () => "自分の体力割合が敵より高い",
     },
     {
       type: "opening",
@@ -102,7 +118,7 @@
       text: () => "敵の防御が自分の攻撃以上",
     },
     { type: "selfFaster", label: "自分が敵より速い", text: () => "自分の行動速度が敵より高い" },
-    { type: "enemyFaster", label: "敵が自分より速い", text: () => "敵の行動速度が自分以上" },
+    { type: "enemyFaster", label: "敵が自分より速い", text: () => "敵の行動速度が自分より高い" },
     { type: "enemyHasDebuff", label: "敵が弱体している", text: () => "敵が弱体している" },
     { type: "enemyNoDebuff", label: "敵が弱体していない", text: () => "敵が弱体していない" },
     { type: "enemyHasBuff", label: "敵に強化がある", text: () => "敵に強化がある" },
@@ -174,19 +190,46 @@
     return Math.max(0, unit.def * (1 + pctSum(unit, "defPct")));
   }
 
+  function effectiveSpeed(unit) {
+    return Math.max(40, Math.floor(unit.speed * (1 + pctSum(unit, "speedPct"))));
+  }
+
+  function effectiveDmgBonus(unit) {
+    return (unit.dmgBonus || 0) + pctSum(unit, "dmgBonus");
+  }
+
+  function effectiveAtkEff(unit) {
+    return Math.max(0.05, (unit.atkEff == null ? 1 : unit.atkEff) + pctSum(unit, "atkEffFlat"));
+  }
+
+  function effectiveDefEff(unit) {
+    return Math.max(0.05, (unit.defEff == null ? 1 : unit.defEff) + pctSum(unit, "defEffFlat"));
+  }
+
+  function effectiveHealEff(unit) {
+    return Math.max(0.05, (unit.healEff == null ? 1 : unit.healEff) + pctSum(unit, "healEffFlat"));
+  }
+
+  /** 被ダメージ軽減の下限（負＝被ダメ増）。一時効果込みでここまで下がる。 */
+  const DR_FLOOR = -0.85;
+  const DR_CEIL = 0.75;
+
+  function effectiveDr(unit) {
+    let dr = unit.dmgReduction || 0;
+    unit.effects.forEach((effect) => {
+      if (effect.kind === "dr") dr += effect.value;
+    });
+    return Math.max(DR_FLOOR, Math.min(DR_CEIL, dr));
+  }
+
   function rawDamage(attacker, defender, mult, ignore) {
     const atk = effectiveAtk(attacker);
     const ignoreRate = Math.min(0.7, Math.max(0, ignore || 0));
     const def = effectiveDef(defender) * (1 - ignoreRate);
     const pen = atk * 0.55;
     const reduction = def <= 0 ? 0 : def / (def + 65 + pen);
-    let damage = atk * (1 + attacker.dmgBonus) * mult * (1 - reduction);
-    let dr = defender.dmgReduction;
-    defender.effects.forEach((effect) => {
-      if (effect.kind === "dr") dr += effect.value;
-    });
-    dr = Math.max(-0.5, Math.min(0.75, dr));
-    damage *= 1 - dr;
+    let damage = atk * (1 + effectiveDmgBonus(attacker)) * mult * (1 - reduction);
+    damage *= 1 - effectiveDr(defender);
     return Math.max(1, Math.floor(damage));
   }
 
@@ -207,9 +250,9 @@
       case "enemyHpAbove":
         return enemyRate * 100 >= value;
       case "hpWorseThanEnemy":
-        return playerRate < enemyRate;
+        return playerRate <= enemyRate;
       case "hpBetterThanEnemy":
-        return playerRate >= enemyRate;
+        return playerRate > enemyRate;
       case "opening":
         return value > 0 && ctx.player.actionCount <= value;
       case "afterActions":
@@ -225,9 +268,9 @@
       case "lastWasSkill":
         return ctx.player.lastAction === "skill";
       case "selfFaster":
-        return ctx.player.speed > ctx.enemy.speed;
+        return effectiveSpeed(ctx.player) > effectiveSpeed(ctx.enemy);
       case "enemyFaster":
-        return ctx.enemy.speed >= ctx.player.speed;
+        return effectiveSpeed(ctx.enemy) > effectiveSpeed(ctx.player);
       case "enemyHasDebuff":
         return hasDebuff(ctx.enemy);
       case "enemyNoDebuff":
@@ -302,6 +345,12 @@
       hasDebuff,
       effectiveAtk,
       effectiveDef,
+      effectiveSpeed,
+      effectiveDmgBonus,
+      effectiveAtkEff,
+      effectiveDefEff,
+      effectiveHealEff,
+      effectiveDr,
       damage(mult, opts) {
         return applyHit(ctx, player, enemy, mult, opts || {});
       },
@@ -314,7 +363,7 @@
         return { dealt, over: Math.max(0, raw - dealt), raw };
       },
       heal(unit, base) {
-        let eff = unit.healEff;
+        let eff = effectiveHealEff(unit);
         unit.effects.forEach((effect) => {
           if (effect.kind === "healDown") eff *= 1 - effect.value;
         });
@@ -343,10 +392,10 @@
         const next = { ...effect, fresh: unit === ctx.actor };
         if (next.value > 0) {
           // 攻撃力バフ（割合・技威力上乗せ）には必ず攻撃力補助効率を乗せる
-          if (next.kind === "atkPct" || next.kind === "skillAmp") next.value *= unit.atkEff;
-          else if (next.scale === "atk") next.value *= unit.atkEff;
-          if (next.kind === "defPct") next.value *= unit.defEff;
-          else if (next.scale === "def") next.value *= unit.defEff;
+          if (next.kind === "atkPct" || next.kind === "skillAmp") next.value *= effectiveAtkEff(unit);
+          else if (next.scale === "atk") next.value *= effectiveAtkEff(unit);
+          if (next.kind === "defPct") next.value *= effectiveDefEff(unit);
+          else if (next.scale === "def") next.value *= effectiveDefEff(unit);
         }
         unit.effects = unit.effects.filter((item) => item.id !== next.id);
         unit.effects.push(next);
@@ -419,7 +468,7 @@
           }
         }
         if (absorbed > 0 && absorb.convertAtk) {
-          const atkVal = absorb.convertAtk * (defender.atkEff || 1);
+          const atkVal = absorb.convertAtk * effectiveAtkEff(defender);
           defender.effects = defender.effects.filter((effect) => effect.id !== "voidguard-atk");
           defender.effects.push({
             id: "voidguard-atk",
@@ -661,7 +710,7 @@
         enemyAttack(0.88 + missing * 0.85, "殴打");
         return;
       }
-      if (enemy.pattern === "warden" && enemy.hp / enemy.maxHp < 0.55 && !enemy.effects.some((e) => e.id === "warden")) {
+      if (enemy.pattern === "warden" && enemy.hp / enemy.maxHp <= 0.5 && !enemy.effects.some((e) => e.id === "warden")) {
         ctx.actor = enemy;
         ctx.addEffect(enemy, {
           id: "warden",
@@ -1006,12 +1055,12 @@
       guard += 1;
       if (nextP <= nextE) {
         lastSide = "player";
-        nextP += 1000 / player.speed;
+        nextP += 1000 / effectiveSpeed(player);
         actions += 1;
         if (!takeTurn(player)) break;
       } else {
         lastSide = "enemy";
-        nextE += 1000 / enemy.speed;
+        nextE += 1000 / effectiveSpeed(enemy);
         actions += 1;
         if (!takeTurn(enemy)) break;
       }
@@ -1063,6 +1112,7 @@
 
   W.CONDITIONS = CONDITIONS;
   W.CONDITION_BY_TYPE = CONDITION_BY_TYPE;
+  W.COMPARE_RULES_HELP = COMPARE_RULES_HELP;
   W.conditionLabel = conditionLabel;
   W.simulate = simulate;
   W.MAX_ACTIONS = MAX_ACTIONS;

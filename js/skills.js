@@ -137,6 +137,31 @@
     )}`;
   }
 
+  function speedBuffText(base, step, level) {
+    const now = scaled(base, step, level);
+    const next = scaled(base, step, level + 1);
+    return `一時的な行動速度${now >= 0 ? "+" : ""}${pctNowLabel(now)}。${growthTail(
+      `${next >= 0 ? "+" : ""}${pctNowLabel(next)}`,
+      pctStepLabel(Math.abs(step))
+    )}`;
+  }
+
+  function flatEffText(label, base, step, level) {
+    const now = scaled(base, step, level);
+    const next = scaled(base, step, level + 1);
+    const fmt = (v) => `${v >= 0 ? "+" : ""}${v.toFixed(2)}`;
+    return `一時的な${label}${fmt(now)}。${growthTail(fmt(next), step.toFixed(2))}`;
+  }
+
+  function dmgBonusText(base, step, level) {
+    const now = scaled(base, step, level);
+    const next = scaled(base, step, level + 1);
+    return `一時的な与ダメージ補正${now >= 0 ? "+" : ""}${pctNowLabel(now)}。${growthTail(
+      `${next >= 0 ? "+" : ""}${pctNowLabel(next)}`,
+      pctStepLabel(Math.abs(step))
+    )}`;
+  }
+
   function overNote(n) {
     return n > 0 ? `(${n}オーバー)` : "";
   }
@@ -594,7 +619,7 @@
         return [
           "現在体力の13%を払い、次の3行動、防御力を大きく上げる。",
           defBuffText(0.5, 0.02, level, stats),
-          "体力が32%以下のときは手順にあっても飛ばされる。",
+          "体力が32%を超えているときだけ使える（32%以下では飛ばされる）。",
         ];
       },
       use(ctx, level) {
@@ -1828,8 +1853,8 @@
       id: "underdog",
       name: "劣勢",
       group: "攻撃",
-      blurb: "自分の体力割合が相手より低いほど強い。",
-      tradeoff: "体力割合で負けているとき限定。勝ち越していると弱い。",
+      blurb: "自分の体力割合が相手以下のとき強い。",
+      tradeoff: "体力割合で負けている（または互角の）とき限定。勝ち越していると弱い。",
       cooldown: 2,
       gain: gain({ maxHp: 4, atk: 3, speed: 2 }),
       describe(level, stats) {
@@ -1837,7 +1862,7 @@
         const behind = scaled(1.75, 0.07, level);
         return [
           `自分の体力割合が相手以下なら${atkMult(behind, stats)}。`,
-          `相手より余裕があるときは${atkMult(even, stats)}。`,
+          `相手より高いときは${atkMult(even, stats)}。`,
           dualMultGrowth(1.75, 0.07, 0.7, 0.03, level),
         ];
       },
@@ -1866,7 +1891,7 @@
         const trail = scaled(0.68, 0.025, level);
         return [
           `自分の体力割合が相手より高いとき${atkMult(lead, stats)}。`,
-          `相手以下のときは${atkMult(trail, stats)}。`,
+          `相手以下（互角を含む）のときは${atkMult(trail, stats)}。`,
           dualMultGrowth(1.7, 0.065, 0.68, 0.025, level),
         ];
       },
@@ -1895,7 +1920,7 @@
         const far = scaled(0.6, 0.02, level);
         return [
           `体力割合の差が20%以内なら${atkMult(close, stats)}。`,
-          `差がそれ以上なら${atkMult(far, stats)}。`,
+          `差が20%を超えるなら${atkMult(far, stats)}。`,
           dualMultGrowth(1.82, 0.07, 0.6, 0.02, level),
         ];
       },
@@ -1983,7 +2008,9 @@
         ];
       },
       use(ctx, level) {
-        const per = scaled(0.1, 0.025, level) * (ctx.player.atkEff || 1);
+        const per = scaled(0.1, 0.025, level) * (ctx.effectiveAtkEff
+          ? ctx.effectiveAtkEff(ctx.player)
+          : ctx.player.atkEff || 1);
         const turns = Math.max(5, Math.floor(scaled(5, 0.5, level)));
         const cap = Math.max(4, Math.floor(scaled(4, 0.5, level)));
         ctx.addEffect(ctx.player, {
@@ -2297,6 +2324,319 @@
         ctx.log(`${ctx.p}無限廊。再使用の壁が、しばらく消えた。`, "buff");
       },
     },
+    // ---- 速度・効率・与ダメ補正・被ダメ軽減のバフ／デバフ ----
+    {
+      id: "gale",
+      name: "疾風",
+      group: "補助",
+      blurb: "しばらく行動速度を上げ、手番を奪いやすくする。",
+      tradeoff: "攻撃そのものはしない。",
+      cooldown: 3,
+      gain: gain({ maxHp: 2, speed: 8, atk: 1 }),
+      describe(level) {
+        return [`次の4行動、${speedBuffText(0.22, 0.03, level)}`];
+      },
+      use(ctx, level) {
+        ctx.addEffect(ctx.player, {
+          id: "gale",
+          kind: "speedPct",
+          value: scaled(0.22, 0.03, level),
+          turns: 4,
+        });
+        ctx.log(`${ctx.p}疾風。足が軽くなった。`, "buff");
+      },
+    },
+    {
+      id: "fetter",
+      name: "足枷",
+      group: "崩し",
+      blurb: "敵の行動速度を落とす。速い相手へのメタ。",
+      tradeoff: "すでに遅い相手にはご褒美が薄い。",
+      cooldown: 3,
+      gain: gain({ maxHp: 3, atk: 2, speed: 3 }),
+      describe(level, stats) {
+        return [
+          multText(0.75, 0.03, level, stats),
+          `敵の次の4行動、${speedBuffText(-0.2, -0.025, level)}`,
+        ];
+      },
+      use(ctx, level) {
+        const r = ctx.damage(scaled(0.75, 0.03, level));
+        ctx.addEffect(ctx.enemy, {
+          id: "fetter",
+          kind: "speedPct",
+          value: -scaled(0.2, 0.025, level),
+          turns: 4,
+          negative: true,
+        });
+        ctx.log(
+          `${ctx.p}足枷。${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}動きが鈍った。`,
+          "attack"
+        );
+      },
+    },
+    {
+      id: "sharplaw",
+      name: "鋭律",
+      group: "補助",
+      blurb: "攻撃力補助効率を一段上げ、バフの乗りを厚くする。",
+      tradeoff: "攻撃力そのものは上げない。バフ技と組む前提。",
+      cooldown: 3,
+      gain: gain({ maxHp: 3, atkEff: 0.05, atk: 1 }),
+      describe(level) {
+        return [`次の4行動、${flatEffText("攻撃力補助効率", 0.22, 0.03, level)}`];
+      },
+      use(ctx, level) {
+        ctx.addEffect(ctx.player, {
+          id: "sharplaw",
+          kind: "atkEffFlat",
+          value: scaled(0.22, 0.03, level),
+          turns: 4,
+        });
+        ctx.log(`${ctx.p}鋭律。刃への乗りが鋭くなった。`, "buff");
+      },
+    },
+    {
+      id: "dullhex",
+      name: "鈍律",
+      group: "崩し",
+      blurb: "敵の攻撃力補助効率を削り、バフ型を鈍らせる。",
+      tradeoff: "敵がバフを使わないと効果が薄い。",
+      cooldown: 3,
+      gain: gain({ maxHp: 3, atk: 2, def: 1 }),
+      describe(level, stats) {
+        return [
+          multText(0.78, 0.03, level, stats),
+          `敵の次の4行動、${flatEffText("攻撃力補助効率", -0.2, -0.025, level)}`,
+        ];
+      },
+      use(ctx, level) {
+        const r = ctx.damage(scaled(0.78, 0.03, level));
+        ctx.addEffect(ctx.enemy, {
+          id: "dullhex",
+          kind: "atkEffFlat",
+          value: -scaled(0.2, 0.025, level),
+          turns: 4,
+          negative: true,
+        });
+        ctx.log(
+          `${ctx.p}鈍律。${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}刃が鈍った。`,
+          "attack"
+        );
+      },
+    },
+    {
+      id: "guardlaw",
+      name: "守律",
+      group: "補助",
+      blurb: "防御力補助効率を上げ、守りのバフを厚くする。",
+      tradeoff: "防御そのものは上げない。鉄身などと組む前提。",
+      cooldown: 3,
+      gain: gain({ maxHp: 4, defEff: 0.05, def: 1 }),
+      describe(level) {
+        return [`次の4行動、${flatEffText("防御力補助効率", 0.22, 0.03, level)}`];
+      },
+      use(ctx, level) {
+        ctx.addEffect(ctx.player, {
+          id: "guardlaw",
+          kind: "defEffFlat",
+          value: scaled(0.22, 0.03, level),
+          turns: 4,
+        });
+        ctx.log(`${ctx.p}守律。盾への乗りが厚くなった。`, "buff");
+      },
+    },
+    {
+      id: "frailty",
+      name: "脆律",
+      group: "崩し",
+      blurb: "敵の防御力補助効率を削り、守りバフを効きにくくする。",
+      tradeoff: "敵が守りを張らないと恩恵が薄い。",
+      cooldown: 3,
+      gain: gain({ maxHp: 3, atk: 2, def: 2 }),
+      describe(level, stats) {
+        return [
+          multText(0.78, 0.03, level, stats),
+          `敵の次の4行動、${flatEffText("防御力補助効率", -0.2, -0.025, level)}`,
+        ];
+      },
+      use(ctx, level) {
+        const r = ctx.damage(scaled(0.78, 0.03, level));
+        ctx.addEffect(ctx.enemy, {
+          id: "frailty",
+          kind: "defEffFlat",
+          value: -scaled(0.2, 0.025, level),
+          turns: 4,
+          negative: true,
+        });
+        ctx.log(
+          `${ctx.p}脆律。${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}守りが脆くなった。`,
+          "attack"
+        );
+      },
+    },
+    {
+      id: "healrite",
+      name: "癒律",
+      group: "回復",
+      blurb: "体力回復効率を上げ、回復技と自動回復を厚くする。",
+      tradeoff: "即時の大きな回復はない。回復ビルド向き。",
+      cooldown: 4,
+      gain: gain({ maxHp: 5, healEff: 0.04, regenAmount: 1 }),
+      describe(level) {
+        return [`次の4行動、${flatEffText("体力回復効率", 0.2, 0.03, level)}`];
+      },
+      use(ctx, level) {
+        ctx.addEffect(ctx.player, {
+          id: "healrite",
+          kind: "healEffFlat",
+          value: scaled(0.2, 0.03, level),
+          turns: 4,
+        });
+        ctx.log(`${ctx.p}癒律。傷の塞がり方が良くなった。`, "heal");
+      },
+    },
+    {
+      id: "healsap",
+      name: "療削",
+      group: "崩し",
+      blurb: "敵の体力回復効率そのものを削る。",
+      tradeoff: "回復しない相手には弱い崩し。",
+      cooldown: 3,
+      gain: gain({ maxHp: 3, atk: 2, regenAmount: 1 }),
+      describe(level, stats) {
+        return [
+          multText(0.72, 0.03, level, stats),
+          `敵の次の4行動、${flatEffText("体力回復効率", -0.22, -0.03, level)}`,
+        ];
+      },
+      use(ctx, level) {
+        const r = ctx.damage(scaled(0.72, 0.03, level));
+        ctx.addEffect(ctx.enemy, {
+          id: "healsap",
+          kind: "healEffFlat",
+          value: -scaled(0.22, 0.03, level),
+          turns: 4,
+          negative: true,
+        });
+        ctx.log(
+          `${ctx.p}療削。${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}回復の効きを削った。`,
+          "attack"
+        );
+      },
+    },
+    {
+      id: "ruinflash",
+      name: "凶閃",
+      group: "補助",
+      blurb: "与ダメージ補正を一時的に押し上げる。",
+      tradeoff: "攻撃力や技倍率そのものは上げない。",
+      cooldown: 3,
+      gain: gain({ maxHp: 2, atk: 2, dmgBonus: 0.01 }),
+      describe(level) {
+        return [`次の4行動、${dmgBonusText(0.14, 0.02, level)}`];
+      },
+      use(ctx, level) {
+        ctx.addEffect(ctx.player, {
+          id: "ruinflash",
+          kind: "dmgBonus",
+          value: scaled(0.14, 0.02, level),
+          turns: 4,
+        });
+        ctx.log(`${ctx.p}凶閃。刃が凶々しく光った。`, "buff");
+      },
+    },
+    {
+      id: "enfeeble",
+      name: "無力",
+      group: "崩し",
+      blurb: "敵の与ダメージ補正を下げ、打撃を軽くする。",
+      tradeoff: "防御を上げるわけではない。",
+      cooldown: 3,
+      gain: gain({ maxHp: 4, def: 2, dmgReduction: 0.008 }),
+      describe(level, stats) {
+        return [
+          multText(0.7, 0.03, level, stats),
+          `敵の次の4行動、${dmgBonusText(-0.14, -0.02, level)}`,
+        ];
+      },
+      use(ctx, level) {
+        const r = ctx.damage(scaled(0.7, 0.03, level));
+        ctx.addEffect(ctx.enemy, {
+          id: "enfeeble",
+          kind: "dmgBonus",
+          value: -scaled(0.14, 0.02, level),
+          turns: 4,
+          negative: true,
+        });
+        ctx.log(
+          `${ctx.p}無力。${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}打撃が軽くなった。`,
+          "attack"
+        );
+      },
+    },
+    {
+      id: "ironveil",
+      name: "鉄膜",
+      group: "守り",
+      blurb: "被ダメージ軽減を直接押し上げる薄い鉄の膜。",
+      tradeoff: "防御力バフではない。重ねすぎると頭打ちしやすい。",
+      cooldown: 4,
+      gain: gain({ maxHp: 5, def: 2, dmgReduction: 0.015 }),
+      describe(level) {
+        const now = scaled(0.12, 0.015, level);
+        const next = scaled(0.12, 0.015, level + 1);
+        return [
+          `次の4行動、被ダメージ軽減+${pctNowLabel(now)}。${growthTail(
+            `+${pctNowLabel(next)}`,
+            pctStepLabel(0.015)
+          )}`,
+        ];
+      },
+      use(ctx, level) {
+        ctx.addEffect(ctx.player, {
+          id: "ironveil",
+          kind: "dr",
+          value: scaled(0.12, 0.015, level),
+          turns: 4,
+        });
+        ctx.log(`${ctx.p}鉄膜。薄い鉄が肌を覆った。`, "buff");
+      },
+    },
+    {
+      id: "rendveil",
+      name: "裂膜",
+      group: "崩し",
+      blurb: "敵の被ダメージ軽減を大きく引き剥がす。負の領域まで落とせる。",
+      tradeoff: "敵の軽減がもともと低いと伸びしろは限られる。",
+      cooldown: 3,
+      gain: gain({ maxHp: 2, atk: 3, dmgBonus: 0.008 }),
+      describe(level, stats) {
+        const down = scaled(0.2, 0.02, level);
+        const next = scaled(0.2, 0.02, level + 1);
+        return [
+          multText(0.85, 0.03, level, stats),
+          `敵の被ダメージ軽減を${pctNowLabel(down)}下げる（敵の4行動）。下限はさらに低い負の領域まで。${growthTail(
+            pctNowLabel(next),
+            pctStepLabel(0.02)
+          )}`,
+        ];
+      },
+      use(ctx, level) {
+        const r = ctx.damage(scaled(0.85, 0.03, level));
+        ctx.addEffect(ctx.enemy, {
+          id: "rendveil",
+          kind: "dr",
+          value: -scaled(0.2, 0.02, level),
+          turns: 4,
+          negative: true,
+        });
+        ctx.log(
+          `${ctx.p}裂膜。${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}防護の膜を裂いた。`,
+          "attack"
+        );
+      },
+    },
   ];
 
   const GROUPS = ["攻撃", "崩し", "守り", "回復", "補助"];
@@ -2342,7 +2682,7 @@
     stats.atkEff = Math.max(0.25, stats.atkEff);
     stats.defEff = Math.max(0.25, stats.defEff);
     stats.speed = Math.max(50, Math.floor(stats.speed));
-    stats.dmgReduction = Math.max(-0.3, Math.min(0.45, stats.dmgReduction));
+    stats.dmgReduction = Math.max(-0.6, Math.min(0.45, stats.dmgReduction));
     return stats;
   }
 
