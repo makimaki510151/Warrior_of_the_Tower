@@ -169,10 +169,16 @@
   }
 
   function addNode(skillId) {
+    return insertNode(skillId, state.flow.length);
+  }
+
+  function insertNode(skillId, index) {
     if (!(state.skills[skillId] > 0)) return false;
     if (state.flow.length >= MAX_FLOW) return false;
     if (state.flow.some((node) => node.skillId === skillId)) return false;
-    state.flow.push({ skillId, cond: { type: "always" } });
+    const at = Math.max(0, Math.min(state.flow.length, Number(index)));
+    if (!Number.isFinite(at)) return false;
+    state.flow.splice(at, 0, { skillId, cond: { type: "always" } });
     save();
     return true;
   }
@@ -249,6 +255,7 @@
   W.isOpeningPick = isOpeningPick;
   W.pickSkill = pickSkill;
   W.addNode = addNode;
+  W.insertNode = insertNode;
   W.updateNode = updateNode;
   W.moveNode = moveNode;
   W.removeNode = removeNode;

@@ -14,6 +14,8 @@
     hasSave: false,
     expandedCard: null,
     pinnedStat: null,
+    dragSkill: null,
+    suppressCardClick: false,
   };
 
   let app = null;
@@ -352,18 +354,51 @@
     const skill = W.SKILL_BY_ID[id];
     if (!skill) return "";
     const g = groupStyle(skill);
+    const inFlow = state.flow.some((node) => node.skillId === id);
+    const canDrag = !inFlow && state.flow.length < W.MAX_FLOW;
     return `
       <article
-        class="skill-card owned-card is-interactive group-${esc(g.slug)} ${ui.detail ? "is-detail" : ""}"
+        class="skill-card owned-card is-interactive group-${esc(g.slug)} ${ui.detail ? "is-detail" : ""}${
+          canDrag ? " is-draggable" : ""
+        }${inFlow ? " is-in-flow" : ""}"
         data-card-kind="owned"
         data-card-id="${esc(id)}"
         data-group="${esc(skill.group || "")}"
+        ${canDrag ? `draggable="true" data-drag-skill="${esc(id)}"` : ""}
         role="button"
         tabindex="0"
-        aria-label="${esc(g.tag)} ${esc(skill.name)}の詳細を開く"
+        aria-label="${esc(g.tag)} ${esc(skill.name)}${inFlow ? "（手順で使用中）" : canDrag ? "（ドラッグで手順へ）" : ""}の詳細を開く"
       >
         ${skillCardInner(skill, state, "owned")}
+        ${inFlow ? `<p class="tiny owned-used">手順で使用中</p>` : ""}
       </article>
+    `;
+  }
+
+  function flowDropSlot(index, empty) {
+    return `
+      <li
+        class="flow-drop${empty ? " is-empty" : ""}"
+        data-drop-index="${index}"
+        aria-label="${empty ? "ここに技をドロップして手順へ" : `ここに挿入（${index + 1}番目）`}"
+      >
+        <span>${empty ? "技をここにドロップ" : "ここに挿入"}</span>
+      </li>
+    `;
+  }
+
+  function flowPaletteChip(id) {
+    const skill = W.SKILL_BY_ID[id];
+    if (!skill) return "";
+    const g = groupStyle(skill);
+    return `
+      <button
+        type="button"
+        class="flow-chip skill-tag-${esc(g.slug)} is-draggable"
+        draggable="true"
+        data-drag-skill="${esc(id)}"
+        title="手順へドラッグ"
+      >${esc(skill.name)}</button>
     `;
   }
 
@@ -474,6 +509,7 @@
         const meta = W.CONDITION_BY_TYPE[node.cond.type] || W.CONDITION_BY_TYPE.always;
         const value = node.cond.value == null ? meta.def : node.cond.value;
         return `
+          ${flowDropSlot(index, false)}
           <li class="flow-item">
             <span class="idx">${index + 1}</span>
             <select data-bind="node-skill" data-index="${index}">${ownedOptions(state, node.skillId)}</select>
@@ -497,6 +533,8 @@
     const addable = unused
       .map((id) => `<option value="${id}">${esc(W.SKILL_BY_ID[id].name)}</option>`)
       .join("");
+    const canAdd = state.flow.length < W.MAX_FLOW && unused.length > 0;
+    const dropTail = canAdd || state.flow.length > 0 ? flowDropSlot(state.flow.length, state.flow.length === 0) : "";
 
     if (!ui.prepTab || !["stats", "skills", "flow"].includes(ui.prepTab)) ui.prepTab = "flow";
 
@@ -515,6 +553,7 @@
         </section>
         <section class="pane pane-skills ${ui.prepTab === "skills" ? "is-active" : ""}" data-prep-pane="skills">
           <h2>習得技</h2>
+          <p class="tiny pane-hint">未使用の技は手順へドラッグできる</p>
           <div class="owned-grid">
             ${
               ownedIds.length
@@ -525,12 +564,26 @@
         </section>
         <section class="pane pane-flow ${ui.prepTab === "flow" ? "is-active" : ""}" data-prep-pane="flow">
           <h2>手順 <span class="tiny">上から判定・外れは通常攻撃</span></h2>
-          <ol class="flow-list">
-            ${nodes || `<li class="empty">手順なし → 通常攻撃のみ</li>`}
+          ${
+            canAdd
+              ? `<div class="flow-palette" aria-label="手順に追加できる技">
+                  <p class="tiny">ドラッグして手順のすき間へ（間にも挿入可）</p>
+                  <div class="flow-chips">${unused.map((id) => flowPaletteChip(id)).join("")}</div>
+                </div>`
+              : ""
+          }
+          <ol class="flow-list" data-flow-list>
+            ${
+              state.flow.length
+                ? `${nodes}${dropTail}`
+                : canAdd
+                  ? dropTail
+                  : `<li class="empty">手順なし → 通常攻撃のみ</li>`
+            }
             <li class="fallback">↓ 通常攻撃</li>
           </ol>
           ${
-            state.flow.length < W.MAX_FLOW && addable
+            canAdd
               ? `<div class="add-row">
                   <select data-new-skill>${addable}</select>
                   <button type="button" class="btn btn-ghost" data-action="add-node">追加</button>
@@ -764,7 +817,7 @@
               <li>同じ技を重ねると効果は伸びる。付随ステータスは1枚目が満額で、2枚目以降は基礎gainの約${Math.round(
                 (W.STACK_GAIN_BONUS || 0.3) * 100
               )}%分だけ追加（例: +6なら2枚で約+7.8）。</li>
-              <li>手順は最大${W.MAX_FLOW}個。上から判定し、外れは通常攻撃。</li>
+              <li>手順は最大${W.MAX_FLOW}個。上から判定し、外れは通常攻撃。習得技をドラッグして手順のすき間へ挿入できる。</li>
               <li>再使用は「自分の行動を何回空けるか」。</li>
               <li>戦闘ログの行動番号は、あなたと敵で別々に数える。</li>
               <li>使用条件は体力・序盤／終盤・直前の行動・強化弱体などから選ぶ。</li>
@@ -1160,7 +1213,80 @@
 
     const card = event.target.closest("[data-card-id].is-interactive");
     if (card && !event.target.closest("[data-action]")) {
+      if (ui.suppressCardClick) {
+        ui.suppressCardClick = false;
+        return;
+      }
       toggleCardZoom(card.dataset.cardKind, card.dataset.cardId);
+    }
+  }
+
+  function clearDropHighlights() {
+    document.querySelectorAll(".flow-drop.is-over").forEach((el) => el.classList.remove("is-over"));
+    document.querySelectorAll(".is-dragging").forEach((el) => el.classList.remove("is-dragging"));
+  }
+
+  function onDragStart(event) {
+    const source = event.target.closest("[data-drag-skill]");
+    if (!source || !event.dataTransfer) return;
+    const id = source.getAttribute("data-drag-skill");
+    if (!id) return;
+    ui.dragSkill = id;
+    ui.suppressCardClick = false;
+    event.dataTransfer.effectAllowed = "copy";
+    event.dataTransfer.setData("text/plain", id);
+    event.dataTransfer.setData("application/x-wot-skill", id);
+    source.classList.add("is-dragging");
+    document.querySelector("[data-flow-list]")?.classList.add("is-drop-target");
+  }
+
+  function onDragEnd() {
+    ui.dragSkill = null;
+    clearDropHighlights();
+    document.querySelector("[data-flow-list]")?.classList.remove("is-drop-target");
+    // ドラッグ後の click で拡大が開かないようにする
+    ui.suppressCardClick = true;
+    setTimeout(() => {
+      ui.suppressCardClick = false;
+    }, 0);
+  }
+
+  function onDragOver(event) {
+    const zone = event.target.closest("[data-drop-index]");
+    if (!zone) return;
+    if (!ui.dragSkill && !(event.dataTransfer && event.dataTransfer.types)) return;
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
+    document.querySelectorAll(".flow-drop.is-over").forEach((el) => {
+      if (el !== zone) el.classList.remove("is-over");
+    });
+    zone.classList.add("is-over");
+  }
+
+  function onDragLeave(event) {
+    const zone = event.target.closest("[data-drop-index]");
+    if (!zone) return;
+    if (zone.contains(event.relatedTarget)) return;
+    zone.classList.remove("is-over");
+  }
+
+  function onDrop(event) {
+    const zone = event.target.closest("[data-drop-index]");
+    if (!zone) return;
+    event.preventDefault();
+    const id =
+      (event.dataTransfer &&
+        (event.dataTransfer.getData("application/x-wot-skill") ||
+          event.dataTransfer.getData("text/plain"))) ||
+      ui.dragSkill;
+    const index = Number(zone.getAttribute("data-drop-index"));
+    clearDropHighlights();
+    document.querySelector("[data-flow-list]")?.classList.remove("is-drop-target");
+    ui.dragSkill = null;
+    if (!id || !Number.isFinite(index)) return;
+    if (W.insertNode(id, index)) {
+      if (W.sfx) W.sfx.ui();
+      render();
     }
   }
 
@@ -1222,6 +1348,11 @@
       app.addEventListener("click", onBackdrop);
       app.addEventListener("change", onChange);
       app.addEventListener("pointerover", onPointerOver);
+      app.addEventListener("dragstart", onDragStart);
+      app.addEventListener("dragend", onDragEnd);
+      app.addEventListener("dragover", onDragOver);
+      app.addEventListener("dragleave", onDragLeave);
+      app.addEventListener("drop", onDrop);
       document.addEventListener("keydown", onKey);
     },
     render,
