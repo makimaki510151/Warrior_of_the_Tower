@@ -8,6 +8,7 @@
     modal: null,
     help: false,
     patchNotes: false,
+    prepTab: "flow",
     battle: null,
     hasSave: false,
     expandedCard: null,
@@ -145,29 +146,32 @@
         ? ui.battle.floor
         : state.floor;
     const best = state.bestCleared;
+    const showMeta = ui.screen !== "title" && ui.screen !== "clear";
+    const showDetail = showMeta;
+    const showReroll = showMeta;
     return `
-      <div class="shell">
+      <div class="shell shell-${ui.screen}">
         <header class="bar">
           <div class="bar-left">
             <strong class="brand">${esc(gameTitle())}</strong>
-            ${ui.screen === "title" ? "" : `<span class="chip">第${floor}層</span>`}
-            ${ui.screen === "title" ? "" : `<span class="chip muted">最高 ${best || "—"}</span>`}
+            ${showMeta ? `<span class="chip chip-floor">第${floor}層</span>` : ""}
+            ${showMeta ? `<span class="chip muted chip-best">最高 ${best || "—"}</span>` : ""}
             ${
-              ui.screen === "title" || ui.screen === "clear"
-                ? ""
-                : `<span class="chip" title="階層クリアでたまる。候補の入れ替えに1消費">リロール ${state.rerollPoints || 0}</span>`
+              showReroll
+                ? `<span class="chip chip-reroll" title="階層クリアでたまる。候補の入れ替えに1消費">リロール ${state.rerollPoints || 0}</span>`
+                : ""
             }
           </div>
           <div class="bar-right">
             ${
-              ui.screen === "title" || ui.screen === "clear"
-                ? ""
-                : `<button type="button" class="btn btn-ghost" data-action="toggle-detail" aria-pressed="${ui.detail}">${
-                    ui.detail ? "標準に切替" : "詳細に切替"
+              showDetail
+                ? `<button type="button" class="btn btn-ghost btn-compact" data-action="toggle-detail" aria-pressed="${ui.detail}">${
+                    ui.detail ? "標準" : "詳細"
                   }</button>`
+                : ""
             }
-            <button type="button" class="btn btn-ghost" data-action="patch-notes">更新履歴</button>
-            <button type="button" class="btn btn-ghost" data-action="help">遊び方</button>
+            <button type="button" class="btn btn-ghost btn-compact" data-action="patch-notes">履歴</button>
+            <button type="button" class="btn btn-ghost btn-compact" data-action="help">遊び方</button>
           </div>
         </header>
         <main class="main main-${ui.screen}">${body}</main>
@@ -227,6 +231,29 @@
     return [...filtered, W.cooldownReuseText(skill.cooldown)];
   }
 
+  const GROUP_STYLE = {
+    攻撃: { slug: "attack", tag: "攻撃", tip: "攻撃技" },
+    崩し: { slug: "break", tag: "弱体", tip: "崩し・弱体技" },
+    守り: { slug: "guard", tag: "守り", tip: "守り技" },
+    回復: { slug: "heal", tag: "回復", tip: "回復技" },
+    補助: { slug: "buff", tag: "強化", tip: "補助・強化技" },
+  };
+
+  function groupStyle(skill) {
+    return (
+      GROUP_STYLE[skill && skill.group] || {
+        slug: "other",
+        tag: (skill && skill.group) || "技",
+        tip: "技",
+      }
+    );
+  }
+
+  function skillGroupTag(skill) {
+    const g = groupStyle(skill);
+    return `<span class="skill-tag skill-tag-${esc(g.slug)}" title="${esc(g.tip)}">${esc(g.tag)}</span>`;
+  }
+
   function skillCardInner(skill, state, kind) {
     const sourceKind = kind === "zoom" && ui.expandedCard ? ui.expandedCard.kind : kind;
     const level = state.skills[skill.id] || 0;
@@ -265,7 +292,10 @@
     return `
       <div class="skill-body">
         <header class="skill-top">
-          <strong>${esc(skill.name)}</strong>
+          <div class="skill-title-row">
+            ${skillGroupTag(skill)}
+            <strong>${esc(skill.name)}</strong>
+          </div>
           <span class="skill-meta">${esc(meta)}</span>
         </header>
         <p class="skill-blurb">${esc(skill.blurb)}</p>
@@ -282,14 +312,16 @@
   function offerCard(id, state) {
     const skill = W.SKILL_BY_ID[id];
     if (!skill) return "";
+    const g = groupStyle(skill);
     return `
       <article
-        class="skill-card offer-card is-interactive ${ui.detail ? "is-detail" : ""}"
+        class="skill-card offer-card is-interactive group-${esc(g.slug)} ${ui.detail ? "is-detail" : ""}"
         data-card-kind="offer"
         data-card-id="${esc(id)}"
+        data-group="${esc(skill.group || "")}"
         role="button"
         tabindex="0"
-        aria-label="${esc(skill.name)}の詳細を開く"
+        aria-label="${esc(g.tag)} ${esc(skill.name)}の詳細を開く"
       >
         ${skillCardInner(skill, state, "offer")}
       </article>
@@ -299,14 +331,16 @@
   function ownedSkillCard(id, state) {
     const skill = W.SKILL_BY_ID[id];
     if (!skill) return "";
+    const g = groupStyle(skill);
     return `
       <article
-        class="skill-card owned-card is-interactive ${ui.detail ? "is-detail" : ""}"
+        class="skill-card owned-card is-interactive group-${esc(g.slug)} ${ui.detail ? "is-detail" : ""}"
         data-card-kind="owned"
         data-card-id="${esc(id)}"
+        data-group="${esc(skill.group || "")}"
         role="button"
         tabindex="0"
-        aria-label="${esc(skill.name)}の詳細を開く"
+        aria-label="${esc(g.tag)} ${esc(skill.name)}の詳細を開く"
       >
         ${skillCardInner(skill, state, "owned")}
       </article>
@@ -318,9 +352,10 @@
     const state = W.getState();
     const skill = W.SKILL_BY_ID[ui.expandedCard.id];
     if (!skill) return "";
+    const g = groupStyle(skill);
     return `
       <div class="card-zoom-backdrop" data-action="close-card-zoom">
-        <article class="skill-card card-zoom" data-card-zoom data-card-id="${esc(skill.id)}" role="dialog" aria-modal="true">
+        <article class="skill-card card-zoom group-${esc(g.slug)}" data-card-zoom data-card-id="${esc(skill.id)}" data-group="${esc(skill.group || "")}" role="dialog" aria-modal="true">
           ${skillCardInner(skill, state, "zoom")}
           <p class="card-zoom-hint">もう一度クリック、または外側クリックで閉じる</p>
         </article>
@@ -335,15 +370,22 @@
     const points = state.rerollPoints || 0;
     return shell(
       `
-      <p class="hint">技を1つ選ぶ（${W.SKILLS.length}種から${offer.length}） · いま${ui.detail ? "詳細" : "標準"}表示</p>
+      <p class="hint offer-hint">技を1つ選ぶ（${W.SKILLS.length}種から${offer.length}） · いま${ui.detail ? "詳細" : "標準"}表示 · カードを開いて確認</p>
+      <p class="group-legend" aria-hidden="true">
+        <span class="skill-tag skill-tag-attack">攻撃</span>
+        <span class="skill-tag skill-tag-break">弱体</span>
+        <span class="skill-tag skill-tag-guard">守り</span>
+        <span class="skill-tag skill-tag-heal">回復</span>
+        <span class="skill-tag skill-tag-buff">強化</span>
+      </p>
       <div class="offer-grid">
         ${offer.map((id) => offerCard(id, state)).join("")}
       </div>
     `,
-      `<footer class="foot">
-        <span class="tiny">リロールポイント ${points}（階層クリアで+1）</span>
+      `<footer class="foot foot-offer">
+        <span class="tiny foot-note">リロール ${points}（クリアで+1）</span>
         <button type="button" class="btn btn-ghost" data-action="reroll" ${points < 1 ? "disabled" : ""}>
-          候補を入れ替える（1消費）
+          入れ替え（1）
         </button>
       </footer>`
     );
@@ -417,15 +459,22 @@
       .map((id) => `<option value="${id}">${esc(W.SKILL_BY_ID[id].name)}</option>`)
       .join("");
 
+    if (!ui.prepTab || !["stats", "skills", "flow"].includes(ui.prepTab)) ui.prepTab = "flow";
+
     return shell(
       `
-      <div class="prep-grid">
-        <section class="pane pane-stats">
+      <nav class="prep-tabs" role="tablist" aria-label="準備画面の切替">
+        <button type="button" class="prep-tab ${ui.prepTab === "stats" ? "is-active" : ""}" data-action="prep-tab" data-tab="stats" role="tab" aria-selected="${ui.prepTab === "stats"}">能力</button>
+        <button type="button" class="prep-tab ${ui.prepTab === "skills" ? "is-active" : ""}" data-action="prep-tab" data-tab="skills" role="tab" aria-selected="${ui.prepTab === "skills"}">習得技 ${ownedIds.length}</button>
+        <button type="button" class="prep-tab ${ui.prepTab === "flow" ? "is-active" : ""}" data-action="prep-tab" data-tab="flow" role="tab" aria-selected="${ui.prepTab === "flow"}">手順 ${state.flow.length}</button>
+      </nav>
+      <div class="prep-grid" data-prep-tab="${esc(ui.prepTab)}">
+        <section class="pane pane-stats ${ui.prepTab === "stats" ? "is-active" : ""}" data-prep-pane="stats">
           <h2>能力</h2>
           ${playerStatsList(stats, null, { tips: true })}
           <p class="tiny">習得 ${ownedIds.length}種 · ${ui.detail ? "詳細" : "標準"} · 能力名で説明</p>
         </section>
-        <section class="pane pane-skills">
+        <section class="pane pane-skills ${ui.prepTab === "skills" ? "is-active" : ""}" data-prep-pane="skills">
           <h2>習得技</h2>
           <div class="owned-grid">
             ${
@@ -435,7 +484,7 @@
             }
           </div>
         </section>
-        <section class="pane pane-flow">
+        <section class="pane pane-flow ${ui.prepTab === "flow" ? "is-active" : ""}" data-prep-pane="flow">
           <h2>手順 <span class="tiny">上から判定・外れは通常攻撃</span></h2>
           <ol class="flow-list">
             ${nodes || `<li class="empty">手順なし → 通常攻撃のみ</li>`}
@@ -452,8 +501,8 @@
         </section>
       </div>
     `,
-      `<footer class="foot">
-        <button type="button" class="btn btn-primary" data-action="fight">第${state.floor}層に挑む</button>
+      `<footer class="foot foot-prep">
+        <button type="button" class="btn btn-primary btn-fight" data-action="fight">第${state.floor}層に挑む</button>
       </footer>`
     );
   }
@@ -920,6 +969,15 @@
         ui.detail = !ui.detail;
         render();
         if (ui.battle && ui.battle.phase === "playing") play();
+        return;
+      }
+      if (action === "prep-tab") {
+        if (W.sfx) W.sfx.ui();
+        const tab = button.getAttribute("data-tab");
+        if (tab === "stats" || tab === "skills" || tab === "flow") {
+          ui.prepTab = tab;
+          render();
+        }
         return;
       }
       if (action === "pick") {
