@@ -101,8 +101,15 @@
   }
 
   function signedPlain(value) {
-    const n = intNum(value);
-    return n > 0 ? `+${n}` : String(n);
+    const n = Number(value) || 0;
+    if (!Number.isFinite(n)) return "0";
+    const rounded = Math.round(n * 10) / 10;
+    if (Math.abs(rounded - Math.round(rounded)) < 0.05) {
+      const whole = Math.round(rounded);
+      return whole > 0 ? `+${whole}` : String(whole);
+    }
+    const text = rounded.toFixed(1);
+    return rounded > 0 ? `+${text}` : text;
   }
 
   function gainText(key, value, asPct) {
@@ -238,14 +245,13 @@
             let suffix = "";
             if (showTotal && contrib) {
               value = contrib[key] || 0;
-              const linear = base * lv;
-              const extra = value - linear;
-              if (Math.abs(extra) >= 0.0005) {
-                suffix = `（重複${esc(gainText(key, extra, asPct))}）`;
+              const stackExtra = base * Math.max(0, lv - 1) * bonus;
+              if (lv >= 2 && Math.abs(stackExtra) >= 0.0005) {
+                suffix = `（うち重複${esc(gainText(key, stackExtra, asPct))}）`;
               }
             } else if (showUpgrade && bonus > 0 && base) {
-              value = base * (1 + bonus);
-              suffix = "／獲得";
+              value = base * bonus;
+              suffix = "／重複分";
             }
             return `<li><span>${label}</span><b>${esc(gainText(key, value, asPct))}${suffix}</b></li>`;
           })
@@ -255,14 +261,11 @@
     if (bonus > 0) {
       const pct = Math.round(bonus * 100);
       if (mode === "offer" && lv === 0) {
-        note = `<p class="tiny gain-note">同じ技を重ねると、効果だけでなく付随ステータスも2枚目以降さらに+${pct}%分伸びる</p>`;
+        note = `<p class="tiny gain-note">同じ技を重ねると効果は伸びるが、付随ステータスの2枚目以降は基礎の約${pct}%分だけ追加</p>`;
       } else if (showUpgrade) {
-        note = `<p class="tiny gain-note">重複ボーナス込み。この獲得の付随ステータスは基礎の${(1 + bonus)
-          .toFixed(2)
-          .replace(/\.00$/, "")
-          .replace(/(\.\d)0$/, "$1")}倍分</p>`;
+        note = `<p class="tiny gain-note">この獲得で増える付随ステータスは基礎の${pct}%分（1枚目の満額は再度乗らない）</p>`;
       } else if (showTotal && lv >= 2) {
-        note = `<p class="tiny gain-note">表示は重複ボーナス込みの合計（2枚目以降 +${pct}%）</p>`;
+        note = `<p class="tiny gain-note">合計 = 1枚目の満額 + 重複分（2枚目以降は各+${pct}%）</p>`;
       }
     }
     return `${list}${note}`;
@@ -786,9 +789,9 @@
               <li>約${W.SKILLS.length}種の技から毎回5つ提示。1つだけ獲得／強化。</li>
               <li>最初の技を得るまでは候補の入れ替えが無料で何度でもできる。2つ目以降はリロールポイントを1消費。</li>
               <li>階層クリアごとにリロールポイントが1たまる。候補画面で1消費し、5枚を全技から入れ替えられる（上限なし）。</li>
-              <li>同じ技を重ねると効果とステータスが伸びる。2枚目以降、付随ステータスに基礎gainの${Math.round(
-                (W.STACK_GAIN_BONUS || 0.25) * 100
-              )}%分が追加で乗る。</li>
+              <li>同じ技を重ねると効果は伸びる。付随ステータスは1枚目が満額で、2枚目以降は基礎gainの約${Math.round(
+                (W.STACK_GAIN_BONUS || 0.3) * 100
+              )}%分だけ追加（例: +6なら2枚で約+7.8）。</li>
               <li>手順は最大${W.MAX_FLOW}個。上から判定し、外れは通常攻撃。</li>
               <li>再使用は「自分の行動を何回空けるか」。</li>
               <li>戦闘ログの行動番号は、あなたと敵で別々に数える。</li>

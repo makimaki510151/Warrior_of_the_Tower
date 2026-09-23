@@ -1864,8 +1864,8 @@
 
   const STAT_KEYS = Object.keys(BASE_STATS);
   const OFFER_COUNT = 5;
-  /** 2枚目以降、基礎gainに上乗せする重複ボーナス係数（若干伸びる） */
-  const STACK_GAIN_BONUS = 0.25;
+  /** 2枚目以降に乗る付随ステータス係数（1枚目は満額、追加分は基礎gain×この値） */
+  const STACK_GAIN_BONUS = 0.3;
 
   function gainFromSkill(skill, level) {
     const lv = Math.max(0, Math.floor(level || 0));
@@ -1873,7 +1873,8 @@
     const out = {};
     STAT_KEYS.forEach((key) => {
       const g = (skill && skill.gain && skill.gain[key]) || 0;
-      out[key] = g * lv + g * stacks * STACK_GAIN_BONUS;
+      // 例: gain 6 / 2枚 → 6 + 6×0.3 = 7.8（線形の 6+6 より抑えめ）
+      out[key] = lv > 0 ? g + g * stacks * STACK_GAIN_BONUS : 0;
     });
     return out;
   }
