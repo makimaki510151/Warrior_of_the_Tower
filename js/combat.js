@@ -350,6 +350,20 @@
         unit.effects = unit.effects.filter((item) => item.id !== next.id);
         unit.effects.push(next);
       },
+      /** 他の技の再使用待ちを即時に進める（exceptId は対象外） */
+      advanceCds(unit, amount, exceptId) {
+        const cut = Math.max(0, Math.floor(amount || 0));
+        if (cut <= 0) return 0;
+        let touched = 0;
+        Object.keys(unit.cd).forEach((id) => {
+          if (exceptId && id === exceptId) return;
+          if (unit.cdFresh[id]) return;
+          unit.cd[id] -= cut;
+          touched += 1;
+          if (unit.cd[id] <= 0) delete unit.cd[id];
+        });
+        return touched;
+      },
       cleanse(unit) {
         const before = unit.effects.length;
         unit.effects = unit.effects.filter((effect) => !effect.negative);
@@ -439,10 +453,15 @@
     }
 
     function endTurn(unit) {
-      const haste = unit.effects.some((effect) => effect.kind === "cdHaste" && !effect.fresh) ? 1 : 0;
+      let hasteExtra = 0;
+      unit.effects.forEach((effect) => {
+        if (effect.kind === "cdHaste" && !effect.fresh) {
+          hasteExtra = Math.max(hasteExtra, Math.max(0, Math.floor(effect.value || 0)));
+        }
+      });
       Object.keys(unit.cd).forEach((id) => {
         if (unit.cdFresh[id]) return;
-        unit.cd[id] -= 1 + haste;
+        unit.cd[id] -= 1 + hasteExtra;
         if (unit.cd[id] <= 0) delete unit.cd[id];
       });
       unit.cdFresh = {};
@@ -458,7 +477,16 @@
     }
 
     function startCooldown(unit, id, skips) {
-      unit.cd[id] = skips;
+      let kick = 0;
+      unit.effects.forEach((effect) => {
+        // 今この行動で付いた拍子は、自分自身の再使用には掛けない
+        if (effect.kind === "cdKick" && !effect.fresh) {
+          kick = Math.max(kick, Math.max(0, Math.floor(effect.value || 0)));
+        }
+      });
+      const final = Math.max(0, skips - kick);
+      if (final <= 0) return;
+      unit.cd[id] = final;
       unit.cdFresh[id] = true;
     }
 

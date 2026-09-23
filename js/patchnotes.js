@@ -17,6 +17,41 @@
   /** @type {{ version: string, date: string, title: string, sections: { heading: string, items: string[] }[] }[]} */
   const PATCH_NOTES = [
     {
+      version: "0.5.17",
+      date: "2026-09-23",
+      title: "加速・拍子をリワーク強化",
+      sections: [
+        {
+          heading: "共通（戦闘）",
+          items: [
+            "cdHaste の value を参照するよう変更。効果量ぶん待ちが進む（従来は有無だけで常に+1）。",
+            "新効果 cdKick: 効果中に撃った技の再使用空きを最初から減らす（付与した直後の自分自身には掛からない）。",
+            "ctx.advanceCds: 使用時に他の技の待ちを即時に進める。",
+          ],
+        },
+        {
+          heading: "加速（haste／補助）",
+          items: [
+            "再使用 4→3。",
+            "使用時に他の技の待ちを即時進行（base 1 / step +0.5、切り捨て。Lv1=1、Lv3=2）。",
+            "その後の待ち促進: value base 1 / step +0.5（切り捨て）。行動終了ごとに待ちが 1+value 進む。持続 base 4 / step +0.5（Lv1=4、Lv3=5）。",
+            "同じあいだ攻撃力バフ base +18% / step +5%（atkEff 乗算）を追加。",
+            "gain: 体力+3 攻撃+1 速度+9 → 体力+4 攻撃+2 速度+12 攻撃力補助効率+0.04。",
+          ],
+        },
+        {
+          heading: "拍子（tempo／補助）",
+          items: [
+            "再使用 3→2。",
+            "使用時に他の技の待ちを即時進行（base 1 / step +0.35、切り捨て）。",
+            "待ち促進 value base 1 / step +0.35。持続 base 3 / step +0.5（Lv1=3、Lv3=4）。",
+            "新効果: 効果中に撃った技の再使用空きを最初から削減（cdKick base 1 / step +0.35）。",
+            "gain: 体力+2 速度+7 攻撃+1 → 体力+3 速度+10 攻撃+2 攻撃力補助効率+0.03。",
+          ],
+        },
+      ],
+    },
+    {
       version: "0.5.16",
       date: "2026-09-23",
       title: "回復技の攻撃力低下を撤廃",
