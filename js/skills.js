@@ -615,13 +615,13 @@
       name: "応急",
       group: "回復",
       blurb: "その場で少し体力を戻す。回復だけでは伸びにくい。",
-      tradeoff: "回復量は控えめ。攻撃力が下がり、再使用も遅い。",
+      tradeoff: "回復量は控えめ。再使用も遅い。",
       cooldown: 5,
-      gain: gain({ maxHp: 4, atk: -3, def: 1, healEff: 0.01, speed: -3 }),
+      gain: gain({ maxHp: 4, def: 1, healEff: 0.01, speed: -3 }),
       describe(level, stats) {
         return [
           healPctText(0.08, 0.004, level, stats),
-          "回復効率がかかる。習得しても攻撃は弱くなる。",
+          "回復効率がかかる。",
         ];
       },
       use(ctx, level) {
@@ -635,9 +635,9 @@
       name: "再生",
       group: "回復",
       blurb: "時間をかけて回復する。今すぐ足りないときには遅い。",
-      tradeoff: "総量は応急より多いが、攻撃が大きく下がり、途中で倒れると取りこぼす。",
+      tradeoff: "総量は応急より多いが、途中で倒れると取りこぼす。",
       cooldown: 6,
-      gain: gain({ maxHp: 5, atk: -4, def: 1, regenAmount: 1, healEff: 0.01, speed: -2 }),
+      gain: gain({ maxHp: 5, def: 1, regenAmount: 1, healEff: 0.01, speed: -2 }),
       describe(level, stats) {
         const each = scaled(0.03, 0.002, level);
         const next = scaled(0.03, 0.002, level + 1);
@@ -665,9 +665,9 @@
       name: "脈動",
       group: "回復",
       blurb: "しばらく自動回復が増える。短い戦いでは間に合わない。",
-      tradeoff: "即時回復はない。行動が大きく遅くなり、攻撃も下がる。",
+      tradeoff: "即時回復はない。行動が大きく遅くなる。",
       cooldown: 5,
-      gain: gain({ maxHp: 4, atk: -2, def: 1, regenAmount: 1, speed: -5 }),
+      gain: gain({ maxHp: 4, def: 1, regenAmount: 1, speed: -5 }),
       describe(level, stats) {
         const extra = scaled(3, 0.6, level);
         const next = scaled(3, 0.6, level + 1);
@@ -693,7 +693,7 @@
       blurb: "弱体を払い、わずかに回復する。何も受けていなければほぼ無駄。",
       tradeoff: "回復量は薄い。弱体がない戦いでは枠を圧迫する。",
       cooldown: 4,
-      gain: gain({ maxHp: 4, atk: -2, def: 1, healEff: 0.01 }),
+      gain: gain({ maxHp: 4, def: 1, healEff: 0.01 }),
       describe(level, stats) {
         return [
           "自分の弱体をすべて消す。",
@@ -765,24 +765,50 @@
       id: "haste",
       name: "加速",
       group: "補助",
-      blurb: "しばらく技の再使用が早まる。自身はダメージを与えない。",
-      tradeoff: "行動速度そのものは連撃ほど上がらない。技の回転だけが速くなる。",
-      cooldown: 4,
-      gain: gain({ maxHp: 3, atk: 1, speed: 9 }),
+      blurb: "技の待ちを一気に進め、しばらく回転と攻撃を底上げする。",
+      tradeoff: "その行動では殴らない。待ちが空いていると即時短縮の恩恵は薄い。",
+      cooldown: 3,
+      gain: gain({ maxHp: 4, atk: 2, speed: 12, atkEff: 0.04 }),
       describe(level, stats) {
+        const instant = Math.max(1, Math.floor(scaled(1, 0.5, level)));
+        const nextInstant = Math.max(1, Math.floor(scaled(1, 0.5, level + 1)));
+        const haste = Math.max(1, Math.floor(scaled(1, 0.5, level)));
+        const nextHaste = Math.max(1, Math.floor(scaled(1, 0.5, level + 1)));
+        const turns = Math.max(4, Math.floor(scaled(4, 0.5, level)));
+        const nextTurns = Math.max(4, Math.floor(scaled(4, 0.5, level + 1)));
         return [
-          "効果中、自分の行動が終わるたびに、他の技の待ちが「1」ではなく「2」進む（空き回数があと少なくなる）。",
-          "自分へのダメージはない。レベルでは加速の強さは変わらず、伸びるのは基礎ステータスだけ。",
+          `使用時、他の技の待ちを${instant}進める。${growthTail(`${nextInstant}`, "0.5切捨")}`,
+          `その後${turns}行動、自分の行動が終わるたびに待ちが「1」ではなく「${1 + haste}」進む。${growthTail(
+            `待ち+${nextHaste}／${nextTurns}行動`,
+            "0.5切捨"
+          )}`,
+          `同じあいだ、${atkBuffText(0.18, 0.05, level, stats)}`,
         ];
       },
-      use(ctx) {
+      use(ctx, level) {
+        const instant = Math.max(1, Math.floor(scaled(1, 0.5, level)));
+        const haste = Math.max(1, Math.floor(scaled(1, 0.5, level)));
+        const turns = Math.max(4, Math.floor(scaled(4, 0.5, level)));
+        const advanced = ctx.advanceCds(ctx.player, instant, "haste");
         ctx.addEffect(ctx.player, {
           id: "haste",
           kind: "cdHaste",
-          value: 1,
-          turns: 3,
+          value: haste,
+          turns,
         });
-        ctx.log(`${ctx.p}加速。技の待ちが進みやすくなる。`, "buff");
+        ctx.addEffect(ctx.player, {
+          id: "haste-atk",
+          kind: "atkPct",
+          value: scaled(0.18, 0.05, level),
+          turns,
+          scale: "atk",
+        });
+        ctx.log(
+          `${ctx.p}加速。${
+            advanced > 0 ? `待ちを${instant}進め、` : ""
+          }技の回転と攻撃力が上がった。`,
+          "buff"
+        );
       },
     },
     {
@@ -1225,9 +1251,9 @@
       name: "息吹",
       group: "回復",
       blurb: "体力がかなり減ったときだけ戻す。",
-      tradeoff: "条件が厳しく、攻撃も大きく下がる。余裕があるときは使えない。",
+      tradeoff: "条件が厳しい。余裕があるときは使えない。",
       cooldown: 6,
-      gain: gain({ maxHp: 5, atk: -3, healEff: 0.01, speed: -2 }),
+      gain: gain({ maxHp: 5, healEff: 0.01, speed: -2 }),
       available(ctx) {
         return ctx.player.hp / ctx.player.maxHp <= 0.35;
       },
@@ -1294,24 +1320,55 @@
       id: "tempo",
       name: "拍子",
       group: "補助",
-      blurb: "加速より短い再使用促進。",
-      tradeoff: "ダメージはない。",
-      cooldown: 3,
-      gain: gain({ maxHp: 2, speed: 7, atk: 1 }),
+      blurb: "短い拍で待ちを進め、直後に撃つ技の再使用も軽くする。",
+      tradeoff: "加速より持続は短い。待ちが空いていると即時短縮の恩恵は薄い。",
+      cooldown: 2,
+      gain: gain({ maxHp: 3, speed: 10, atk: 2, atkEff: 0.03 }),
       describe(level, stats) {
+        const instant = Math.max(1, Math.floor(scaled(1, 0.35, level)));
+        const nextInstant = Math.max(1, Math.floor(scaled(1, 0.35, level + 1)));
+        const haste = Math.max(1, Math.floor(scaled(1, 0.35, level)));
+        const nextHaste = Math.max(1, Math.floor(scaled(1, 0.35, level + 1)));
+        const turns = Math.max(3, Math.floor(scaled(3, 0.5, level)));
+        const nextTurns = Math.max(3, Math.floor(scaled(3, 0.5, level + 1)));
+        const kick = Math.max(1, Math.floor(scaled(1, 0.35, level)));
+        const nextKick = Math.max(1, Math.floor(scaled(1, 0.35, level + 1)));
         return [
-          "効果中、自分の行動が終わるたびに、他の技の待ちが「1」ではなく「2」進む。",
-          "加速より短い。レベルでは拍子の強さは変わらない。",
+          `使用時、他の技の待ちを${instant}進める。${growthTail(`${nextInstant}`, "0.35切捨")}`,
+          `その後${turns}行動、待ちが「1」ではなく「${1 + haste}」進む。${growthTail(
+            `待ち+${nextHaste}／${nextTurns}行動`,
+            "0.35／0.5切捨"
+          )}`,
+          `効果中に撃った技は、再使用の空きが最初から${kick}少ない。${growthTail(
+            `${nextKick}`,
+            "0.35切捨"
+          )}`,
         ];
       },
-      use(ctx) {
+      use(ctx, level) {
+        const instant = Math.max(1, Math.floor(scaled(1, 0.35, level)));
+        const haste = Math.max(1, Math.floor(scaled(1, 0.35, level)));
+        const turns = Math.max(3, Math.floor(scaled(3, 0.5, level)));
+        const kick = Math.max(1, Math.floor(scaled(1, 0.35, level)));
+        const advanced = ctx.advanceCds(ctx.player, instant, "tempo");
         ctx.addEffect(ctx.player, {
           id: "tempo",
           kind: "cdHaste",
-          value: 1,
-          turns: 2,
+          value: haste,
+          turns,
         });
-        ctx.log(`${ctx.p}拍子。技の待ちが少し早く進む。`, "buff");
+        ctx.addEffect(ctx.player, {
+          id: "tempo-kick",
+          kind: "cdKick",
+          value: kick,
+          turns,
+        });
+        ctx.log(
+          `${ctx.p}拍子。${
+            advanced > 0 ? `待ちを${instant}進め、` : ""
+          }次に撃つ技の再使用も軽くなった。`,
+          "buff"
+        );
       },
     },
     {
@@ -1431,9 +1488,9 @@
       name: "泉湧",
       group: "回復",
       blurb: "しばらく自動回復量を底上げする。即時回復はない。",
-      tradeoff: "戦闘が短いと間に合わない。攻撃は下がる。",
+      tradeoff: "戦闘が短いと間に合わない。",
       cooldown: 5,
-      gain: gain({ maxHp: 7, regenAmount: 3, atk: -2, healEff: 0.01 }),
+      gain: gain({ maxHp: 7, regenAmount: 3, healEff: 0.01 }),
       describe(level, stats) {
         const extra = scaled(4, 1.5, level);
         const next = scaled(4, 1.5, level + 1);
@@ -1522,9 +1579,9 @@
       name: "回春",
       group: "回復",
       blurb: "自動回復量を基礎に、すぐ戻してから脈を残す。",
-      tradeoff: "自動回復量が低いとほぼ効かない。攻撃は下がる。",
+      tradeoff: "自動回復量が低いとほぼ効かない。",
       cooldown: 5,
-      gain: gain({ maxHp: 6, regenAmount: 3, atk: -3, healEff: 0.02, regenInterval: -1 }),
+      gain: gain({ maxHp: 6, regenAmount: 3, healEff: 0.02, regenInterval: -1 }),
       describe(level, stats) {
         const mult = scaled(1.1, 0.2, level);
         const next = scaled(1.1, 0.2, level + 1);
