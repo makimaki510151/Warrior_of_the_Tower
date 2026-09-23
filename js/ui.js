@@ -645,7 +645,6 @@
   }
 
   function render() {
-    applyZoom();
     let body = "";
     if (ui.screen === "title") body = renderTitle();
     else if (ui.screen === "offer") body = renderOffer();
