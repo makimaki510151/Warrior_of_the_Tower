@@ -1911,6 +1911,392 @@
         );
       },
     },
+    // ---- 革新的ユニーク10種 ----
+    {
+      id: "echo",
+      name: "残響",
+      group: "攻撃",
+      blurb: "一撃を残し、次の残響で重ねて爆発させる。積み重ねるほど主役になる。",
+      tradeoff: "単発では普通。残響を貯めない手順では伸びない。",
+      cooldown: 3,
+      gain: gain({ maxHp: 4, atk: 4, atkEff: 0.03, dmgBonus: 0.008 }),
+      describe(level, stats) {
+        const base = scaled(0.95, 0.04, level);
+        const store = scaled(0.55, 0.06, level);
+        const nextStore = scaled(0.55, 0.06, level + 1);
+        return [
+          `威力は${atkMult(base, stats)}。与えたダメージの${pctNowLabel(store)}を残響として記憶する。`,
+          "残響が残っているときにもう一度使うと、記憶した分を上乗せして放ち、新たに記憶し直す。",
+          growthTail(`記憶${pctNowLabel(nextStore)}`, pctStepLabel(0.06)),
+        ];
+      },
+      use(ctx, level) {
+        const base = scaled(0.95, 0.04, level);
+        const storeRate = scaled(0.55, 0.06, level);
+        const prev = ctx.findEffect(ctx.player, "echo");
+        const bonus = prev ? Math.max(0, Math.floor(prev.value || 0)) : 0;
+        const r = ctx.damage(base);
+        const total = r.dmg + bonus;
+        if (bonus > 0) {
+          const hurt = ctx.hurt(ctx.enemy, bonus, "echo");
+          ctx.log(
+            `${ctx.p}残響。本撃${r.dmg}に残響${hurt.dealt}が重なり、合計${r.dmg + hurt.dealt}。${ctx.overNote(r.over + hurt.over)}`,
+            "attack"
+          );
+        } else {
+          ctx.log(
+            `${ctx.p}残響。${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}響きを残した。`,
+            "attack"
+          );
+        }
+        const stored = Math.max(1, Math.floor(total * storeRate));
+        ctx.addEffect(ctx.player, {
+          id: "echo",
+          kind: "echo",
+          value: stored,
+          turns: 8,
+        });
+      },
+    },
+    {
+      id: "crescendo",
+      name: "階調",
+      group: "補助",
+      blurb: "技を重ねるほど次の攻撃が膨らむ。手順の陰の立役者。",
+      tradeoff: "それ自体はダメージを出さない。攻撃技で解放する前提。",
+      cooldown: 4,
+      gain: gain({ maxHp: 3, atk: 2, atkEff: 0.06, speed: 3 }),
+      describe(level, stats) {
+        const per = scaled(0.1, 0.025, level);
+        const turns = Math.max(5, Math.floor(scaled(5, 0.5, level)));
+        const cap = Math.max(4, Math.floor(scaled(4, 0.5, level)));
+        return [
+          `次の${turns}行動、技を使うたびに階調チャージ+1（上限${cap}）。`,
+          `次の攻撃技はチャージをすべて消費し、威力にチャージ×${pctNowLabel(per)}を乗せる（攻撃力補助効率も乗る）。`,
+          growthTail(
+            `+${pctNowLabel(scaled(0.1, 0.025, level + 1))}／${Math.max(5, Math.floor(scaled(5, 0.5, level + 1)))}行動／上限${Math.max(
+              4,
+              Math.floor(scaled(4, 0.5, level + 1))
+            )}`,
+            "2.5%／0.5／0.5"
+          ),
+        ];
+      },
+      use(ctx, level) {
+        const per = scaled(0.1, 0.025, level) * (ctx.player.atkEff || 1);
+        const turns = Math.max(5, Math.floor(scaled(5, 0.5, level)));
+        const cap = Math.max(4, Math.floor(scaled(4, 0.5, level)));
+        ctx.addEffect(ctx.player, {
+          id: "crescendo",
+          kind: "crescendo",
+          value: per,
+          perCharge: per,
+          charges: 0,
+          cap,
+          turns,
+        });
+        ctx.log(`${ctx.p}階調。技の響きが段々と厚くなり始める。`, "buff");
+      },
+    },
+    {
+      id: "bloodpact",
+      name: "血契",
+      group: "攻撃",
+      blurb: "今の体力を賭け、払った血ごとぶん殴るド級の一打。",
+      tradeoff: "体力を大きく削る。回復や守りがないと自滅する。",
+      cooldown: 4,
+      gain: gain({ maxHp: 8, atk: 5, healEff: 0.02, dmgBonus: 0.01 }),
+      describe(level, stats) {
+        const pay = scaled(0.18, 0.015, level);
+        const convert = scaled(2.4, 0.2, level);
+        const base = scaled(0.7, 0.04, level);
+        return [
+          `自分の現在体力の${pctNowLabel(pay)}を支払う。`,
+          `威力は${atkMult(base, stats)}に加え、支払った量×${convert.toFixed(2)}を追加ダメージにする。`,
+          growthTail(
+            `支払い${pctNowLabel(scaled(0.18, 0.015, level + 1))}／×${scaled(2.4, 0.2, level + 1).toFixed(2)}`,
+            "1.5%／0.20"
+          ),
+        ];
+      },
+      use(ctx, level) {
+        const payRate = scaled(0.18, 0.015, level);
+        const convert = scaled(2.4, 0.2, level);
+        const base = scaled(0.7, 0.04, level);
+        const cost = Math.max(1, Math.floor(ctx.player.hp * payRate));
+        const paid = ctx.hurt(ctx.player, cost, "self");
+        const r = ctx.damage(base);
+        const bonus = Math.max(0, Math.floor(paid.dealt * convert));
+        const extra = bonus > 0 ? ctx.hurt(ctx.enemy, bonus, "bloodpact") : { dealt: 0, over: 0 };
+        ctx.log(
+          `${ctx.p}血契。${paid.dealt}を捧げ、${ctx.enemy.name}に${r.dmg + extra.dealt}のダメージ。${ctx.overNote(
+            r.over + extra.over
+          )}`,
+          "attack"
+        );
+      },
+    },
+    {
+      id: "repay",
+      name: "返礼",
+      group: "攻撃",
+      blurb: "受けた傷をすべて刃に変えて返す。耐えるほど主役になる。",
+      tradeoff: "傷を受けていないと弱い。開幕単体では伸びない。",
+      cooldown: 3,
+      gain: gain({ maxHp: 6, atk: 3, def: 2, dmgReduction: 0.01 }),
+      describe(level, stats) {
+        const base = scaled(0.65, 0.03, level);
+        const rate = scaled(0.85, 0.08, level);
+        return [
+          `基礎は${atkMult(base, stats)}。戦闘中に受けたダメージ累計×${rate.toFixed(2)}を追加する。`,
+          "使うと累計は半分になる（すべて消しはしない）。",
+          growthTail(`基礎×${scaled(0.65, 0.03, level + 1).toFixed(2)}／×${scaled(0.85, 0.08, level + 1).toFixed(2)}`, "0.03／0.08"),
+        ];
+      },
+      use(ctx, level) {
+        const base = scaled(0.65, 0.03, level);
+        const rate = scaled(0.85, 0.08, level);
+        const pain = Math.max(0, ctx.player.pain || 0);
+        const bonus = Math.floor(pain * rate);
+        const r = ctx.damage(base);
+        const extra = bonus > 0 ? ctx.hurt(ctx.enemy, bonus, "repay") : { dealt: 0, over: 0 };
+        ctx.player.pain = Math.floor(pain * 0.5);
+        ctx.log(
+          `${ctx.p}返礼。受けた傷${pain}を刃に変え、${ctx.enemy.name}に${r.dmg + extra.dealt}のダメージ。${ctx.overNote(
+            r.over + extra.over
+          )}`,
+          "attack"
+        );
+      },
+    },
+    {
+      id: "resonance",
+      name: "共鳴",
+      group: "攻撃",
+      blurb: "自分の強化と敵の弱体の数だけ鳴る。バフ／崩しビルドの影の主役。",
+      tradeoff: "強化も弱体もないとただの弱い攻撃。",
+      cooldown: 2,
+      gain: gain({ maxHp: 3, atk: 3, atkEff: 0.04, defEff: 0.02 }),
+      describe(level, stats) {
+        const base = scaled(0.8, 0.03, level);
+        const per = scaled(0.16, 0.03, level);
+        return [
+          `基礎は${atkMult(base, stats)}。自分の強化1つ・敵の弱体1つごとに威力+${pctNowLabel(per)}。`,
+          growthTail(
+            `×${scaled(0.8, 0.03, level + 1).toFixed(2)}／+${pctNowLabel(scaled(0.16, 0.03, level + 1))}`,
+            "0.03／3%"
+          ),
+        ];
+      },
+      use(ctx, level) {
+        const base = scaled(0.8, 0.03, level);
+        const per = scaled(0.16, 0.03, level);
+        const buffs = ctx.countBuffs(ctx.player);
+        const debuffs = ctx.countDebuffs(ctx.enemy);
+        const mult = base + (buffs + debuffs) * per;
+        const r = ctx.damage(mult);
+        ctx.log(
+          `${ctx.p}共鳴。強化${buffs}・弱体${debuffs}が響き、${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}`,
+          "attack"
+        );
+      },
+    },
+    {
+      id: "timestitch",
+      name: "時縫い",
+      group: "補助",
+      blurb: "待ちを一気に縫い合わせ、次の技を連打できる余白を作る。",
+      tradeoff: "再使用が長い。待ちが空いていると恩恵が薄い。",
+      cooldown: 5,
+      gain: gain({ maxHp: 4, speed: 8, atkEff: 0.03, atk: 1 }),
+      describe(level, stats) {
+        const cut = Math.max(2, Math.floor(scaled(2, 0.5, level)));
+        const free = Math.max(1, Math.floor(scaled(1, 0.35, level)));
+        return [
+          `使用時、他の技の待ちを${cut}進める。`,
+          `そのあと、次に撃つ技${free}回ぶんは再使用待ちが発生しない。`,
+          growthTail(
+            `待ち${Math.max(2, Math.floor(scaled(2, 0.5, level + 1)))}／無料${Math.max(
+              1,
+              Math.floor(scaled(1, 0.35, level + 1))
+            )}回`,
+            "0.5／0.35切捨"
+          ),
+        ];
+      },
+      use(ctx, level) {
+        const cut = Math.max(2, Math.floor(scaled(2, 0.5, level)));
+        const free = Math.max(1, Math.floor(scaled(1, 0.35, level)));
+        const advanced = ctx.advanceCds(ctx.player, cut, "timestitch");
+        ctx.addEffect(ctx.player, {
+          id: "timestitch",
+          kind: "freeCast",
+          value: free,
+          turns: 6,
+        });
+        ctx.log(
+          `${ctx.p}時縫い。${advanced > 0 ? `待ちを${cut}縫い、` : ""}次の技${free}回が切れ目なく続く。`,
+          "buff"
+        );
+      },
+    },
+    {
+      id: "doommark",
+      name: "終焔",
+      group: "崩し",
+      blurb: "敵に終末の印を押し、時が来たときド級の爆発を起こす。",
+      tradeoff: "すぐには削れない。倒す前に爆発しないと取りこぼす。",
+      cooldown: 4,
+      gain: gain({ maxHp: 3, atk: 3, def: 1, dmgBonus: 0.01 }),
+      describe(level, stats) {
+        const hit = scaled(0.55, 0.03, level);
+        const boom = scaled(2.1, 0.15, level);
+        const delay = Math.max(2, Math.floor(scaled(3, -0.25, level)));
+        return [
+          `軽い一撃（${atkMult(hit, stats)}）と同時に終焔の印を付与する。`,
+          `敵の行動がおよそ${delay}回終わると印が弾け、${atkMult(boom, stats)}相当の爆発が起きる。`,
+          "打ち直すと爆発倍率は更新され、残り時間も振り直される。",
+          growthTail(
+            `一撃×${scaled(0.55, 0.03, level + 1).toFixed(2)}／爆発×${scaled(2.1, 0.15, level + 1).toFixed(2)}`,
+            "0.03／0.15"
+          ),
+        ];
+      },
+      use(ctx, level) {
+        const hit = scaled(0.55, 0.03, level);
+        const boom = scaled(2.1, 0.15, level);
+        const delay = Math.max(2, Math.floor(scaled(3, -0.25, level)));
+        const r = ctx.damage(hit);
+        ctx.addEffect(ctx.enemy, {
+          id: "doommark",
+          kind: "doom",
+          mult: boom,
+          stored: 0,
+          value: boom,
+          turns: delay,
+          negative: true,
+        });
+        ctx.log(
+          `${ctx.p}終焔。${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}終末の印を押した。`,
+          "attack"
+        );
+      },
+    },
+    {
+      id: "voidguard",
+      name: "虚盾",
+      group: "守り",
+      blurb: "次の被弾の大半を虚無に飲み、回復と攻撃へ転化する。",
+      tradeoff: "一度きり。攻撃を受けないと何も起きない。",
+      cooldown: 5,
+      gain: gain({ maxHp: 6, def: 3, defEff: 0.03, dmgReduction: 0.012 }),
+      describe(level, stats) {
+        const rate = scaled(0.7, 0.04, level);
+        const heal = scaled(0.6, 0.05, level);
+        const atk = scaled(0.2, 0.04, level);
+        return [
+          `次に受ける一撃のダメージを${pctNowLabel(rate)}減らす（最低1は残る）。`,
+          `減らした分の${pctNowLabel(heal)}を回復し、${atkBuffText(0.2, 0.04, level, stats)}`,
+          growthTail(`軽減${pctNowLabel(scaled(0.7, 0.04, level + 1))}／回復${pctNowLabel(scaled(0.6, 0.05, level + 1))}`, "4%／5%"),
+        ];
+      },
+      use(ctx, level) {
+        const rate = scaled(0.7, 0.04, level);
+        const heal = scaled(0.6, 0.05, level);
+        const atk = scaled(0.2, 0.04, level);
+        ctx.addEffect(ctx.player, {
+          id: "voidguard",
+          kind: "absorb",
+          value: rate,
+          convertHeal: heal,
+          convertAtk: atk,
+          convertTurns: 3,
+          turns: 5,
+        });
+        ctx.log(`${ctx.p}虚盾。次の衝撃を虚無へ落とす構え。`, "buff");
+      },
+    },
+    {
+      id: "overglow",
+      name: "溢光",
+      group: "回復",
+      blurb: "溢れ出た回復を光として蓄え、次の一撃に乗せる。",
+      tradeoff: "体力が減っていないと光が貯まらない。回復ビルド向き。",
+      cooldown: 4,
+      gain: gain({ maxHp: 7, healEff: 0.03, regenAmount: 2, atk: 1 }),
+      describe(level, stats) {
+        const heal = scaled(0.14, 0.012, level);
+        const bank = scaled(0.9, 0.05, level);
+        return [
+          healPctText(0.14, 0.012, level, stats),
+          `回復しきれなかった分（オーバー）の${pctNowLabel(bank)}を溢光として蓄え、次の攻撃技のダメージに加算する。`,
+          growthTail(`オーバー${pctNowLabel(scaled(0.9, 0.05, level + 1))}`, "5%"),
+        ];
+      },
+      use(ctx, level) {
+        const rate = scaled(0.14, 0.012, level);
+        const bankRate = scaled(0.9, 0.05, level);
+        const healed = ctx.heal(ctx.player, ctx.player.maxHp * rate);
+        const banked = Math.max(0, Math.floor(healed.over * bankRate));
+        if (banked > 0) {
+          ctx.addEffect(ctx.player, {
+            id: "overglow",
+            kind: "overglow",
+            value: banked,
+            turns: 6,
+          });
+        }
+        ctx.log(
+          `${ctx.p}溢光。体力が${healed.got}回復した。${ctx.overNote(healed.over)}${
+            banked > 0 ? `溢れ${banked}が光になった。` : ""
+          }`,
+          "heal"
+        );
+      },
+    },
+    {
+      id: "endless",
+      name: "無限廊",
+      group: "補助",
+      blurb: "短いあいだ、技の再使用という概念を廊下の向こうへ捨てる。",
+      tradeoff: "再使用が非常に長い。使いどころを誤ると死に技。",
+      cooldown: 7,
+      gain: gain({ maxHp: 5, speed: 6, atk: 2, atkEff: 0.05 }),
+      describe(level, stats) {
+        const free = Math.max(2, Math.floor(scaled(2, 0.5, level)));
+        const haste = Math.max(1, Math.floor(scaled(1, 0.25, level)));
+        const turns = Math.max(3, Math.floor(scaled(4, 0.25, level)));
+        return [
+          `次に撃つ技${free}回ぶんは再使用待ちが発生しない。`,
+          `同時に${turns}行動、待ちが「1」ではなく「${1 + haste}」進む。`,
+          growthTail(
+            `無料${Math.max(2, Math.floor(scaled(2, 0.5, level + 1)))}回／待ち+${Math.max(
+              1,
+              Math.floor(scaled(1, 0.25, level + 1))
+            )}／${Math.max(3, Math.floor(scaled(4, 0.25, level + 1)))}行動`,
+            "0.5／0.25／0.25切捨"
+          ),
+        ];
+      },
+      use(ctx, level) {
+        const free = Math.max(2, Math.floor(scaled(2, 0.5, level)));
+        const haste = Math.max(1, Math.floor(scaled(1, 0.25, level)));
+        const turns = Math.max(3, Math.floor(scaled(4, 0.25, level)));
+        ctx.addEffect(ctx.player, {
+          id: "endless",
+          kind: "freeCast",
+          value: free,
+          turns: 8,
+        });
+        ctx.addEffect(ctx.player, {
+          id: "endless-haste",
+          kind: "cdHaste",
+          value: haste,
+          turns,
+        });
+        ctx.log(`${ctx.p}無限廊。再使用の壁が、しばらく消えた。`, "buff");
+      },
+    },
   ];
 
   const GROUPS = ["攻撃", "崩し", "守り", "回復", "補助"];
