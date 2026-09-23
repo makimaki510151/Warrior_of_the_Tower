@@ -17,6 +17,21 @@
   /** @type {{ version: string, date: string, title: string, sections: { heading: string, items: string[] }[] }[]} */
   const PATCH_NOTES = [
     {
+      version: "0.5.1",
+      date: "2026-09-23",
+      title: "スキルカードの種類タグと色分け",
+      sections: [
+        {
+          heading: "見た目",
+          items: [
+            "技カードに種類タグを追加。攻撃＝攻撃、崩し＝弱体、守り＝守り、回復＝回復、補助＝強化。",
+            "カード左縁と背景の薄い色分けで、種類を一目で判別できるようにした。",
+            "候補・所持・拡大表示のすべてに同じ色／タグを適用。",
+          ],
+        },
+      ],
+    },
+    {
       version: "0.5.0",
       date: "2026-09-23",
       title: "縦長スマホ向けUIの大幅改善",
