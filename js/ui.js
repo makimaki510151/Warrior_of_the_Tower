@@ -8,6 +8,7 @@
     modal: null,
     help: false,
     patchNotes: false,
+    offerStats: false,
     prepTab: "flow",
     battle: null,
     hasSave: false,
@@ -188,7 +189,11 @@
 
   function playerStatsList(stats, hp, opts) {
     const compact = !!(opts && opts.compact);
-    const rows = ui.detail || compact ? STAT_ROWS_DETAIL : STAT_ROWS_CORE;
+    const forceDetail = !!(opts && opts.forceDetail);
+    let rows = forceDetail || ui.detail || compact ? STAT_ROWS_DETAIL : STAT_ROWS_CORE;
+    if (opts && opts.hideCurrent) {
+      rows = rows.filter(([key]) => key !== "currentHp");
+    }
     const withTips = !!(opts && opts.tips);
     const listClass = `stat-list${withTips ? " has-tips" : ""}${compact ? " is-compact" : ""}`;
     return `
@@ -378,9 +383,22 @@
     const points = state.rerollPoints || 0;
     const freeReroll = W.isOpeningPick ? W.isOpeningPick(state) : false;
     const canReroll = freeReroll || points >= 1;
+    const stats = W.computeStats(state.skills);
+    const ownedCount = Object.keys(state.skills).filter((id) => state.skills[id] > 0).length;
     return shell(
       `
       <p class="hint offer-hint">技を1つ選ぶ（${W.SKILLS.length}種から${offer.length}） · いま${ui.detail ? "詳細" : "標準"}表示 · カードを開いて確認</p>
+      <div class="offer-self">
+        <div class="offer-self-stats" aria-label="いまの能力（要約）">
+          <span><b>体力</b>${intNum(stats.maxHp)}</span>
+          <span><b>攻撃</b>${intNum(stats.atk)}</span>
+          <span><b>防御</b>${intNum(stats.def)}</span>
+          <span class="tiny">習得 ${ownedCount}</span>
+        </div>
+        <button type="button" class="btn btn-ghost btn-compact" data-action="offer-stats" aria-expanded="${ui.offerStats ? "true" : "false"}">
+          能力を見る
+        </button>
+      </div>
       <p class="group-legend" aria-hidden="true">
         <span class="skill-tag skill-tag-attack">攻撃</span>
         <span class="skill-tag skill-tag-break">弱体</span>
@@ -701,6 +719,20 @@
   }
 
   function modal() {
+    if (ui.offerStats) {
+      const state = W.getState();
+      const stats = W.computeStats(state.skills);
+      const ownedCount = Object.keys(state.skills).filter((id) => state.skills[id] > 0).length;
+      return `
+        <div class="modal" role="dialog" aria-modal="true" aria-label="いまの能力">
+          <div class="modal-card">
+            <h2>いまの能力</h2>
+            <p class="tiny muted">習得 ${ownedCount}種 · 候補選ぶ前の確認</p>
+            ${playerStatsList(stats, null, { forceDetail: true, hideCurrent: true, tips: true })}
+            <button type="button" class="btn btn-primary" data-action="close-modal">閉じる</button>
+          </div>
+        </div>`;
+    }
     if (ui.patchNotes) {
       return `
         <div class="modal" role="dialog" aria-modal="true" aria-label="更新履歴">
@@ -728,6 +760,7 @@
               <li>戦闘ログの行動番号は、あなたと敵で別々に数える。</li>
               <li>使用条件は体力・序盤／終盤・直前の行動・強化弱体などから選ぶ。</li>
               <li>技カードはクリックで拡大表示。能力名に触れると説明が出る。</li>
+              <li>技の候補画面では「能力を見る」でいまのステータスを確認できる。</li>
               <li>敵は序盤だけ弱く、以降は急に強くなる。100層は育成と手順が要る。</li>
               <li>回復技は少なめで代償が大きい。自動回復に注目した技もある。</li>
               <li>標準／詳細で表示量を切り替えられる。</li>
@@ -781,6 +814,7 @@
     ui.modal = null;
     ui.help = false;
     ui.patchNotes = false;
+    ui.offerStats = false;
   }
 
   function beginRun() {
@@ -985,6 +1019,15 @@
         render();
         return;
       }
+      if (action === "offer-stats") {
+        if (W.sfx) W.sfx.ui();
+        ui.offerStats = true;
+        ui.help = false;
+        ui.patchNotes = false;
+        ui.modal = null;
+        render();
+        return;
+      }
       if (action === "toggle-detail") {
         if (W.sfx) W.sfx.ui();
         ui.detail = !ui.detail;
@@ -1139,7 +1182,7 @@
       closeCardZoom(true);
       return;
     }
-    if (!ui.modal && !ui.help && !ui.patchNotes) return;
+    if (!ui.modal && !ui.help && !ui.patchNotes && !ui.offerStats) return;
     closeOverlays();
     if (W.sfx) W.sfx.ui();
     render();

@@ -17,6 +17,21 @@
   /** @type {{ version: string, date: string, title: string, sections: { heading: string, items: string[] }[] }[]} */
   const PATCH_NOTES = [
     {
+      version: "0.5.5",
+      date: "2026-09-23",
+      title: "スキル獲得画面で自身の能力を確認できるように",
+      sections: [
+        {
+          heading: "候補画面",
+          items: [
+            "技の候補画面に、いまの体力・攻撃・防御と習得数の要約を表示。",
+            "「能力を見る」で詳細ステータス（強化・弱体・回復効率など）をモーダル表示。能力名で説明も見られる。",
+            "遊び方ヘルプに、候補画面での能力確認の案内を追加。",
+          ],
+        },
+      ],
+    },
+    {
       version: "0.5.4",
       date: "2026-09-23",
       title: "戦闘詳細ステータスがログを圧迫しないよう調整",

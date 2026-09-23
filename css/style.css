@@ -107,6 +107,43 @@ h1, h2, .brand { font-family: var(--serif); }
 .btn-ghost { background: transparent; border-color: var(--line); color: var(--text); }
 .btn-danger { background: #6e2e2a; border-color: #a85a52; color: #fff4ef; }
 
+.offer-self {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(255, 244, 220, 0.04);
+}
+.offer-self-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  font-size: 0.92em;
+  min-width: 0;
+}
+.offer-self-stats span {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  white-space: nowrap;
+}
+.offer-self-stats b {
+  font-weight: 700;
+  color: var(--muted);
+  font-size: 0.88em;
+}
+.btn-compact {
+  min-height: 32px;
+  padding: 4px 10px;
+  font-size: 0.9em;
+  white-space: nowrap;
+  flex: none;
+}
+
 .offer-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -850,6 +887,20 @@ select {
   }
 
   .offer-hint { font-size: 0.86em; line-height: 1.35; }
+  .offer-self {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .offer-self-stats {
+    justify-content: space-between;
+    gap: 6px 10px;
+    font-size: 0.88em;
+  }
+  .offer-self .btn-compact {
+    width: 100%;
+    min-height: 40px;
+  }
   .offer-grid {
     display: flex;
     flex-direction: column;
