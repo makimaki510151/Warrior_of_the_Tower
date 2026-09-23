@@ -59,6 +59,82 @@
     return `威力は${atkMult(now, stats)}。次の強化で×${next.toFixed(2)}（+${step.toFixed(2)}）`;
   }
 
+  /** 次の強化で…（+step） — 上昇率の共通テンプレート */
+  function growthTail(nextText, stepText) {
+    return `次の強化で${nextText}（+${stepText}）`;
+  }
+
+  function pctStepLabel(step) {
+    const n = Math.floor(step * 1000) / 10;
+    return Number.isInteger(n) ? `${n}%` : `${n}%`;
+  }
+
+  function pctNowLabel(rate) {
+    return `${Math.floor(rate * 100)}%`;
+  }
+
+  /** 条件付き二系統の倍率に上昇率を付ける */
+  function dualMultGrowth(baseA, stepA, baseB, stepB, level) {
+    const nextA = scaled(baseA, stepA, level + 1);
+    const nextB = scaled(baseB, stepB, level + 1);
+    return growthTail(
+      `×${nextA.toFixed(2)}／×${nextB.toFixed(2)}`,
+      `${stepA.toFixed(2)}／+${stepB.toFixed(2)}`
+    );
+  }
+
+  function atkBuffText(base, step, level, stats) {
+    const now = scaled(base, step, level);
+    const next = scaled(base, step, level + 1);
+    let cur = `+${pctNowLabel(now)}`;
+    if (stats) {
+      const flat = Math.floor(Math.max(1, stats.atk) * now * (stats.atkEff || 1));
+      cur = `+${pctNowLabel(now)}(+${flat})`;
+    }
+    return `一時的な攻撃力${cur}。${growthTail(`+${pctNowLabel(next)}`, pctStepLabel(step))}`;
+  }
+
+  function defBuffText(base, step, level, stats) {
+    const now = scaled(base, step, level);
+    const next = scaled(base, step, level + 1);
+    let cur = `+${pctNowLabel(now)}`;
+    if (stats) {
+      const flat = Math.floor(Math.max(0, stats.def) * now * (stats.defEff || 1));
+      cur = `+${pctNowLabel(now)}(+${flat})`;
+    }
+    return `一時的な防御力${cur}。${growthTail(`+${pctNowLabel(next)}`, pctStepLabel(step))}`;
+  }
+
+  function drText(base, step, level) {
+    const now = scaled(base, step, level);
+    const next = scaled(base, step, level + 1);
+    return `受けるダメージを${pctNowLabel(now)}減らす。${growthTail(`${pctNowLabel(next)}減`, pctStepLabel(step))}`;
+  }
+
+  function healPctText(base, step, level, stats, prefix) {
+    const now = scaled(base, step, level);
+    const next = scaled(base, step, level + 1);
+    const head = prefix || "最大体力の";
+    return `${head}${maxHpPct(now, stats)}を基礎に回復する。${growthTail(
+      maxHpPct(next, stats),
+      pctStepLabel(step)
+    )}`;
+  }
+
+  function ampText(base, step, level, stats) {
+    const now = scaled(base, step, level);
+    const next = scaled(base, step, level + 1);
+    let cur = `+${pctNowLabel(now)}`;
+    if (stats) {
+      const flat = Math.floor(Math.max(1, stats.atk) * (1 + (stats.dmgBonus || 0)) * now);
+      cur = `+${pctNowLabel(now)}(+${flat})`;
+    }
+    return `次に出す攻撃技の威力を${cur}上乗せする。${growthTail(
+      `+${pctNowLabel(next)}`,
+      pctStepLabel(step)
+    )}`;
+  }
+
   function overNote(n) {
     return n > 0 ? `(${n}オーバー)` : "";
   }
@@ -157,7 +233,7 @@
         return [
           `敵の体力が50%未満なら${atkMult(scaled(1.68, 0.06, level), stats)}。`,
           `それ以外は${atkMult(scaled(0.62, 0.02, level), stats)}。`,
-          "強化しても、得意な条件と苦手な条件の差は埋まらない。",
+          dualMultGrowth(1.68, 0.06, 0.62, 0.02, level),
         ];
       },
       use(ctx, level) {
@@ -181,9 +257,12 @@
       describe(level, stats) {
         const full = scaled(0.5, 0.02, level);
         const empty = full + scaled(1.2, 0.05, level);
+        const nextFull = scaled(0.5, 0.02, level + 1);
+        const nextEmpty = nextFull + scaled(1.2, 0.05, level + 1);
         return [
           `満タン時は${atkMult(full, stats)}。体力が尽きかけたとき${atkMult(empty, stats).replace("攻撃×", "最大×")}。`,
           "減っている体力の割合だけ、威力が一定幅で上乗せされる。",
+          growthTail(`×${nextFull.toFixed(2)}／最大×${nextEmpty.toFixed(2)}`, `0.02／+0.07`),
         ];
       },
       use(ctx, level) {
@@ -203,9 +282,13 @@
       gain: gain({ atk: 5, def: -2, dmgReduction: -0.012 }),
       describe(level, stats) {
         const cost = scaled(0.08, 0.003, level);
+        const nextCost = scaled(0.08, 0.003, level + 1);
         return [
           multText(2.02, 0.08, level, stats),
-          `自分の最大体力の${maxHpPct(cost, stats)}を失う。防御無視や軽減は乗らない。`,
+          `自分の最大体力の${maxHpPct(cost, stats)}を失う。防御無視や軽減は乗らない。${growthTail(
+            maxHpPct(nextCost, stats),
+            pctStepLabel(0.003)
+          )}`,
           "習得のたびに防御が下がり、受けるダメージも増える。",
         ];
       },
@@ -226,9 +309,13 @@
       gain: gain({ maxHp: 3, atk: 1, healEff: 0.01, def: -1 }),
       describe(level, stats) {
         const ratio = scaled(0.22, 0.01, level);
+        const next = scaled(0.22, 0.01, level + 1);
         return [
           multText(1.0, 0.035, level, stats),
-          `与ダメージの${Math.floor(ratio * 100)}%を基礎に回復する。回復効率がかかる。`,
+          `与ダメージの${pctNowLabel(ratio)}を基礎に回復する。回復効率がかかる。${growthTail(
+            pctNowLabel(next),
+            pctStepLabel(0.01)
+          )}`,
         ];
       },
       use(ctx, level) {
@@ -251,7 +338,7 @@
         return [
           `直前の行動が技なら${atkMult(scaled(1.52, 0.05, level), stats)}。`,
           `通常攻撃の直後なら${atkMult(scaled(0.7, 0.02, level), stats)}。`,
-          "手順の並びで強さが変わる。",
+          dualMultGrowth(1.52, 0.05, 0.7, 0.02, level),
         ];
       },
       use(ctx, level) {
@@ -276,6 +363,7 @@
         return [
           `敵の防御が自分の攻撃以上なら、${atkMult(scaled(1.58, 0.06, level), stats)}かつ防御20%無視。`,
           `そうでなければ${atkMult(scaled(0.88, 0.025, level), stats)}。`,
+          dualMultGrowth(1.58, 0.06, 0.88, 0.025, level),
         ];
       },
       use(ctx, level) {
@@ -298,9 +386,13 @@
       gain: gain({ maxHp: 2, atk: 2, def: 1, atkEff: 0.03 }),
       describe(level, stats) {
         const down = scaled(0.16, 0.01, level);
+        const next = scaled(0.16, 0.01, level + 1);
         return [
           multText(0.78, 0.03, level, stats),
-          `敵の防御力を${Math.floor(down * 100)}%下げる（敵の3行動）。`,
+          `敵の防御力を${pctNowLabel(down)}下げる（敵の3行動）。${growthTail(
+            pctNowLabel(next),
+            pctStepLabel(0.01)
+          )}`,
           "この低下に、自分の補助効率は乗らない。",
         ];
       },
@@ -329,6 +421,7 @@
         return [
           `敵が弱体中なら${atkMult(scaled(1.86, 0.07, level), stats)}。`,
           `何もなければ${atkMult(scaled(0.8, 0.02, level), stats)}。`,
+          dualMultGrowth(1.86, 0.07, 0.8, 0.02, level),
         ];
       },
       use(ctx, level) {
@@ -351,9 +444,13 @@
       gain: gain({ maxHp: 2, atk: 3, speed: 4, healEff: -0.02 }),
       describe(level, stats) {
         const ratio = scaled(0.26, 0.02, level);
+        const next = scaled(0.26, 0.02, level + 1);
         return [
           multText(0.5, 0.025, level, stats),
-          `その後、敵は4行動のあいだ行動ごとに${atkMult(ratio, stats)}の毒を受ける。`,
+          `その後、敵は4行動のあいだ行動ごとに${atkMult(ratio, stats)}の毒を受ける。${growthTail(
+            `×${next.toFixed(2)}`,
+            "0.02"
+          )}`,
           "毒は重ねがけせず、打ち直すと残りが更新される。",
         ];
       },
@@ -406,9 +503,8 @@
       cooldown: 3,
       gain: gain({ maxHp: 8, def: 4, defEff: 0.03 }),
       describe(level, stats) {
-        const rate = scaled(0.42, 0.02, level);
         return [
-          `次の3行動、一時的な防御力+${Math.floor(rate * 100)}%（防御力補助効率も乗る）。`,
+          `次の3行動、${defBuffText(0.42, 0.02, level, stats)}`,
           "この行動では攻撃しない。",
         ];
       },
@@ -433,9 +529,8 @@
       cooldown: 3,
       gain: gain({ maxHp: 4, atk: -1, def: 3, defEff: 0.02, dmgReduction: 0.012 }),
       describe(level, stats) {
-        const rate = scaled(0.26, 0.015, level);
         return [
-          `次の2行動、受けるダメージを${Math.floor(rate * 100)}%減らす。`,
+          `次の2行動、${drText(0.26, 0.015, level)}`,
           "軽減は防御計算のあとでかかる。上限75%。",
         ];
       },
@@ -460,9 +555,13 @@
       gain: gain({ maxHp: 5, def: 3, defEff: 0.02, speed: 3 }),
       describe(level, stats) {
         const ratio = scaled(0.5, 0.03, level);
+        const next = scaled(0.5, 0.03, level + 1);
         return [
           "次に受ける打撃を22%軽減し、軽減後の55%前後を相手へ返す。",
-          `返しの割合は今${Math.floor(ratio * 100)}%。3行動以内に受けなければ消える。`,
+          `返しの割合は今${pctNowLabel(ratio)}。3行動以内に受けなければ消える。${growthTail(
+            pctNowLabel(next),
+            pctStepLabel(0.03)
+          )}`,
           "一度返すと解ける。",
         ];
       },
@@ -490,10 +589,9 @@
         return ctx.player.hp / ctx.player.maxHp > 0.32;
       },
       describe(level, stats) {
-        const rate = scaled(0.5, 0.02, level);
         return [
           "現在体力の13%を払い、次の3行動、防御力を大きく上げる。",
-          `上昇の基礎は+${Math.floor(rate * 100)}%（防御力補助効率も乗る）。`,
+          defBuffText(0.5, 0.02, level, stats),
           "体力が32%以下のときは手順にあっても飛ばされる。",
         ];
       },
@@ -519,9 +617,8 @@
       cooldown: 5,
       gain: gain({ maxHp: 4, atk: -3, def: 1, healEff: 0.01, speed: -3 }),
       describe(level, stats) {
-        const rate = scaled(0.08, 0.004, level);
         return [
-          `最大体力の${maxHpPct(rate, stats)}を基礎に、すぐ回復する。`,
+          healPctText(0.08, 0.004, level, stats),
           "回復効率がかかる。習得しても攻撃は弱くなる。",
         ];
       },
@@ -541,8 +638,12 @@
       gain: gain({ maxHp: 5, atk: -4, def: 1, regenAmount: 1, healEff: 0.01, speed: -2 }),
       describe(level, stats) {
         const each = scaled(0.03, 0.002, level);
+        const next = scaled(0.03, 0.002, level + 1);
         return [
-          `3行動にわたり、行動ごとに最大体力の${maxHpPct(each, stats)}を基礎に回復する。`,
+          `3行動にわたり、行動ごとに最大体力の${maxHpPct(each, stats)}を基礎に回復する。${growthTail(
+            maxHpPct(next, stats),
+            pctStepLabel(0.002)
+          )}`,
           "打ち直すと残り時間は更新される。回復効率がかかる。",
         ];
       },
@@ -567,8 +668,9 @@
       gain: gain({ maxHp: 4, atk: -2, def: 1, regenAmount: 1, speed: -5 }),
       describe(level, stats) {
         const extra = scaled(3, 0.6, level);
+        const next = scaled(3, 0.6, level + 1);
         return [
-          `次の3行動、自動回復量+${extra.toFixed(0)}。`,
+          `次の3行動、自動回復量+${extra.toFixed(1)}。${growthTail(`+${next.toFixed(1)}`, "0.6")}`,
           "即時回復はない。速度低下の代償が大きい。",
         ];
       },
@@ -591,10 +693,9 @@
       cooldown: 4,
       gain: gain({ maxHp: 4, atk: -2, def: 1, healEff: 0.01 }),
       describe(level, stats) {
-        const rate = scaled(0.04, 0.002, level);
         return [
           "自分の弱体をすべて消す。",
-          `最大体力の${maxHpPct(rate, stats)}を基礎に回復する。`,
+          healPctText(0.04, 0.002, level, stats),
           "弱体を1つでも消したときは、さらに最大体力の3%が基礎に加わる。",
         ];
       },
@@ -618,9 +719,8 @@
       cooldown: 3,
       gain: gain({ maxHp: 4, atk: 1, def: 2, atkEff: 0.03, speed: 2 }),
       describe(level, stats) {
-        const rate = scaled(0.22, 0.015, level);
         return [
-          `次の3行動、一時的な攻撃力+${Math.floor(rate * 100)}%（攻撃力補助効率も乗る）。`,
+          `次の3行動、${atkBuffText(0.22, 0.015, level, stats)}`,
           "通常攻撃にも、技にも乗る。",
         ];
       },
@@ -644,9 +744,8 @@
       cooldown: 2,
       gain: gain({ maxHp: 2, atk: 1, def: 1, atkEff: 0.05 }),
       describe(level, stats) {
-        const rate = scaled(0.42, 0.03, level);
         return [
-          `次に出す攻撃技の威力を${Math.floor(rate * 100)}%上乗せする。`,
+          ampText(0.42, 0.03, level, stats),
           "通常攻撃では消費しない。攻撃技を出すと一度で消える。",
         ];
       },
@@ -712,6 +811,7 @@
         return [
           `敵の体力割合が高いほど強い。満タン付近で${atkMult(scaled(1.55, 0.05, level), stats)}。`,
           `尽きかけでは${atkMult(scaled(0.7, 0.02, level), stats)}。`,
+          dualMultGrowth(1.55, 0.05, 0.7, 0.02, level),
         ];
       },
       use(ctx, level) {
@@ -730,7 +830,10 @@
       cooldown: 4,
       gain: gain({ maxHp: 4, atk: 3, atkEff: 0.02 }),
       describe(level, stats) {
-        return [multText(1.35, 0.05, level, stats), "敵の防御を45%無視する。"];
+        return [
+          multText(1.35, 0.05, level, stats),
+          "敵の防御を45%無視する。",
+        ];
       },
       use(ctx, level) {
         const r = ctx.damage(scaled(1.35, 0.05, level), { ignore: 0.45 });
@@ -765,7 +868,14 @@
       gain: gain({ maxHp: 3, atk: 0, healEff: 0.01, speed: -2 }),
       describe(level, stats) {
         const ratio = scaled(0.32, 0.012, level);
-        return [multText(0.82, 0.025, level, stats), `与ダメージの${Math.floor(ratio * 100)}%を基礎に回復する。`];
+        const next = scaled(0.32, 0.012, level + 1);
+        return [
+          multText(0.82, 0.025, level, stats),
+          `与ダメージの${pctNowLabel(ratio)}を基礎に回復する。${growthTail(
+            pctNowLabel(next),
+            pctStepLabel(0.012)
+          )}`,
+        ];
       },
       use(ctx, level) {
         const r = ctx.damage(scaled(0.82, 0.025, level));
@@ -786,6 +896,7 @@
         return [
           `自分の行動が3回目までなら${atkMult(scaled(1.7, 0.06, level), stats)}。`,
           `それ以降は${atkMult(scaled(0.75, 0.02, level), stats)}。`,
+          dualMultGrowth(1.7, 0.06, 0.75, 0.02, level),
         ];
       },
       use(ctx, level) {
@@ -807,6 +918,7 @@
         return [
           `直前にダメージを受けていれば${atkMult(scaled(1.75, 0.06, level), stats)}。`,
           `受けていなければ${atkMult(scaled(0.72, 0.02, level), stats)}。`,
+          dualMultGrowth(1.75, 0.06, 0.72, 0.02, level),
         ];
       },
       use(ctx, level) {
@@ -828,6 +940,7 @@
         return [
           `自分の攻撃が敵の防御より高ければ${atkMult(scaled(1.6, 0.05, level), stats)}。`,
           `そうでなければ${atkMult(scaled(0.85, 0.02, level), stats)}。`,
+          dualMultGrowth(1.6, 0.05, 0.85, 0.02, level),
         ];
       },
       use(ctx, level) {
@@ -847,7 +960,14 @@
       gain: gain({ maxHp: 2, atk: 1, def: 2, atkEff: 0.02 }),
       describe(level, stats) {
         const down = scaled(0.24, 0.012, level);
-        return [multText(0.4, 0.02, level, stats), `敵の防御力を${Math.floor(down * 100)}%下げる（敵の3行動）。`];
+        const next = scaled(0.24, 0.012, level + 1);
+        return [
+          multText(0.4, 0.02, level, stats),
+          `敵の防御力を${pctNowLabel(down)}下げる（敵の3行動）。${growthTail(
+            pctNowLabel(next),
+            pctStepLabel(0.012)
+          )}`,
+        ];
       },
       use(ctx, level) {
         const r = ctx.damage(scaled(0.4, 0.02, level));
@@ -871,7 +991,14 @@
       gain: gain({ maxHp: 2, atk: 2, speed: 2, healEff: -0.02 }),
       describe(level, stats) {
         const ratio = scaled(0.2, 0.015, level);
-        return [multText(0.35, 0.02, level, stats), `6行動のあいだ、行動ごとに${atkMult(ratio, stats)}の毒。`];
+        const next = scaled(0.2, 0.015, level + 1);
+        return [
+          multText(0.35, 0.02, level, stats),
+          `6行動のあいだ、行動ごとに${atkMult(ratio, stats)}の毒。${growthTail(
+            `×${next.toFixed(2)}`,
+            "0.015"
+          )}`,
+        ];
       },
       use(ctx, level) {
         const r = ctx.damage(scaled(0.35, 0.02, level));
@@ -896,7 +1023,14 @@
       gain: gain({ maxHp: 4, def: 3, defEff: 0.02 }),
       describe(level, stats) {
         const down = scaled(0.18, 0.01, level);
-        return [multText(0.55, 0.025, level, stats), `敵の攻撃力を${Math.floor(down * 100)}%下げる（敵の3行動）。`];
+        const next = scaled(0.18, 0.01, level + 1);
+        return [
+          multText(0.55, 0.025, level, stats),
+          `敵の攻撃力を${pctNowLabel(down)}下げる（敵の3行動）。${growthTail(
+            pctNowLabel(next),
+            pctStepLabel(0.01)
+          )}`,
+        ];
       },
       use(ctx, level) {
         const r = ctx.damage(scaled(0.55, 0.025, level));
@@ -920,7 +1054,14 @@
       gain: gain({ maxHp: 2, atk: 2, dmgBonus: 0.008 }),
       describe(level, stats) {
         const down = scaled(0.12, 0.01, level);
-        return [multText(0.7, 0.03, level, stats), `敵の被ダメージ軽減を${Math.floor(down * 100)}%下げる（敵の3行動）。`];
+        const next = scaled(0.12, 0.01, level + 1);
+        return [
+          multText(0.7, 0.03, level, stats),
+          `敵の被ダメージ軽減を${pctNowLabel(down)}下げる（敵の3行動）。${growthTail(
+            pctNowLabel(next),
+            pctStepLabel(0.01)
+          )}`,
+        ];
       },
       use(ctx, level) {
         const r = ctx.damage(scaled(0.7, 0.03, level));
@@ -989,8 +1130,7 @@
       cooldown: 3,
       gain: gain({ maxHp: 6, def: 5, defEff: 0.02 }),
       describe(level, stats) {
-        const rate = scaled(0.55, 0.025, level);
-        return [`次の2行動、一時的な防御力+${Math.floor(rate * 100)}%。`];
+        return [`次の2行動、${defBuffText(0.55, 0.025, level, stats)}`];
       },
       use(ctx, level) {
         ctx.addEffect(ctx.player, {
@@ -1012,8 +1152,7 @@
       cooldown: 4,
       gain: gain({ maxHp: 5, atk: -2, def: 4, dmgReduction: 0.015 }),
       describe(level, stats) {
-        const rate = scaled(0.2, 0.012, level);
-        return [`次の3行動、受けるダメージを${Math.floor(rate * 100)}%減らす。`];
+        return [`次の3行動、${drText(0.2, 0.012, level)}`];
       },
       use(ctx, level) {
         ctx.addEffect(ctx.player, {
@@ -1034,9 +1173,11 @@
       cooldown: 3,
       gain: gain({ maxHp: 4, def: 4, speed: 2 }),
       describe(level, stats) {
+        const ratio = scaled(0.35, 0.02, level);
+        const next = scaled(0.35, 0.02, level + 1);
         return [
           "次に受ける打撃を28%軽減し、軽減後の一部を返す。",
-          `返しの割合は${Math.floor(scaled(0.35, 0.02, level) * 100)}%。`,
+          `返しの割合は${pctNowLabel(ratio)}。${growthTail(pctNowLabel(next), pctStepLabel(0.02))}`,
         ];
       },
       use(ctx, level) {
@@ -1063,9 +1204,8 @@
         return ctx.player.hp / ctx.player.maxHp <= 0.45;
       },
       describe(level, stats) {
-        const rate = scaled(0.35, 0.02, level);
         return [
-          `体力が45%以下のときだけ使える。次の2行動、被ダメージ-${Math.floor(rate * 100)}%。`,
+          `体力が45%以下のときだけ使える。次の2行動、${drText(0.35, 0.02, level)}`,
         ];
       },
       use(ctx, level) {
@@ -1090,8 +1230,10 @@
         return ctx.player.hp / ctx.player.maxHp <= 0.35;
       },
       describe(level, stats) {
-        const rate = scaled(0.12, 0.005, level);
-        return [`体力35%以下のときだけ。最大体力の${maxHpPct(rate, stats)}を基礎に回復する。`];
+        return [
+          "体力35%以下のときだけ。",
+          healPctText(0.12, 0.005, level, stats),
+        ];
       },
       use(ctx, level) {
         const healed = ctx.heal(ctx.player, ctx.player.maxHp * scaled(0.12, 0.005, level));
@@ -1108,8 +1250,7 @@
       cooldown: 2,
       gain: gain({ maxHp: 2, atk: 2, atkEff: 0.02 }),
       describe(level, stats) {
-        const rate = scaled(0.3, 0.02, level);
-        return [`次の2行動、一時的な攻撃力+${Math.floor(rate * 100)}%。`];
+        return [`次の2行動、${atkBuffText(0.3, 0.02, level, stats)}`];
       },
       use(ctx, level) {
         ctx.addEffect(ctx.player, {
@@ -1131,8 +1272,10 @@
       cooldown: 3,
       gain: gain({ maxHp: 2, atk: 2, speed: 2, atkEff: 0.02 }),
       describe(level, stats) {
-        const rate = scaled(0.18, 0.012, level);
-        return [`次の3行動、一時的な攻撃力+${Math.floor(rate * 100)}%。通常攻撃にも乗る。`];
+        return [
+          `次の3行動、${atkBuffText(0.18, 0.012, level, stats)}`,
+          "通常攻撃にも乗る。",
+        ];
       },
       use(ctx, level) {
         ctx.addEffect(ctx.player, {
