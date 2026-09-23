@@ -138,6 +138,26 @@
     return meta.text(cond && cond.value);
   }
 
+  function nodeConds(node) {
+    if (node && Array.isArray(node.conds) && node.conds.length) return node.conds;
+    if (node && node.cond) return [node.cond];
+    return [{ type: "always" }];
+  }
+
+  function nodeConditionsMet(node, ctx) {
+    const list = nodeConds(node);
+    if (node && node.join === "or") return list.some((cond) => conditionMet(cond, ctx));
+    return list.every((cond) => conditionMet(cond, ctx));
+  }
+
+  function nodeConditionLabel(node) {
+    const list = nodeConds(node);
+    const labels = list.map((cond) => conditionLabel(cond));
+    if (labels.length <= 1) return labels[0] || "常に";
+    const sep = node && node.join === "or" ? "または" : "かつ";
+    return labels.join(sep);
+  }
+
   function makeCombatant(name, stats) {
     return {
       name,
@@ -640,12 +660,12 @@
         const level = levels[node.skillId] || 0;
         if (!skill || level <= 0) continue;
         if (skill.available && !skill.available(ctx, level)) continue;
-        if (!conditionMet(node.cond, ctx)) continue;
+        if (!nodeConditionsMet(node, ctx)) continue;
         if (player.cd[skill.id] > 0) {
           waiting.push(skill.name);
           continue;
         }
-        ctx.p = `〔${conditionLabel(node.cond)}〕`;
+        ctx.p = `〔${nodeConditionLabel(node)}〕`;
         skill.use(ctx, level);
         // 階調: 補助技以外の技を使うたびにチャージが乗る
         if (skill.id !== "crescendo") {
@@ -1114,6 +1134,10 @@
   W.CONDITION_BY_TYPE = CONDITION_BY_TYPE;
   W.COMPARE_RULES_HELP = COMPARE_RULES_HELP;
   W.conditionLabel = conditionLabel;
+  W.nodeConds = nodeConds;
+  W.nodeConditionsMet = nodeConditionsMet;
+  W.nodeConditionLabel = nodeConditionLabel;
   W.simulate = simulate;
   W.MAX_ACTIONS = MAX_ACTIONS;
+  W.DR_FLOOR = DR_FLOOR;
 })(typeof window !== "undefined" ? window : globalThis);
