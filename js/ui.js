@@ -319,6 +319,11 @@
           <li class="flow-item">
             <span class="idx">${index + 1}</span>
             <select data-bind="node-skill" data-index="${index}">${ownedOptions(state, node.skillId)}</select>
+            <div class="flow-mini">
+              <button type="button" class="btn btn-ghost btn-icon" data-action="move-node" data-index="${index}" data-dir="-1" ${index === 0 ? "disabled" : ""} aria-label="上へ">↑</button>
+              <button type="button" class="btn btn-ghost btn-icon" data-action="move-node" data-index="${index}" data-dir="1" ${index === state.flow.length - 1 ? "disabled" : ""} aria-label="下へ">↓</button>
+              <button type="button" class="btn btn-ghost btn-icon" data-action="remove-node" data-index="${index}" aria-label="外す">×</button>
+            </div>
             <select data-bind="node-cond" data-index="${index}">
               ${W.CONDITIONS.map(
                 (cond) =>
@@ -326,11 +331,6 @@
               ).join("")}
             </select>
             ${meta.value ? valueField(meta, index, value) : `<span class="value-spacer"></span>`}
-            <div class="flow-mini">
-              <button type="button" class="btn btn-ghost btn-icon" data-action="move-node" data-index="${index}" data-dir="-1" ${index === 0 ? "disabled" : ""} aria-label="上へ">↑</button>
-              <button type="button" class="btn btn-ghost btn-icon" data-action="move-node" data-index="${index}" data-dir="1" ${index === state.flow.length - 1 ? "disabled" : ""} aria-label="下へ">↓</button>
-              <button type="button" class="btn btn-ghost btn-icon" data-action="remove-node" data-index="${index}" aria-label="外す">×</button>
-            </div>
           </li>
         `;
       })
