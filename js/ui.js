@@ -229,15 +229,23 @@
     `;
   }
 
-  function gainList(skill) {
+  function gainList(skill, level, mode) {
     const rows = ui.detail
       ? [...GAIN_CORE, ...GAIN_EXTRA.filter(([key]) => skill.gain[key])]
       : GAIN_CORE;
+    const lv = Math.max(0, level || 0);
+    // 所持: いまの合計 / 候補で強化: 獲得後の合計 / 新規: 基礎gain
+    let totalLevel = 0;
+    if (mode === "owned" && lv >= 1) totalLevel = lv;
+    else if (mode === "offer" && lv >= 1) totalLevel = lv + 1;
+    const totals =
+      totalLevel > 0 && W.gainFromSkill ? W.gainFromSkill(skill, totalLevel) : null;
     return `
       <ul class="gains">
         ${rows
           .map(([key, label, asPct]) => {
-            const value = skill.gain[key] || 0;
+            const base = skill.gain[key] || 0;
+            const value = totals ? totals[key] || 0 : base;
             return `<li><span>${label}</span><b>${esc(gainText(key, value, asPct))}</b></li>`;
           })
           .join("")}
@@ -288,9 +296,12 @@
         : `Lv.${level} · ${W.cooldownShort(skill.cooldown)}`;
     let bodyExtra = "";
     if (sourceKind === "offer") {
-      bodyExtra += gainList(skill);
+      bodyExtra += gainList(skill, level, "offer");
     } else if (showFull) {
-      bodyExtra += gainList(skill);
+      bodyExtra += gainList(skill, level, "owned");
+    } else if (sourceKind === "owned" && level >= 2) {
+      // 重複で付随ステータスが伸びているときは、標準表示でも合計値を出す
+      bodyExtra += gainList(skill, level, "owned");
     }
     if (showFull) {
       bodyExtra += `<div class="skill-detail">

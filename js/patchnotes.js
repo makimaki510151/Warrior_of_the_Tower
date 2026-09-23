@@ -17,6 +17,21 @@
   /** @type {{ version: string, date: string, title: string, sections: { heading: string, items: string[] }[] }[]} */
   const PATCH_NOTES = [
     {
+      version: "0.5.12",
+      date: "2026-09-23",
+      title: "スキル重複時の付随ステータス表示を合計値に",
+      sections: [
+        {
+          heading: "UI",
+          items: [
+            "同じ技を重ねているとき、カード上の付随ステータス表示を基礎gain固定ではなく、実際の合計（1枚目満額＋2枚目以降×0.3）に合わせる。",
+            "例: gain 攻撃+6 を2枚持つと、カード表示も +7.8。候補で Lv.2→3 のときは獲得後の合計を表示。",
+            "所持カードは Lv.2 以上なら標準表示でも合計ステータスを出す。",
+          ],
+        },
+      ],
+    },
+    {
       version: "0.5.11",
       date: "2026-09-23",
       title: "習得技をドラッグ＆ドロップで手順へ挿入",
