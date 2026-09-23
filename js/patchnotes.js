@@ -17,6 +17,20 @@
   /** @type {{ version: string, date: string, title: string, sections: { heading: string, items: string[] }[] }[]} */
   const PATCH_NOTES = [
     {
+      version: "0.5.9",
+      date: "2026-09-23",
+      title: "スキルカードから重複ステータスの説明文を削除",
+      sections: [
+        {
+          heading: "UI",
+          items: [
+            "候補・所持のスキルカードに出ていた、重複時の付随ステータス説明（約30%など）を削除。",
+            "カード上の「／重複分」「うち重複」などの注記もやめた。計算式自体（2枚目以降は基礎×0.3）は変更なし。",
+          ],
+        },
+      ],
+    },
+    {
       version: "0.5.8",
       date: "2026-09-23",
       title: "重複時の付随ステータスを抑制（2枚目以降は約30%）",

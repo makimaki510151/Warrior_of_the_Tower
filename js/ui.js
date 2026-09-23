@@ -227,48 +227,20 @@
     `;
   }
 
-  function gainList(skill, level, mode) {
+  function gainList(skill) {
     const rows = ui.detail
       ? [...GAIN_CORE, ...GAIN_EXTRA.filter(([key]) => skill.gain[key])]
       : GAIN_CORE;
-    const bonus = W.STACK_GAIN_BONUS || 0;
-    const lv = Math.max(0, level || 0);
-    const showTotal = mode === "owned" && lv >= 1;
-    const showUpgrade = mode === "offer" && lv >= 1;
-    const contrib = showTotal && W.gainFromSkill ? W.gainFromSkill(skill, lv) : null;
-    const list = `
+    return `
       <ul class="gains">
         ${rows
           .map(([key, label, asPct]) => {
-            const base = skill.gain[key] || 0;
-            let value = base;
-            let suffix = "";
-            if (showTotal && contrib) {
-              value = contrib[key] || 0;
-              const stackExtra = base * Math.max(0, lv - 1) * bonus;
-              if (lv >= 2 && Math.abs(stackExtra) >= 0.0005) {
-                suffix = `（うち重複${esc(gainText(key, stackExtra, asPct))}）`;
-              }
-            } else if (showUpgrade && bonus > 0 && base) {
-              value = base * bonus;
-              suffix = "／重複分";
-            }
-            return `<li><span>${label}</span><b>${esc(gainText(key, value, asPct))}${suffix}</b></li>`;
+            const value = skill.gain[key] || 0;
+            return `<li><span>${label}</span><b>${esc(gainText(key, value, asPct))}</b></li>`;
           })
           .join("")}
-      </ul>`;
-    let note = "";
-    if (bonus > 0) {
-      const pct = Math.round(bonus * 100);
-      if (mode === "offer" && lv === 0) {
-        note = `<p class="tiny gain-note">同じ技を重ねると効果は伸びるが、付随ステータスの2枚目以降は基礎の約${pct}%分だけ追加</p>`;
-      } else if (showUpgrade) {
-        note = `<p class="tiny gain-note">この獲得で増える付随ステータスは基礎の${pct}%分（1枚目の満額は再度乗らない）</p>`;
-      } else if (showTotal && lv >= 2) {
-        note = `<p class="tiny gain-note">合計 = 1枚目の満額 + 重複分（2枚目以降は各+${pct}%）</p>`;
-      }
-    }
-    return `${list}${note}`;
+      </ul>
+    `;
   }
 
   function describeLines(skill, level, stats) {
@@ -314,9 +286,9 @@
         : `Lv.${level} · ${W.cooldownShort(skill.cooldown)}`;
     let bodyExtra = "";
     if (sourceKind === "offer") {
-      bodyExtra += gainList(skill, level, "offer");
+      bodyExtra += gainList(skill);
     } else if (showFull) {
-      bodyExtra += gainList(skill, level, "owned");
+      bodyExtra += gainList(skill);
     }
     if (showFull) {
       bodyExtra += `<div class="skill-detail">
