@@ -337,6 +337,7 @@ h1, h2, .brand { font-family: var(--serif); }
   padding: 0;
 }
 .gains b { color: var(--gold); font-weight: 700; }
+.gain-note { margin: 4px 0 0; line-height: 1.35; }
 .skill-detail {
   font-size: 0.85em;
   color: var(--muted);

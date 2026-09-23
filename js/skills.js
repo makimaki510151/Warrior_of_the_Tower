@@ -1864,6 +1864,19 @@
 
   const STAT_KEYS = Object.keys(BASE_STATS);
   const OFFER_COUNT = 5;
+  /** 2枚目以降、基礎gainに上乗せする重複ボーナス係数（若干伸びる） */
+  const STACK_GAIN_BONUS = 0.25;
+
+  function gainFromSkill(skill, level) {
+    const lv = Math.max(0, Math.floor(level || 0));
+    const stacks = Math.max(0, lv - 1);
+    const out = {};
+    STAT_KEYS.forEach((key) => {
+      const g = (skill && skill.gain && skill.gain[key]) || 0;
+      out[key] = g * lv + g * stacks * STACK_GAIN_BONUS;
+    });
+    return out;
+  }
 
   function computeStats(levels) {
     const stats = { ...BASE_STATS };
@@ -1871,11 +1884,9 @@
       const level = levels[id] || 0;
       const skill = BY_ID[id];
       if (!skill || level <= 0) return;
-      // 2枚目以降は基礎gainに15%分を上乗せし、重複でステータスが少し伸びる
-      const stacks = Math.max(0, level - 1);
+      const contrib = gainFromSkill(skill, level);
       STAT_KEYS.forEach((key) => {
-        const g = skill.gain[key] || 0;
-        stats[key] += g * level + g * stacks * 0.15;
+        stats[key] += contrib[key] || 0;
       });
     });
     stats.maxHp = Math.max(40, Math.floor(stats.maxHp));
@@ -1919,6 +1930,8 @@
   W.SKILL_GROUPS = GROUPS;
   W.SKILL_BY_ID = BY_ID;
   W.OFFER_COUNT = OFFER_COUNT;
+  W.STACK_GAIN_BONUS = STACK_GAIN_BONUS;
+  W.gainFromSkill = gainFromSkill;
   W.computeStats = computeStats;
   W.rollOffer = rollOffer;
   W.scaled = scaled;
