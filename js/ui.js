@@ -4,7 +4,6 @@
   const ui = {
     screen: "title",
     detail: false,
-    zoom: 1.15,
     speed: 1,
     modal: null,
     help: false,
@@ -133,10 +132,6 @@
     else document.title = `第${state.floor}層 | 塔の戦士`;
   }
 
-  function applyZoom() {
-    document.documentElement.style.setProperty("--ui-scale", String(ui.zoom));
-  }
-
   function shell(body, footer) {
     const state = W.getState();
     const floor =
@@ -144,7 +139,6 @@
         ? ui.battle.floor
         : state.floor;
     const best = state.bestCleared;
-    const zoomLabel = `${Math.round(ui.zoom * 100)}%`;
     return `
       <div class="shell">
         <header class="bar">
@@ -159,9 +153,6 @@
             }
           </div>
           <div class="bar-right">
-            <button type="button" class="btn btn-ghost" data-action="zoom-out" aria-label="文字を小さく">A-</button>
-            <span class="chip muted" title="表示倍率">${zoomLabel}</span>
-            <button type="button" class="btn btn-ghost" data-action="zoom-in" aria-label="文字を大きく">A+</button>
             ${
               ui.screen === "title" || ui.screen === "clear"
                 ? ""
@@ -871,20 +862,6 @@
         if (ui.battle && ui.battle.phase === "playing") play();
         return;
       }
-      if (action === "zoom-in") {
-        if (W.sfx) W.sfx.ui();
-        ui.zoom = Math.min(1.45, Math.round((ui.zoom + 0.1) * 100) / 100);
-        applyZoom();
-        render();
-        return;
-      }
-      if (action === "zoom-out") {
-        if (W.sfx) W.sfx.ui();
-        ui.zoom = Math.max(1, Math.round((ui.zoom - 0.1) * 100) / 100);
-        applyZoom();
-        render();
-        return;
-      }
       if (action === "pick") {
         if (W.pickSkill(button.dataset.skill)) {
           ui.expandedCard = null;
@@ -1050,7 +1027,6 @@
       if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
         ui.speed = 4;
       }
-      applyZoom();
       app.addEventListener("click", onClick);
       app.addEventListener("click", onBackdrop);
       app.addEventListener("change", onChange);
