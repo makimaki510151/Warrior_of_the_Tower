@@ -615,13 +615,13 @@
       name: "応急",
       group: "回復",
       blurb: "その場で少し体力を戻す。回復だけでは伸びにくい。",
-      tradeoff: "回復量は控えめ。攻撃力が下がり、再使用も遅い。",
+      tradeoff: "回復量は控えめ。再使用も遅い。",
       cooldown: 5,
-      gain: gain({ maxHp: 4, atk: -3, def: 1, healEff: 0.01, speed: -3 }),
+      gain: gain({ maxHp: 4, def: 1, healEff: 0.01, speed: -3 }),
       describe(level, stats) {
         return [
           healPctText(0.08, 0.004, level, stats),
-          "回復効率がかかる。習得しても攻撃は弱くなる。",
+          "回復効率がかかる。",
         ];
       },
       use(ctx, level) {
@@ -635,9 +635,9 @@
       name: "再生",
       group: "回復",
       blurb: "時間をかけて回復する。今すぐ足りないときには遅い。",
-      tradeoff: "総量は応急より多いが、攻撃が大きく下がり、途中で倒れると取りこぼす。",
+      tradeoff: "総量は応急より多いが、途中で倒れると取りこぼす。",
       cooldown: 6,
-      gain: gain({ maxHp: 5, atk: -4, def: 1, regenAmount: 1, healEff: 0.01, speed: -2 }),
+      gain: gain({ maxHp: 5, def: 1, regenAmount: 1, healEff: 0.01, speed: -2 }),
       describe(level, stats) {
         const each = scaled(0.03, 0.002, level);
         const next = scaled(0.03, 0.002, level + 1);
@@ -665,9 +665,9 @@
       name: "脈動",
       group: "回復",
       blurb: "しばらく自動回復が増える。短い戦いでは間に合わない。",
-      tradeoff: "即時回復はない。行動が大きく遅くなり、攻撃も下がる。",
+      tradeoff: "即時回復はない。行動が大きく遅くなる。",
       cooldown: 5,
-      gain: gain({ maxHp: 4, atk: -2, def: 1, regenAmount: 1, speed: -5 }),
+      gain: gain({ maxHp: 4, def: 1, regenAmount: 1, speed: -5 }),
       describe(level, stats) {
         const extra = scaled(3, 0.6, level);
         const next = scaled(3, 0.6, level + 1);
@@ -693,7 +693,7 @@
       blurb: "弱体を払い、わずかに回復する。何も受けていなければほぼ無駄。",
       tradeoff: "回復量は薄い。弱体がない戦いでは枠を圧迫する。",
       cooldown: 4,
-      gain: gain({ maxHp: 4, atk: -2, def: 1, healEff: 0.01 }),
+      gain: gain({ maxHp: 4, def: 1, healEff: 0.01 }),
       describe(level, stats) {
         return [
           "自分の弱体をすべて消す。",
@@ -1225,9 +1225,9 @@
       name: "息吹",
       group: "回復",
       blurb: "体力がかなり減ったときだけ戻す。",
-      tradeoff: "条件が厳しく、攻撃も大きく下がる。余裕があるときは使えない。",
+      tradeoff: "条件が厳しい。余裕があるときは使えない。",
       cooldown: 6,
-      gain: gain({ maxHp: 5, atk: -3, healEff: 0.01, speed: -2 }),
+      gain: gain({ maxHp: 5, healEff: 0.01, speed: -2 }),
       available(ctx) {
         return ctx.player.hp / ctx.player.maxHp <= 0.35;
       },
@@ -1431,9 +1431,9 @@
       name: "泉湧",
       group: "回復",
       blurb: "しばらく自動回復量を底上げする。即時回復はない。",
-      tradeoff: "戦闘が短いと間に合わない。攻撃は下がる。",
+      tradeoff: "戦闘が短いと間に合わない。",
       cooldown: 5,
-      gain: gain({ maxHp: 7, regenAmount: 3, atk: -2, healEff: 0.01 }),
+      gain: gain({ maxHp: 7, regenAmount: 3, healEff: 0.01 }),
       describe(level, stats) {
         const extra = scaled(4, 1.5, level);
         const next = scaled(4, 1.5, level + 1);
@@ -1522,9 +1522,9 @@
       name: "回春",
       group: "回復",
       blurb: "自動回復量を基礎に、すぐ戻してから脈を残す。",
-      tradeoff: "自動回復量が低いとほぼ効かない。攻撃は下がる。",
+      tradeoff: "自動回復量が低いとほぼ効かない。",
       cooldown: 5,
-      gain: gain({ maxHp: 6, regenAmount: 3, atk: -3, healEff: 0.02, regenInterval: -1 }),
+      gain: gain({ maxHp: 6, regenAmount: 3, healEff: 0.02, regenInterval: -1 }),
       describe(level, stats) {
         const mult = scaled(1.1, 0.2, level);
         const next = scaled(1.1, 0.2, level + 1);

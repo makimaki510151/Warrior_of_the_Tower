@@ -17,6 +17,21 @@
   /** @type {{ version: string, date: string, title: string, sections: { heading: string, items: string[] }[] }[]} */
   const PATCH_NOTES = [
     {
+      version: "0.5.16",
+      date: "2026-09-23",
+      title: "回復技の攻撃力低下を撤廃",
+      sections: [
+        {
+          heading: "回復技の付随ステータス",
+          items: [
+            "応急・再生・脈動・浄化・息吹・泉湧・回春から、習得時の攻撃力低下（atkマイナス）をすべて削除。",
+            "速度低下など、攻撃以外の代償はそのまま。",
+            "説明文・ヘルプの「攻撃が下がる」表記も合わせて削除。",
+          ],
+        },
+      ],
+    },
+    {
       version: "0.5.15",
       date: "2026-09-23",
       title: "30層以降の敵ビルド・種類を大幅追加",
