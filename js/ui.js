@@ -234,18 +234,20 @@
       ? [...GAIN_CORE, ...GAIN_EXTRA.filter(([key]) => skill.gain[key])]
       : GAIN_CORE;
     const lv = Math.max(0, level || 0);
-    // 所持: いまの合計 / 候補で強化: 獲得後の合計 / 新規: 基礎gain
-    let totalLevel = 0;
-    if (mode === "owned" && lv >= 1) totalLevel = lv;
-    else if (mode === "offer" && lv >= 1) totalLevel = lv + 1;
+    const bonus = W.STACK_GAIN_BONUS || 0;
+    // 所持／手順: 重複込みの合計。獲得画面: この獲得での上昇値（新規=基礎、強化=基礎×重複係数）
+    const showOwnedTotal = mode === "owned" && lv >= 1;
     const totals =
-      totalLevel > 0 && W.gainFromSkill ? W.gainFromSkill(skill, totalLevel) : null;
+      showOwnedTotal && W.gainFromSkill ? W.gainFromSkill(skill, lv) : null;
+    const offerUpgrade = mode === "offer" && lv >= 1;
     return `
       <ul class="gains">
         ${rows
           .map(([key, label, asPct]) => {
             const base = skill.gain[key] || 0;
-            const value = totals ? totals[key] || 0 : base;
+            let value = base;
+            if (totals) value = totals[key] || 0;
+            else if (offerUpgrade) value = base * bonus;
             return `<li><span>${label}</span><b>${esc(gainText(key, value, asPct))}</b></li>`;
           })
           .join("")}

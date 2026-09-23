@@ -17,6 +17,21 @@
   /** @type {{ version: string, date: string, title: string, sections: { heading: string, items: string[] }[] }[]} */
   const PATCH_NOTES = [
     {
+      version: "0.5.14",
+      date: "2026-09-23",
+      title: "獲得画面のステータス表示を上昇値に修正",
+      sections: [
+        {
+          heading: "UI",
+          items: [
+            "スキル獲得（候補）画面で、重複時に付随ステータスの合計値が出ていた問題を修正。",
+            "獲得画面は「この獲得での上昇値」を表示（新規＝基礎gain、強化＝基礎×0.3）。",
+            "所持／手順側のカードは、これまでどおり重複込みの合計値表示のまま。",
+          ],
+        },
+      ],
+    },
+    {
       version: "0.5.13",
       date: "2026-09-23",
       title: "バフ／デバフ強化と大器晩成の4重基準見直し",
