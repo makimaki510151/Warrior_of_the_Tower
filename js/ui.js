@@ -8,6 +8,7 @@
     modal: null,
     help: false,
     patchNotes: false,
+    offerStats: false,
     prepTab: "flow",
     battle: null,
     hasSave: false,
@@ -187,10 +188,16 @@
   }
 
   function playerStatsList(stats, hp, opts) {
-    const rows = ui.detail ? STAT_ROWS_DETAIL : STAT_ROWS_CORE;
+    const compact = !!(opts && opts.compact);
+    const forceDetail = !!(opts && opts.forceDetail);
+    let rows = forceDetail || ui.detail || compact ? STAT_ROWS_DETAIL : STAT_ROWS_CORE;
+    if (opts && opts.hideCurrent) {
+      rows = rows.filter(([key]) => key !== "currentHp");
+    }
     const withTips = !!(opts && opts.tips);
+    const listClass = `stat-list${withTips ? " has-tips" : ""}${compact ? " is-compact" : ""}`;
     return `
-      <dl class="stat-list ${withTips ? "has-tips" : ""}">
+      <dl class="${listClass}">
         ${rows
           .map(([key, label, kind]) => {
             const help = STAT_HELP[key] || "";
@@ -213,20 +220,52 @@
     `;
   }
 
-  function gainList(skill) {
+  function gainList(skill, level, mode) {
     const rows = ui.detail
       ? [...GAIN_CORE, ...GAIN_EXTRA.filter(([key]) => skill.gain[key])]
       : GAIN_CORE;
-    return `
+    const bonus = W.STACK_GAIN_BONUS || 0;
+    const lv = Math.max(0, level || 0);
+    const showTotal = mode === "owned" && lv >= 1;
+    const showUpgrade = mode === "offer" && lv >= 1;
+    const contrib = showTotal && W.gainFromSkill ? W.gainFromSkill(skill, lv) : null;
+    const list = `
       <ul class="gains">
         ${rows
           .map(([key, label, asPct]) => {
-            const value = skill.gain[key] || 0;
-            return `<li><span>${label}</span><b>${esc(gainText(key, value, asPct))}</b></li>`;
+            const base = skill.gain[key] || 0;
+            let value = base;
+            let suffix = "";
+            if (showTotal && contrib) {
+              value = contrib[key] || 0;
+              const linear = base * lv;
+              const extra = value - linear;
+              if (Math.abs(extra) >= 0.0005) {
+                suffix = `（重複${esc(gainText(key, extra, asPct))}）`;
+              }
+            } else if (showUpgrade && bonus > 0 && base) {
+              value = base * (1 + bonus);
+              suffix = "／獲得";
+            }
+            return `<li><span>${label}</span><b>${esc(gainText(key, value, asPct))}${suffix}</b></li>`;
           })
           .join("")}
-      </ul>
-    `;
+      </ul>`;
+    let note = "";
+    if (bonus > 0) {
+      const pct = Math.round(bonus * 100);
+      if (mode === "offer" && lv === 0) {
+        note = `<p class="tiny gain-note">同じ技を重ねると、効果だけでなく付随ステータスも2枚目以降さらに+${pct}%分伸びる</p>`;
+      } else if (showUpgrade) {
+        note = `<p class="tiny gain-note">重複ボーナス込み。この獲得の付随ステータスは基礎の${(1 + bonus)
+          .toFixed(2)
+          .replace(/\.00$/, "")
+          .replace(/(\.\d)0$/, "$1")}倍分</p>`;
+      } else if (showTotal && lv >= 2) {
+        note = `<p class="tiny gain-note">表示は重複ボーナス込みの合計（2枚目以降 +${pct}%）</p>`;
+      }
+    }
+    return `${list}${note}`;
   }
 
   function describeLines(skill, level, stats) {
@@ -272,9 +311,9 @@
         : `Lv.${level} · ${W.cooldownShort(skill.cooldown)}`;
     let bodyExtra = "";
     if (sourceKind === "offer") {
-      bodyExtra += gainList(skill);
+      bodyExtra += gainList(skill, level, "offer");
     } else if (showFull) {
-      bodyExtra += gainList(skill);
+      bodyExtra += gainList(skill, level, "owned");
     }
     if (showFull) {
       bodyExtra += `<div class="skill-detail">
@@ -376,9 +415,22 @@
     const points = state.rerollPoints || 0;
     const freeReroll = W.isOpeningPick ? W.isOpeningPick(state) : false;
     const canReroll = freeReroll || points >= 1;
+    const stats = W.computeStats(state.skills);
+    const ownedCount = Object.keys(state.skills).filter((id) => state.skills[id] > 0).length;
     return shell(
       `
       <p class="hint offer-hint">技を1つ選ぶ（${W.SKILLS.length}種から${offer.length}） · いま${ui.detail ? "詳細" : "標準"}表示 · カードを開いて確認</p>
+      <div class="offer-self">
+        <div class="offer-self-stats" aria-label="いまの能力（要約）">
+          <span><b>体力</b>${intNum(stats.maxHp)}</span>
+          <span><b>攻撃</b>${intNum(stats.atk)}</span>
+          <span><b>防御</b>${intNum(stats.def)}</span>
+          <span class="tiny">習得 ${ownedCount}</span>
+        </div>
+        <button type="button" class="btn btn-ghost btn-compact" data-action="offer-stats" aria-expanded="${ui.offerStats ? "true" : "false"}">
+          能力を見る
+        </button>
+      </div>
       <p class="group-legend" aria-hidden="true">
         <span class="skill-tag skill-tag-attack">攻撃</span>
         <span class="skill-tag skill-tag-break">弱体</span>
@@ -630,14 +682,20 @@
 
     return shell(
       `
-      <div class="battle-pane">
+      <div class="battle-pane${ui.detail ? " is-detail" : ""}">
         <div class="bars">
-          <div>
+          <div class="fighter fighter-player">
             <div class="bar-label"><span>あなた</span><span data-hp-label="player">${Math.max(0, intNum(playerHp))}/${intNum(stats.maxHp)}</span></div>
             <div class="hp"><span data-bar="player" style="width:${pRate}%"></span></div>
-            ${ui.detail ? playerStatsList(stats, playerHp) : ""}
+            ${
+              ui.detail
+                ? `<div class="battle-stats" aria-label="詳細能力">${playerStatsList(stats, playerHp, {
+                    compact: true,
+                  })}</div>`
+                : ""
+            }
           </div>
-          <div>
+          <div class="fighter fighter-enemy">
             <div class="bar-label"><span>敵</span><span data-hp-label="enemy">${Math.max(0, intNum(enemyHp))}/${intNum(enemy.maxHp)}</span></div>
             <div class="hp enemy"><span data-bar="enemy" style="width:${eRate}%"></span></div>
           </div>
@@ -693,6 +751,20 @@
   }
 
   function modal() {
+    if (ui.offerStats) {
+      const state = W.getState();
+      const stats = W.computeStats(state.skills);
+      const ownedCount = Object.keys(state.skills).filter((id) => state.skills[id] > 0).length;
+      return `
+        <div class="modal" role="dialog" aria-modal="true" aria-label="いまの能力">
+          <div class="modal-card">
+            <h2>いまの能力</h2>
+            <p class="tiny muted">習得 ${ownedCount}種 · 候補選ぶ前の確認</p>
+            ${playerStatsList(stats, null, { forceDetail: true, hideCurrent: true, tips: true })}
+            <button type="button" class="btn btn-primary" data-action="close-modal">閉じる</button>
+          </div>
+        </div>`;
+    }
     if (ui.patchNotes) {
       return `
         <div class="modal" role="dialog" aria-modal="true" aria-label="更新履歴">
@@ -714,12 +786,15 @@
               <li>約${W.SKILLS.length}種の技から毎回5つ提示。1つだけ獲得／強化。</li>
               <li>最初の技を得るまでは候補の入れ替えが無料で何度でもできる。2つ目以降はリロールポイントを1消費。</li>
               <li>階層クリアごとにリロールポイントが1たまる。候補画面で1消費し、5枚を全技から入れ替えられる（上限なし）。</li>
-              <li>同じ技を重ねると効果とステータスが伸びる。2枚目以降はステータスに追加ボーナス。</li>
+              <li>同じ技を重ねると効果とステータスが伸びる。2枚目以降、付随ステータスに基礎gainの${Math.round(
+                (W.STACK_GAIN_BONUS || 0.25) * 100
+              )}%分が追加で乗る。</li>
               <li>手順は最大${W.MAX_FLOW}個。上から判定し、外れは通常攻撃。</li>
               <li>再使用は「自分の行動を何回空けるか」。</li>
               <li>戦闘ログの行動番号は、あなたと敵で別々に数える。</li>
               <li>使用条件は体力・序盤／終盤・直前の行動・強化弱体などから選ぶ。</li>
               <li>技カードはクリックで拡大表示。能力名に触れると説明が出る。</li>
+              <li>技の候補画面では「能力を見る」でいまのステータスを確認できる。</li>
               <li>敵は序盤だけ弱く、以降は急に強くなる。100層は育成と手順が要る。</li>
               <li>回復技は少なめで代償が大きい。自動回復に注目した技もある。</li>
               <li>標準／詳細で表示量を切り替えられる。</li>
@@ -773,6 +848,7 @@
     ui.modal = null;
     ui.help = false;
     ui.patchNotes = false;
+    ui.offerStats = false;
   }
 
   function beginRun() {
@@ -977,6 +1053,15 @@
         render();
         return;
       }
+      if (action === "offer-stats") {
+        if (W.sfx) W.sfx.ui();
+        ui.offerStats = true;
+        ui.help = false;
+        ui.patchNotes = false;
+        ui.modal = null;
+        render();
+        return;
+      }
       if (action === "toggle-detail") {
         if (W.sfx) W.sfx.ui();
         ui.detail = !ui.detail;
@@ -1131,7 +1216,7 @@
       closeCardZoom(true);
       return;
     }
-    if (!ui.modal && !ui.help && !ui.patchNotes) return;
+    if (!ui.modal && !ui.help && !ui.patchNotes && !ui.offerStats) return;
     closeOverlays();
     if (W.sfx) W.sfx.ui();
     render();

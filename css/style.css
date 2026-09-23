@@ -107,6 +107,43 @@ h1, h2, .brand { font-family: var(--serif); }
 .btn-ghost { background: transparent; border-color: var(--line); color: var(--text); }
 .btn-danger { background: #6e2e2a; border-color: #a85a52; color: #fff4ef; }
 
+.offer-self {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(255, 244, 220, 0.04);
+}
+.offer-self-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  font-size: 0.92em;
+  min-width: 0;
+}
+.offer-self-stats span {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  white-space: nowrap;
+}
+.offer-self-stats b {
+  font-weight: 700;
+  color: var(--muted);
+  font-size: 0.88em;
+}
+.btn-compact {
+  min-height: 32px;
+  padding: 4px 10px;
+  font-size: 0.9em;
+  white-space: nowrap;
+  flex: none;
+}
+
 .offer-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -300,6 +337,7 @@ h1, h2, .brand { font-family: var(--serif); }
   padding: 0;
 }
 .gains b { color: var(--gold); font-weight: 700; }
+.gain-note { margin: 4px 0 0; line-height: 1.35; }
 .skill-detail {
   font-size: 0.85em;
   color: var(--muted);
@@ -554,6 +592,40 @@ select {
   overflow: hidden;
 }
 .bars { display: grid; gap: 8px; }
+.fighter { min-width: 0; }
+.battle-stats {
+  margin-top: 6px;
+  max-height: min(22vh, 168px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px 6px;
+  border-radius: var(--radius);
+  border: 1px solid rgba(109, 87, 56, 0.45);
+  background: rgba(12, 10, 8, 0.35);
+}
+.battle-stats .stat-list.is-compact {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 10px;
+}
+.battle-stats .stat-list.is-compact > div,
+.battle-stats .stat-list.is-compact .stat-row {
+  padding: 2px 0;
+  border-bottom-color: rgba(255, 244, 220, 0.04);
+}
+.battle-stats .stat-list.is-compact dt {
+  font-size: 0.78em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.battle-stats .stat-list.is-compact dd {
+  font-size: 0.9em;
+}
+.battle-pane.is-detail .log {
+  min-height: 140px;
+}
 .log-head {
   display: flex;
   justify-content: space-between;
@@ -816,6 +888,20 @@ select {
   }
 
   .offer-hint { font-size: 0.86em; line-height: 1.35; }
+  .offer-self {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .offer-self-stats {
+    justify-content: space-between;
+    gap: 6px 10px;
+    font-size: 0.88em;
+  }
+  .offer-self .btn-compact {
+    width: 100%;
+    min-height: 40px;
+  }
   .offer-grid {
     display: flex;
     flex-direction: column;
@@ -989,6 +1075,12 @@ select {
   .title-actions .btn { width: 100%; min-height: 48px; }
 
   .battle-pane { gap: 6px; }
+  .battle-stats {
+    max-height: min(18vh, 128px);
+  }
+  .battle-pane.is-detail .log {
+    min-height: 120px;
+  }
   .hp { height: 14px; }
   .log { font-size: 0.9em; }
 

@@ -322,7 +322,21 @@
         const room = Math.max(0, unit.maxHp - unit.hp);
         const got = Math.min(room, amount);
         unit.hp += got;
-        return { got, over: Math.max(0, amount - got), raw: amount };
+        let punish = 0;
+        if (got > 0) {
+          unit.effects.forEach((effect) => {
+            if (effect.kind === "healPunish") punish += Math.floor(got * effect.value);
+          });
+        }
+        if (punish > 0) {
+          const before = unit.hp;
+          unit.hp = Math.max(0, unit.hp - punish);
+          const dealt = before - unit.hp;
+          if (dealt > 0) {
+            log(`${unit.name}の回復に罰が乗り、${dealt}のダメージ。`, "dot");
+          }
+        }
+        return { got, over: Math.max(0, amount - got), raw: amount, punish };
       },
       addEffect(unit, effect) {
         const next = { ...effect, fresh: unit === ctx.actor };
@@ -395,16 +409,19 @@
         }
       }
       let regenHaste = 0;
+      let regenSap = 0;
       unit.effects.forEach((effect) => {
         if (effect.kind === "regenHaste") regenHaste += effect.value;
+        if (effect.kind === "regenSap") regenSap += effect.value;
       });
       const regenEvery = Math.max(1, unit.regenInterval - regenHaste);
       const blocked = unit.effects.some((effect) => effect.kind === "noRegen");
-      if (!blocked && (unit.regenAmount > 0 || extraRegen > 0)) {
+      const regenPool = Math.max(0, unit.regenAmount + extraRegen - regenSap);
+      if (!blocked && regenPool > 0) {
         unit.regenCounter += 1;
         if (unit.regenCounter >= regenEvery) {
           unit.regenCounter = 0;
-          const healed = ctx.heal(unit, unit.regenAmount + extraRegen);
+          const healed = ctx.heal(unit, regenPool);
           if (healed.got > 0 || healed.over > 0) {
             log(`${unit.name}の体力が${healed.got}回復した。${ctx.overNote(healed.over)}`, "heal");
           }
