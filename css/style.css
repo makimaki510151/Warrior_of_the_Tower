@@ -147,7 +147,8 @@ h1, h2, .brand { font-family: var(--serif); }
   gap: 1px;
 }
 .skill-top strong { font-size: 1.05em; line-height: 1.25; }
-.skill-meta { font-size: 0.8em; color: var(--muted); }
+.skill-meta { font-size: 0.8em; color: var(--muted); line-height: 1.25; }
+.skill-cd { color: var(--gold); }
 .skill-blurb,
 .skill-brief {
   font-size: 0.88em;
@@ -255,9 +256,33 @@ h1, h2, .brand { font-family: var(--serif); }
 }
 .flow-item {
   display: grid;
-  grid-template-columns: 20px minmax(0, 1.1fr) minmax(0, 1.3fr) auto auto;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
   gap: 6px;
   align-items: center;
+}
+.flow-item .idx {
+  grid-column: 1;
+  grid-row: 1;
+}
+.flow-item select[data-bind="node-skill"] {
+  grid-column: 2;
+  grid-row: 1;
+}
+.flow-item .flow-mini {
+  grid-column: 3;
+  grid-row: 1;
+}
+.flow-item select[data-bind="node-cond"] {
+  grid-column: 2;
+  grid-row: 2;
+  min-width: 0;
+}
+.flow-item .value-field,
+.flow-item .value-spacer {
+  grid-column: 3;
+  grid-row: 2;
+  justify-self: stretch;
 }
 .idx {
   width: 20px;
@@ -427,12 +452,15 @@ select {
     grid-template-columns: minmax(150px, 180px) minmax(150px, 1fr) minmax(200px, 1.1fr);
   }
   .flow-item {
-    grid-template-columns: 18px minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-columns: 18px minmax(0, 1fr) auto;
   }
   .flow-item .value-field,
-  .flow-item .value-spacer,
-  .flow-item .flow-mini {
+  .flow-item .value-spacer {
     grid-column: 2 / -1;
+  }
+  .flow-item .flow-mini {
+    grid-column: 3;
+    grid-row: 1;
   }
 }
 

@@ -13,7 +13,7 @@
       max: 99,
       step: 1,
       def: 40,
-      unit: "%",
+      unit: "%未満",
       text: (v) => `自分の体力が${v}%未満`,
     },
     {
@@ -24,7 +24,7 @@
       max: 99,
       step: 1,
       def: 60,
-      unit: "%",
+      unit: "%以上",
       text: (v) => `自分の体力が${v}%以上`,
     },
     {
@@ -35,7 +35,7 @@
       max: 99,
       step: 1,
       def: 40,
-      unit: "%",
+      unit: "%未満",
       text: (v) => `敵の体力が${v}%未満`,
     },
     {
@@ -46,30 +46,70 @@
       max: 99,
       step: 1,
       def: 70,
-      unit: "%",
+      unit: "%以上",
       text: (v) => `敵の体力が${v}%以上`,
     },
     {
-      type: "enemyDefGEAtk",
-      label: "敵の防御が自分の攻撃以上",
-      text: () => "敵の防御が自分の攻撃以上",
+      type: "hpWorseThanEnemy",
+      label: "自分の方が体力割合が低い",
+      text: () => "自分の体力割合が敵より低い",
     },
-    { type: "tookHit", label: "直前にダメージを受けた", text: () => "直前にダメージを受けた" },
-    { type: "enemyHasDebuff", label: "敵が弱体している", text: () => "敵が弱体している" },
-    { type: "selfHasDebuff", label: "自分が弱体している", text: () => "自分が弱体している" },
-    { type: "enemyRegen", label: "敵が自動回復する", text: () => "敵が自動回復する" },
-    { type: "selfNoBuff", label: "自分に強化がない", text: () => "自分に強化がない" },
+    {
+      type: "hpBetterThanEnemy",
+      label: "自分の方が体力割合が高い",
+      text: () => "自分の体力割合が敵以上",
+    },
+    {
+      type: "opening",
+      label: "戦いの序盤だけ",
+      value: true,
+      min: 1,
+      max: 5,
+      step: 1,
+      def: 3,
+      unit: "回目まで",
+      text: (v) => `自分の行動が${v}回目まで`,
+    },
+    {
+      type: "afterActions",
+      label: "ある程度戦ってから",
+      value: true,
+      min: 2,
+      max: 8,
+      step: 1,
+      def: 4,
+      unit: "回目から",
+      text: (v) => `自分の行動が${v}回目から`,
+    },
     {
       type: "everyN",
-      label: "N回目の行動ごと",
+      label: "決まった回数ごと",
       value: true,
       min: 2,
       max: 6,
       step: 1,
       def: 3,
-      unit: "回",
-      text: (v) => `自分の${v}回目の行動ごと`,
+      unit: "回ごと",
+      text: (v) => `自分の行動が${v}回ごと`,
     },
+    { type: "tookHit", label: "直前にダメージを受けた", text: () => "直前にダメージを受けた" },
+    { type: "notTookHit", label: "直前は無傷だった", text: () => "直前にダメージを受けていない" },
+    { type: "lastWasNormal", label: "直前が通常攻撃だった", text: () => "直前の行動が通常攻撃だった" },
+    { type: "lastWasSkill", label: "直前が技だった", text: () => "直前の行動が技だった" },
+    {
+      type: "enemyDefGEAtk",
+      label: "敵の防御が自分の攻撃以上",
+      text: () => "敵の防御が自分の攻撃以上",
+    },
+    { type: "selfFaster", label: "自分が敵より速い", text: () => "自分の行動速度が敵より高い" },
+    { type: "enemyFaster", label: "敵が自分より速い", text: () => "敵の行動速度が自分以上" },
+    { type: "enemyHasDebuff", label: "敵が弱体している", text: () => "敵が弱体している" },
+    { type: "enemyNoDebuff", label: "敵が弱体していない", text: () => "敵が弱体していない" },
+    { type: "enemyHasBuff", label: "敵に強化がある", text: () => "敵に強化がある" },
+    { type: "selfHasDebuff", label: "自分が弱体している", text: () => "自分が弱体している" },
+    { type: "selfHasBuff", label: "自分に強化がある", text: () => "自分に強化がある" },
+    { type: "selfNoBuff", label: "自分に強化がない", text: () => "自分に強化がない" },
+    { type: "enemyRegen", label: "敵が自動回復する", text: () => "敵が自動回復するタイプ" },
   ];
 
   const CONDITION_BY_TYPE = {};
@@ -103,7 +143,7 @@
       actionCount: 0,
       regenCounter: 0,
       tookHit: false,
-      lastAction: "normal",
+      lastAction: null,
       pattern: stats.pattern,
       boss: !!stats.boss,
     };
@@ -165,14 +205,38 @@
         return enemyRate * 100 < value;
       case "enemyHpAbove":
         return enemyRate * 100 >= value;
+      case "hpWorseThanEnemy":
+        return playerRate < enemyRate;
+      case "hpBetterThanEnemy":
+        return playerRate >= enemyRate;
+      case "opening":
+        return value > 0 && ctx.player.actionCount <= value;
+      case "afterActions":
+        return value > 0 && ctx.player.actionCount >= value;
       case "enemyDefGEAtk":
         return effectiveDef(ctx.enemy) >= effectiveAtk(ctx.player);
       case "tookHit":
         return ctx.sawHit;
+      case "notTookHit":
+        return !ctx.sawHit;
+      case "lastWasNormal":
+        return ctx.player.lastAction === "normal";
+      case "lastWasSkill":
+        return ctx.player.lastAction === "skill";
+      case "selfFaster":
+        return ctx.player.speed > ctx.enemy.speed;
+      case "enemyFaster":
+        return ctx.enemy.speed >= ctx.player.speed;
       case "enemyHasDebuff":
         return hasDebuff(ctx.enemy);
+      case "enemyNoDebuff":
+        return !hasDebuff(ctx.enemy);
+      case "enemyHasBuff":
+        return hasBuff(ctx.enemy);
       case "selfHasDebuff":
         return hasDebuff(ctx.player);
+      case "selfHasBuff":
+        return hasBuff(ctx.player);
       case "enemyRegen":
         return ctx.enemy.regenAmount > 0;
       case "selfNoBuff":
