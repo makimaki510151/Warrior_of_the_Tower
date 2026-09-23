@@ -510,7 +510,54 @@ select {
   background: var(--panel);
   border: 1px solid var(--line);
 }
+.modal-card-wide {
+  width: min(560px, 100%);
+  max-height: 86dvh;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.modal-card-wide > .btn { align-self: stretch; flex-shrink: 0; }
+.patch-scroll {
+  overflow: auto;
+  flex: 1;
+  min-height: 0;
+  padding-right: 4px;
+  margin: 4px 0 8px;
+}
+.patch-entry {
+  padding: 10px 0 12px;
+  border-top: 1px solid var(--line);
+}
+.patch-entry:first-child { border-top: 0; padding-top: 0; }
+.patch-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: baseline;
+  margin-bottom: 4px;
+}
+.patch-title {
+  width: 100%;
+  margin: 2px 0 6px;
+  font-size: 14px;
+  color: var(--ink);
+}
+.patch-h {
+  margin: 10px 0 4px;
+  font-size: 13px;
+  color: var(--gold);
+  font-weight: 700;
+}
+.patch-list {
+  padding-left: 1.1em;
+  margin: 0 0 6px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.patch-list li { margin: 0.25em 0; }
 .modal-card ul { padding-left: 1.1em; margin: 8px 0 12px; font-size: 13px; }
+.title-actions .tiny { opacity: 0.75; }
 
 .sr {
   position: absolute;
