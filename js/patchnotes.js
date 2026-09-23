@@ -17,6 +17,20 @@
   /** @type {{ version: string, date: string, title: string, sections: { heading: string, items: string[] }[] }[]} */
   const PATCH_NOTES = [
     {
+      version: "0.5.2",
+      date: "2026-09-23",
+      title: "習得技ホバー時の横スクロール修正",
+      sections: [
+        {
+          heading: "UI",
+          items: [
+            "習得技一覧でカードにカーソルを合わせると横スクロールバーが出る問題を修正。",
+            "所持技カードはホバー時の拡大（scale）をやめ、枠線・影のみにする。一覧は overflow-x: hidden。",
+          ],
+        },
+      ],
+    },
+    {
       version: "0.5.1",
       date: "2026-09-23",
       title: "スキルカードの種類タグと色分け",
