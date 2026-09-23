@@ -25,6 +25,8 @@
   const STAT_ROWS_DETAIL = [
     ["currentHp", "現在体力", "current"],
     ["maxHp", "最大体力", "plain"],
+    ["atk", "攻撃力", "plain"],
+    ["def", "防御力", "plain"],
     ["regenInterval", "自動体力回復速度", "interval"],
     ["regenAmount", "自動体力回復量", "plain"],
     ["healEff", "体力回復効率", "pct"],
@@ -184,18 +186,26 @@
     `;
   }
 
+  function describeLines(skill, level, stats) {
+    const raw = skill.describe(Math.max(1, level || 1), stats) || [];
+    const filtered = raw.filter(
+      (line) => !/行動あけると再使用|自分の行動を\d+回空けるとまた使える/.test(line)
+    );
+    return [...filtered, W.cooldownReuseText(skill.cooldown)];
+  }
+
   function offerCard(id, state) {
     const skill = W.SKILL_BY_ID[id];
     if (!skill) return "";
     const level = state.skills[id] || 0;
     const stats = W.computeStats(state.skills);
-    const lines = skill.describe(Math.max(1, level || 1), stats);
+    const lines = describeLines(skill, level || 1, stats);
     return `
       <article class="skill-card offer-card ${ui.detail ? "is-detail" : ""}">
         <div class="skill-body">
           <header class="skill-top">
             <strong>${esc(skill.name)}</strong>
-            <span class="skill-meta">${level ? `Lv.${level}→${level + 1}` : "新規"} · ${skill.cooldown}行</span>
+            <span class="skill-meta">${level ? `Lv.${level}→${level + 1}` : "新規"} · ${esc(W.cooldownShort(skill.cooldown))}</span>
           </header>
           <p class="skill-blurb">${esc(skill.blurb)}</p>
           ${gainList(skill)}
@@ -205,7 +215,9 @@
                   ${lines.map((line) => `<p>${esc(line)}</p>`).join("")}
                   <p class="trade">${esc(skill.tradeoff)}</p>
                 </div>`
-              : ""
+              : `<div class="skill-detail skill-detail-lite">
+                  <p class="skill-cd">${esc(W.cooldownReuseText(skill.cooldown))}</p>
+                </div>`
           }
         </div>
         <button type="button" class="btn btn-primary" data-action="pick" data-skill="${id}">獲得</button>
@@ -218,12 +230,12 @@
     if (!skill) return "";
     const level = state.skills[id] || 0;
     const stats = W.computeStats(state.skills);
-    const lines = skill.describe(Math.max(1, level), stats);
+    const lines = describeLines(skill, level, stats);
     return `
       <article class="skill-card owned-card ${ui.detail ? "is-detail" : ""}">
         <header class="skill-top">
           <strong>${esc(skill.name)}</strong>
-          <span class="skill-meta">Lv.${level} · ${skill.cooldown}行</span>
+          <span class="skill-meta">Lv.${level} · ${esc(W.cooldownShort(skill.cooldown))}</span>
         </header>
         <p class="skill-blurb">${esc(skill.blurb)}</p>
         ${
@@ -236,7 +248,12 @@
               </div>
             `
             : `<div class="skill-detail skill-detail-lite">
-                ${lines.slice(0, 2).map((line) => `<p>${esc(line)}</p>`).join("")}
+                ${lines
+                  .slice(0, -1)
+                  .slice(0, 1)
+                  .map((line) => `<p>${esc(line)}</p>`)
+                  .join("")}
+                <p class="skill-cd">${esc(W.cooldownReuseText(skill.cooldown))}</p>
               </div>`
         }
       </article>
@@ -517,6 +534,8 @@
               <li>約${W.SKILLS.length}種の技から毎回5つ提示。1つだけ獲得／強化。</li>
               <li>同じ技を重ねても伸びは一定。完全上位互換はない。</li>
               <li>手順は上から判定。外れは通常攻撃。</li>
+              <li>再使用は「自分の行動を何回空けるか」。敵の行動は数えない。</li>
+              <li>使用条件は体力・序盤／終盤・直前の行動・強化弱体などから選ぶ。</li>
               <li>敵の詳細は出ない。階層ごとの相手は固定。</li>
               <li>標準／詳細で表示量を切り替えられる。</li>
               <li>敗北時は手順の組み直しか諦め。</li>

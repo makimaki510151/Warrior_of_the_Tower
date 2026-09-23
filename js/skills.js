@@ -63,6 +63,18 @@
     return n > 0 ? `(${n}オーバー)` : "";
   }
 
+  /** 使ったあと、自分の行動を何回空ければまた使えるか */
+  function cooldownReuseText(skips) {
+    const n = Math.max(0, Math.floor(Number(skips) || 0));
+    if (n === 0) return "使った直後から、また使える。";
+    return `使ったあと、自分の行動を${n}回空けるとまた使える（敵の行動は数えない）。`;
+  }
+
+  function cooldownShort(skips) {
+    const n = Math.max(0, Math.floor(Number(skips) || 0));
+    return `再使用まで自分の行動${n}回`;
+  }
+
   const SKILLS = [
     {
       id: "slash",
@@ -73,7 +85,7 @@
       cooldown: 1,
       gain: gain({ maxHp: 4, atk: 2, def: 2 }),
       describe(level, stats) {
-        return [multText(1.16, 0.04, level, stats), "使用後、1行動あけると再使用できる。"];
+        return [multText(1.16, 0.04, level, stats)];
       },
       use(ctx, level) {
         const r = ctx.damage(scaled(1.16, 0.04, level));
@@ -89,7 +101,7 @@
       cooldown: 1,
       gain: gain({ maxHp: 2, atk: 2, speed: 6 }),
       describe(level, stats) {
-        return [multText(1.28, 0.05, level, stats), "使用後、1行動あけると再使用できる。", "体が速くなる代わりに、守りは伸びない。"];
+        return [multText(1.28, 0.05, level, stats), "体が速くなる代わりに、守りは伸びない。"];
       },
       use(ctx, level) {
         const r = ctx.damage(scaled(1.28, 0.05, level));
@@ -105,7 +117,7 @@
       cooldown: 3,
       gain: gain({ maxHp: 6, atk: 3, atkEff: 0.02 }),
       describe(level, stats) {
-        return [multText(1.72, 0.06, level, stats), "使用後、3行動あけると再使用できる。"];
+        return [multText(1.72, 0.06, level, stats)];
       },
       use(ctx, level) {
         const r = ctx.damage(scaled(1.72, 0.06, level));
@@ -125,7 +137,6 @@
         return [
           multText(1.22, 0.05, level, stats),
           `敵の防御を${Math.floor(ignore * 100)}%無視する。次は+1%。`,
-          "使用後、3行動あけると再使用できる。",
         ];
       },
       use(ctx, level) {
@@ -659,8 +670,8 @@
       gain: gain({ maxHp: 3, atk: 1, speed: 9 }),
       describe(level, stats) {
         return [
-          "次の3行動の終わりに、他の技の再使用カウントが余分に1進む。",
-          "ダメージはない。レベルが上がっても加速の中身は同じで、伸びるのは基礎ステータスだけ。",
+          "効果中、自分の行動が終わるたびに、他の技の待ちが「1」ではなく「2」進む（空き回数があと少なくなる）。",
+          "自分へのダメージはない。レベルでは加速の強さは変わらず、伸びるのは基礎ステータスだけ。",
         ];
       },
       use(ctx) {
@@ -670,7 +681,7 @@
           value: 1,
           turns: 3,
         });
-        ctx.log(`${ctx.p}加速。技の再使用が早まる。`, "buff");
+        ctx.log(`${ctx.p}加速。技の待ちが進みやすくなる。`, "buff");
       },
     },
     {
@@ -1231,7 +1242,10 @@
       cooldown: 3,
       gain: gain({ maxHp: 2, speed: 7, atk: 1 }),
       describe(level, stats) {
-        return ["次の2行動の終わりに、他の技の再使用カウントが余分に1進む。レベルでは中身は変わらない。"];
+        return [
+          "効果中、自分の行動が終わるたびに、他の技の待ちが「1」ではなく「2」進む。",
+          "加速より短い。レベルでは拍子の強さは変わらない。",
+        ];
       },
       use(ctx) {
         ctx.addEffect(ctx.player, {
@@ -1240,7 +1254,7 @@
           value: 1,
           turns: 2,
         });
-        ctx.log(`${ctx.p}拍子。技の再使用がわずかに早まる。`, "buff");
+        ctx.log(`${ctx.p}拍子。技の待ちが少し早く進む。`, "buff");
       },
     },
   ];
@@ -1311,4 +1325,6 @@
   W.overNote = overNote;
   W.maxHpPct = maxHpPct;
   W.atkMult = atkMult;
+  W.cooldownReuseText = cooldownReuseText;
+  W.cooldownShort = cooldownShort;
 })(typeof window !== "undefined" ? window : globalThis);
