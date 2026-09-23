@@ -594,7 +594,7 @@
         return [
           "現在体力の13%を払い、次の3行動、防御力を大きく上げる。",
           defBuffText(0.5, 0.02, level, stats),
-          "体力が32%以下のときは手順にあっても飛ばされる。",
+          "体力が32%を超えているときだけ使える（32%以下では飛ばされる）。",
         ];
       },
       use(ctx, level) {
@@ -1828,8 +1828,8 @@
       id: "underdog",
       name: "劣勢",
       group: "攻撃",
-      blurb: "自分の体力割合が相手より低いほど強い。",
-      tradeoff: "体力割合で負けているとき限定。勝ち越していると弱い。",
+      blurb: "自分の体力割合が相手以下のとき強い。",
+      tradeoff: "体力割合で負けている（または互角の）とき限定。勝ち越していると弱い。",
       cooldown: 2,
       gain: gain({ maxHp: 4, atk: 3, speed: 2 }),
       describe(level, stats) {
@@ -1837,7 +1837,7 @@
         const behind = scaled(1.75, 0.07, level);
         return [
           `自分の体力割合が相手以下なら${atkMult(behind, stats)}。`,
-          `相手より余裕があるときは${atkMult(even, stats)}。`,
+          `相手より高いときは${atkMult(even, stats)}。`,
           dualMultGrowth(1.75, 0.07, 0.7, 0.03, level),
         ];
       },
@@ -1866,7 +1866,7 @@
         const trail = scaled(0.68, 0.025, level);
         return [
           `自分の体力割合が相手より高いとき${atkMult(lead, stats)}。`,
-          `相手以下のときは${atkMult(trail, stats)}。`,
+          `相手以下（互角を含む）のときは${atkMult(trail, stats)}。`,
           dualMultGrowth(1.7, 0.065, 0.68, 0.025, level),
         ];
       },
@@ -1895,7 +1895,7 @@
         const far = scaled(0.6, 0.02, level);
         return [
           `体力割合の差が20%以内なら${atkMult(close, stats)}。`,
-          `差がそれ以上なら${atkMult(far, stats)}。`,
+          `差が20%を超えるなら${atkMult(far, stats)}。`,
           dualMultGrowth(1.82, 0.07, 0.6, 0.02, level),
         ];
       },

@@ -3,6 +3,22 @@
 
   const MAX_ACTIONS = 220;
 
+  /**
+   * 比較の言葉と判定の対応（ゲーム全体で統一）
+   * - 以上 … その値を含む（>=）
+   * - 以下 … その値を含む（<=）
+   * - 未満 … その値を含まない（<）
+   * - より高い／より低い／より速い … その値を含まない（> または <）
+   * - まで … その値を含む（<=）／から … その値を含む（>=）
+   * - 以内 … その値を含む（<=）／を超える … その値を含まない（>）
+   * 二つに分けるときは「以下（<=）」と「より高い（>）」のように、境界がどちらか一方だけに入るようにする。
+   */
+  const COMPARE_RULES_HELP = [
+    "以上＝その値を含む。以下＝その値を含む。未満＝その値を含まない。",
+    "より高い／より低い／より速い＝その値を含まない（同じなら成り立たない）。",
+    "まで＝その回数を含む。から＝その回数を含む。以内＝その差を含む。を超える＝含まない。",
+  ];
+
   const CONDITIONS = [
     { type: "always", label: "常に使う", text: () => "常に" },
     {
@@ -51,13 +67,13 @@
     },
     {
       type: "hpWorseThanEnemy",
-      label: "自分の方が体力割合が低い",
-      text: () => "自分の体力割合が敵より低い",
+      label: "自分の体力割合が敵以下",
+      text: () => "自分の体力割合が敵以下",
     },
     {
       type: "hpBetterThanEnemy",
-      label: "自分の方が体力割合が高い",
-      text: () => "自分の体力割合が敵以上",
+      label: "自分の体力割合が敵より高い",
+      text: () => "自分の体力割合が敵より高い",
     },
     {
       type: "opening",
@@ -102,7 +118,7 @@
       text: () => "敵の防御が自分の攻撃以上",
     },
     { type: "selfFaster", label: "自分が敵より速い", text: () => "自分の行動速度が敵より高い" },
-    { type: "enemyFaster", label: "敵が自分より速い", text: () => "敵の行動速度が自分以上" },
+    { type: "enemyFaster", label: "敵が自分より速い", text: () => "敵の行動速度が自分より高い" },
     { type: "enemyHasDebuff", label: "敵が弱体している", text: () => "敵が弱体している" },
     { type: "enemyNoDebuff", label: "敵が弱体していない", text: () => "敵が弱体していない" },
     { type: "enemyHasBuff", label: "敵に強化がある", text: () => "敵に強化がある" },
@@ -207,9 +223,9 @@
       case "enemyHpAbove":
         return enemyRate * 100 >= value;
       case "hpWorseThanEnemy":
-        return playerRate < enemyRate;
+        return playerRate <= enemyRate;
       case "hpBetterThanEnemy":
-        return playerRate >= enemyRate;
+        return playerRate > enemyRate;
       case "opening":
         return value > 0 && ctx.player.actionCount <= value;
       case "afterActions":
@@ -227,7 +243,7 @@
       case "selfFaster":
         return ctx.player.speed > ctx.enemy.speed;
       case "enemyFaster":
-        return ctx.enemy.speed >= ctx.player.speed;
+        return ctx.enemy.speed > ctx.player.speed;
       case "enemyHasDebuff":
         return hasDebuff(ctx.enemy);
       case "enemyNoDebuff":
@@ -661,7 +677,7 @@
         enemyAttack(0.88 + missing * 0.85, "殴打");
         return;
       }
-      if (enemy.pattern === "warden" && enemy.hp / enemy.maxHp < 0.55 && !enemy.effects.some((e) => e.id === "warden")) {
+      if (enemy.pattern === "warden" && enemy.hp / enemy.maxHp <= 0.5 && !enemy.effects.some((e) => e.id === "warden")) {
         ctx.actor = enemy;
         ctx.addEffect(enemy, {
           id: "warden",
@@ -1063,6 +1079,7 @@
 
   W.CONDITIONS = CONDITIONS;
   W.CONDITION_BY_TYPE = CONDITION_BY_TYPE;
+  W.COMPARE_RULES_HELP = COMPARE_RULES_HELP;
   W.conditionLabel = conditionLabel;
   W.simulate = simulate;
   W.MAX_ACTIONS = MAX_ACTIONS;
