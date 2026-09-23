@@ -387,25 +387,25 @@
       cooldown: 3,
       gain: gain({ maxHp: 2, atk: 2, def: 1, atkEff: 0.03 }),
       describe(level, stats) {
-        const down = scaled(0.16, 0.01, level);
-        const next = scaled(0.16, 0.01, level + 1);
+        const down = scaled(0.3, 0.02, level);
+        const next = scaled(0.3, 0.02, level + 1);
         return [
-          multText(0.78, 0.03, level, stats),
-          `敵の防御力を${pctNowLabel(down)}下げる（敵の3行動）。${growthTail(
+          multText(0.95, 0.035, level, stats),
+          `敵の防御力を${pctNowLabel(down)}下げる（敵の4行動）。${growthTail(
             pctNowLabel(next),
-            pctStepLabel(0.01)
+            pctStepLabel(0.02)
           )}`,
           "この低下に、自分の補助効率は乗らない。",
         ];
       },
       use(ctx, level) {
-        const r = ctx.damage(scaled(0.78, 0.03, level));
-        const down = scaled(0.16, 0.01, level);
+        const r = ctx.damage(scaled(0.95, 0.035, level));
+        const down = scaled(0.3, 0.02, level);
         ctx.addEffect(ctx.enemy, {
           id: "sunder",
           kind: "defPct",
           value: -down,
-          turns: 3,
+          turns: 4,
           negative: true,
         });
         ctx.log(`${ctx.p}崩甲。${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}防御力を下げた。`, "attack");
@@ -421,14 +421,14 @@
       gain: gain({ maxHp: 1, atk: 3, speed: 4, atkEff: 0.01 }),
       describe(level, stats) {
         return [
-          `敵が弱体中なら${atkMult(scaled(1.86, 0.07, level), stats)}。`,
-          `何もなければ${atkMult(scaled(0.8, 0.02, level), stats)}。`,
-          dualMultGrowth(1.86, 0.07, 0.8, 0.02, level),
+          `敵が弱体中なら${atkMult(scaled(2.35, 0.09, level), stats)}。`,
+          `何もなければ${atkMult(scaled(0.95, 0.03, level), stats)}。`,
+          dualMultGrowth(2.35, 0.09, 0.95, 0.03, level),
         ];
       },
       use(ctx, level) {
         const debuffed = ctx.hasDebuff(ctx.enemy);
-        const mult = debuffed ? scaled(1.86, 0.07, level) : scaled(0.8, 0.02, level);
+        const mult = debuffed ? scaled(2.35, 0.09, level) : scaled(0.95, 0.03, level);
         const r = ctx.damage(mult);
         ctx.log(
           `${ctx.p}弱点。${debuffed ? "隙を広げて" : "狙いが外れ、"}${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}`,
@@ -445,25 +445,25 @@
       cooldown: 2,
       gain: gain({ maxHp: 2, atk: 3, speed: 4, healEff: -0.02 }),
       describe(level, stats) {
-        const ratio = scaled(0.26, 0.02, level);
-        const next = scaled(0.26, 0.02, level + 1);
+        const ratio = scaled(0.4, 0.03, level);
+        const next = scaled(0.4, 0.03, level + 1);
         return [
-          multText(0.5, 0.025, level, stats),
-          `その後、敵は4行動のあいだ行動ごとに${atkMult(ratio, stats)}の毒を受ける。${growthTail(
+          multText(0.72, 0.03, level, stats),
+          `その後、敵は5行動のあいだ行動ごとに${atkMult(ratio, stats)}の毒を受ける。${growthTail(
             `×${next.toFixed(2)}`,
-            "0.02"
+            "0.03"
           )}`,
           "毒は重ねがけせず、打ち直すと残りが更新される。",
         ];
       },
       use(ctx, level) {
-        const r = ctx.damage(scaled(0.5, 0.025, level));
-        const dot = Math.max(1, Math.floor(ctx.effectiveAtk(ctx.player) * scaled(0.26, 0.02, level)));
+        const r = ctx.damage(scaled(0.72, 0.03, level));
+        const dot = Math.max(1, Math.floor(ctx.effectiveAtk(ctx.player) * scaled(0.4, 0.03, level)));
         ctx.addEffect(ctx.enemy, {
           id: "venom",
           kind: "dot",
           value: dot,
-          turns: 4,
+          turns: 5,
           negative: true,
         });
         ctx.log(`${ctx.p}毒刃。${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}毒が回る。`, "attack");
@@ -506,17 +506,17 @@
       gain: gain({ maxHp: 8, def: 4, defEff: 0.03 }),
       describe(level, stats) {
         return [
-          `次の3行動、${defBuffText(0.42, 0.02, level, stats)}`,
+          `次の4行動、${defBuffText(0.55, 0.03, level, stats)}`,
           "この行動では攻撃しない。",
         ];
       },
       use(ctx, level) {
-        const rate = scaled(0.42, 0.02, level);
+        const rate = scaled(0.55, 0.03, level);
         ctx.addEffect(ctx.player, {
           id: "guard",
           kind: "defPct",
           value: rate,
-          turns: 3,
+          turns: 4,
           scale: "def",
         });
         ctx.log(`${ctx.p}鉄身。防御力が上がった。`, "buff");
@@ -532,17 +532,17 @@
       gain: gain({ maxHp: 4, atk: -1, def: 3, defEff: 0.02, dmgReduction: 0.012 }),
       describe(level, stats) {
         return [
-          `次の2行動、${drText(0.26, 0.015, level)}`,
+          `次の3行動、${drText(0.4, 0.02, level)}`,
           "軽減は防御計算のあとでかかる。上限75%。",
         ];
       },
       use(ctx, level) {
-        const rate = scaled(0.26, 0.015, level);
+        const rate = scaled(0.4, 0.02, level);
         ctx.addEffect(ctx.player, {
           id: "fortress",
           kind: "dr",
           value: rate,
-          turns: 2,
+          turns: 3,
         });
         ctx.log(`${ctx.p}堅守。受ける打撃をいなす体勢に入った。`, "buff");
       },
@@ -961,23 +961,23 @@
       cooldown: 3,
       gain: gain({ maxHp: 2, atk: 1, def: 2, atkEff: 0.02 }),
       describe(level, stats) {
-        const down = scaled(0.24, 0.012, level);
-        const next = scaled(0.24, 0.012, level + 1);
+        const down = scaled(0.38, 0.02, level);
+        const next = scaled(0.38, 0.02, level + 1);
         return [
-          multText(0.4, 0.02, level, stats),
-          `敵の防御力を${pctNowLabel(down)}下げる（敵の3行動）。${growthTail(
+          multText(0.55, 0.025, level, stats),
+          `敵の防御力を${pctNowLabel(down)}下げる（敵の4行動）。${growthTail(
             pctNowLabel(next),
-            pctStepLabel(0.012)
+            pctStepLabel(0.02)
           )}`,
         ];
       },
       use(ctx, level) {
-        const r = ctx.damage(scaled(0.4, 0.02, level));
+        const r = ctx.damage(scaled(0.55, 0.025, level));
         ctx.addEffect(ctx.enemy, {
           id: "rift",
           kind: "defPct",
-          value: -scaled(0.24, 0.012, level),
-          turns: 3,
+          value: -scaled(0.38, 0.02, level),
+          turns: 4,
           negative: true,
         });
         ctx.log(`${ctx.p}裂甲。${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}防御を大きく下げた。`, "attack");
@@ -992,24 +992,24 @@
       cooldown: 3,
       gain: gain({ maxHp: 2, atk: 2, speed: 2, healEff: -0.02 }),
       describe(level, stats) {
-        const ratio = scaled(0.2, 0.015, level);
-        const next = scaled(0.2, 0.015, level + 1);
+        const ratio = scaled(0.32, 0.02, level);
+        const next = scaled(0.32, 0.02, level + 1);
         return [
-          multText(0.35, 0.02, level, stats),
-          `6行動のあいだ、行動ごとに${atkMult(ratio, stats)}の毒。${growthTail(
+          multText(0.55, 0.025, level, stats),
+          `7行動のあいだ、行動ごとに${atkMult(ratio, stats)}の毒。${growthTail(
             `×${next.toFixed(2)}`,
-            "0.015"
+            "0.02"
           )}`,
         ];
       },
       use(ctx, level) {
-        const r = ctx.damage(scaled(0.35, 0.02, level));
-        const dot = Math.max(1, Math.floor(ctx.effectiveAtk(ctx.player) * scaled(0.2, 0.015, level)));
+        const r = ctx.damage(scaled(0.55, 0.025, level));
+        const dot = Math.max(1, Math.floor(ctx.effectiveAtk(ctx.player) * scaled(0.32, 0.02, level)));
         ctx.addEffect(ctx.enemy, {
           id: "plague",
           kind: "dot",
           value: dot,
-          turns: 6,
+          turns: 7,
           negative: true,
         });
         ctx.log(`${ctx.p}疫刃。${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}長い毒が回る。`, "attack");
@@ -1024,23 +1024,23 @@
       cooldown: 3,
       gain: gain({ maxHp: 4, def: 3, defEff: 0.02 }),
       describe(level, stats) {
-        const down = scaled(0.18, 0.01, level);
-        const next = scaled(0.18, 0.01, level + 1);
+        const down = scaled(0.3, 0.02, level);
+        const next = scaled(0.3, 0.02, level + 1);
         return [
-          multText(0.55, 0.025, level, stats),
-          `敵の攻撃力を${pctNowLabel(down)}下げる（敵の3行動）。${growthTail(
+          multText(0.75, 0.03, level, stats),
+          `敵の攻撃力を${pctNowLabel(down)}下げる（敵の4行動）。${growthTail(
             pctNowLabel(next),
-            pctStepLabel(0.01)
+            pctStepLabel(0.02)
           )}`,
         ];
       },
       use(ctx, level) {
-        const r = ctx.damage(scaled(0.55, 0.025, level));
+        const r = ctx.damage(scaled(0.75, 0.03, level));
         ctx.addEffect(ctx.enemy, {
           id: "sap",
           kind: "atkPct",
-          value: -scaled(0.18, 0.01, level),
-          turns: 3,
+          value: -scaled(0.3, 0.02, level),
+          turns: 4,
           negative: true,
         });
         ctx.log(`${ctx.p}削気。${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}攻撃力を下げた。`, "attack");
@@ -1055,23 +1055,23 @@
       cooldown: 3,
       gain: gain({ maxHp: 2, atk: 2, dmgBonus: 0.008 }),
       describe(level, stats) {
-        const down = scaled(0.12, 0.01, level);
-        const next = scaled(0.12, 0.01, level + 1);
+        const down = scaled(0.22, 0.015, level);
+        const next = scaled(0.22, 0.015, level + 1);
         return [
-          multText(0.7, 0.03, level, stats),
-          `敵の被ダメージ軽減を${pctNowLabel(down)}下げる（敵の3行動）。${growthTail(
+          multText(0.9, 0.035, level, stats),
+          `敵の被ダメージ軽減を${pctNowLabel(down)}下げる（敵の4行動）。${growthTail(
             pctNowLabel(next),
-            pctStepLabel(0.01)
+            pctStepLabel(0.015)
           )}`,
         ];
       },
       use(ctx, level) {
-        const r = ctx.damage(scaled(0.7, 0.03, level));
+        const r = ctx.damage(scaled(0.9, 0.035, level));
         ctx.addEffect(ctx.enemy, {
           id: "expose",
           kind: "dr",
-          value: -scaled(0.12, 0.01, level),
-          turns: 3,
+          value: -scaled(0.22, 0.015, level),
+          turns: 4,
           negative: true,
         });
         ctx.log(`${ctx.p}露呈。${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}守りを開いた。`, "attack");
@@ -1109,15 +1109,15 @@
       cooldown: 2,
       gain: gain({ maxHp: 1, atk: 2, speed: 3 }),
       describe(level, stats) {
-        return [multText(0.6, 0.025, level, stats), "敵に軽微な攻撃低下を付ける（敵の2行動）。弱体判定に乗る。"];
+        return [multText(0.8, 0.03, level, stats), "敵に攻撃低下を付ける（敵の3行動）。弱体判定に乗る。"];
       },
       use(ctx, level) {
-        const r = ctx.damage(scaled(0.6, 0.025, level));
+        const r = ctx.damage(scaled(0.8, 0.03, level));
         ctx.addEffect(ctx.enemy, {
           id: "mark",
           kind: "atkPct",
-          value: -scaled(0.08, 0.005, level),
-          turns: 2,
+          value: -scaled(0.18, 0.015, level),
+          turns: 3,
           negative: true,
         });
         ctx.log(`${ctx.p}印刻。${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}印を刻んだ。`, "attack");
@@ -1132,14 +1132,14 @@
       cooldown: 3,
       gain: gain({ maxHp: 6, def: 5, defEff: 0.02 }),
       describe(level, stats) {
-        return [`次の2行動、${defBuffText(0.55, 0.025, level, stats)}`];
+        return [`次の3行動、${defBuffText(0.7, 0.03, level, stats)}`];
       },
       use(ctx, level) {
         ctx.addEffect(ctx.player, {
           id: "bulwark",
           kind: "defPct",
-          value: scaled(0.55, 0.025, level),
-          turns: 2,
+          value: scaled(0.7, 0.03, level),
+          turns: 3,
           scale: "def",
         });
         ctx.log(`${ctx.p}防壁。短いあいだ、防御力が大きく上がった。`, "buff");
@@ -1154,14 +1154,14 @@
       cooldown: 4,
       gain: gain({ maxHp: 5, atk: -2, def: 4, dmgReduction: 0.015 }),
       describe(level, stats) {
-        return [`次の3行動、${drText(0.2, 0.012, level)}`];
+        return [`次の4行動、${drText(0.32, 0.018, level)}`];
       },
       use(ctx, level) {
         ctx.addEffect(ctx.player, {
           id: "aegis",
           kind: "dr",
-          value: scaled(0.2, 0.012, level),
-          turns: 3,
+          value: scaled(0.32, 0.018, level),
+          turns: 4,
         });
         ctx.log(`${ctx.p}聖壁。打撃をいなす壁を張った。`, "buff");
       },
@@ -1319,17 +1319,17 @@
       name: "晩成",
       group: "攻撃",
       blurb: "初期は弱いが、重ねるほど威力が伸びる大器晩成の一撃。",
-      tradeoff: "1枚目は通常攻撃以下。4枚付近で斬撃級を超える。",
+      tradeoff: "1枚目は通常攻撃以下。4枚付近で同系統の斬撃4重に匹敵する。",
       cooldown: 2,
       gain: gain({ maxHp: 10, atk: 6, def: 2, atkEff: 0.02 }),
       describe(level, stats) {
         return [
-          multText(0.55, 0.28, level, stats),
-          "初期値は低い。4枚前後で同系統の初期攻撃（斬撃）を追い抜く想定。",
+          multText(0.55, 0.55, level, stats),
+          "初期値は低い。4枚前後で同系統の斬撃を4枚重ねた水準に届く想定（再使用の長さも織り込み）。",
         ];
       },
       use(ctx, level) {
-        const r = ctx.damage(scaled(0.55, 0.28, level));
+        const r = ctx.damage(scaled(0.55, 0.55, level));
         ctx.log(`${ctx.p}晩成。${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}`, "attack");
       },
     },
@@ -1338,17 +1338,17 @@
       name: "極撃",
       group: "攻撃",
       blurb: "初期は控えめな大技。重複で頂点が跳ね上がる。",
-      tradeoff: "間隔が長い。低レベルでは強打に負ける。4枚付近で逆転。",
+      tradeoff: "間隔が長い。低レベルでは強打に負ける。4枚付近で強打4重に匹敵。",
       cooldown: 4,
       gain: gain({ maxHp: 8, atk: 7, atkEff: 0.04, dmgBonus: 0.01 }),
       describe(level, stats) {
         return [
-          multText(0.88, 0.4, level, stats),
-          "再使用は遅い。4枚前後で同系統の初期大技（強打）を超える想定。",
+          multText(0.9, 0.55, level, stats),
+          "再使用は遅い。4枚前後で同系統の強打を4枚重ねた水準に届く想定。",
         ];
       },
       use(ctx, level) {
-        const r = ctx.damage(scaled(0.88, 0.4, level));
+        const r = ctx.damage(scaled(0.9, 0.55, level));
         ctx.log(`${ctx.p}極撃。${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}`, "attack");
       },
     },
@@ -1357,21 +1357,21 @@
       name: "積威",
       group: "補助",
       blurb: "弱い攻撃バフから始まり、重ねるほど厚くなる。",
-      tradeoff: "1枚目の上昇は薄い。4枚付近で鼓舞を超える。",
+      tradeoff: "1枚目の上昇は薄い。4枚付近で鼓舞4重に匹敵する。",
       cooldown: 3,
       gain: gain({ maxHp: 5, atk: 5, atkEff: 0.07, speed: 1 }),
       describe(level, stats) {
         return [
-          `次の3行動、${atkBuffText(0.08, 0.07, level, stats)}`,
-          "初期の上昇は小さい。4枚前後で同系統の初期バフ（鼓舞）を追い抜く想定。",
+          `次の4行動、${atkBuffText(0.1, 0.12, level, stats)}`,
+          "初期の上昇は小さい。4枚前後で同系統の鼓舞を4枚重ねた水準に届く想定。",
         ];
       },
       use(ctx, level) {
         ctx.addEffect(ctx.player, {
           id: "stackmight",
           kind: "atkPct",
-          value: scaled(0.08, 0.07, level),
-          turns: 3,
+          value: scaled(0.1, 0.12, level),
+          turns: 4,
           scale: "atk",
         });
         ctx.log(`${ctx.p}積威。攻撃力がわずかに、しかし着実に上がった。`, "buff");
@@ -1382,20 +1382,20 @@
       name: "錬鋭",
       group: "補助",
       blurb: "次の攻撃技への上乗せは最初は薄い。重複で鋭くなる。",
-      tradeoff: "集中より初手は弱い。4枚付近で逆転する。",
+      tradeoff: "集中より初手は弱い。4枚付近で集中4重に匹敵する。",
       cooldown: 2,
       gain: gain({ maxHp: 4, atk: 4, atkEff: 0.09, def: 1 }),
       describe(level, stats) {
         return [
-          ampText(0.12, 0.15, level, stats),
-          "通常攻撃では消費しない。4枚前後で同系統の初期構え（集中）を超える想定。",
+          ampText(0.15, 0.23, level, stats),
+          "通常攻撃では消費しない。4枚前後で同系統の集中を4枚重ねた水準に届く想定。",
         ];
       },
       use(ctx, level) {
         ctx.addEffect(ctx.player, {
           id: "temper",
           kind: "skillAmp",
-          value: scaled(0.12, 0.15, level),
+          value: scaled(0.15, 0.23, level),
           turns: null,
         });
         ctx.log(`${ctx.p}錬鋭。次の攻撃技へ、薄い刃を重ねた。`, "buff");
@@ -1406,21 +1406,21 @@
       name: "厚盾",
       group: "守り",
       blurb: "初期の防御上昇は薄いが、重ねると鉄壁になる。",
-      tradeoff: "攻撃しない。低レベルでは鉄身に劣る。4枚付近で逆転。",
+      tradeoff: "攻撃しない。低レベルでは鉄身に劣る。4枚付近で鉄身4重に匹敵。",
       cooldown: 3,
       gain: gain({ maxHp: 14, def: 7, defEff: 0.05, atk: -1 }),
       describe(level, stats) {
         return [
-          `次の3行動、${defBuffText(0.12, 0.14, level, stats)}`,
-          "この行動では攻撃しない。4枚前後で同系統の初期守り（鉄身）を超える想定。",
+          `次の4行動、${defBuffText(0.14, 0.17, level, stats)}`,
+          "この行動では攻撃しない。4枚前後で同系統の鉄身を4枚重ねた水準に届く想定。",
         ];
       },
       use(ctx, level) {
         ctx.addEffect(ctx.player, {
           id: "thickshield",
           kind: "defPct",
-          value: scaled(0.12, 0.14, level),
-          turns: 3,
+          value: scaled(0.14, 0.17, level),
+          turns: 4,
           scale: "def",
         });
         ctx.log(`${ctx.p}厚盾。盾が少し厚くなった。`, "buff");
