@@ -17,6 +17,20 @@
   /** @type {{ version: string, date: string, title: string, sections: { heading: string, items: string[] }[] }[]} */
   const PATCH_NOTES = [
     {
+      version: "0.5.4",
+      date: "2026-09-23",
+      title: "戦闘詳細ステータスがログを圧迫しないよう調整",
+      sections: [
+        {
+          heading: "戦闘UI",
+          items: [
+            "詳細表示時の能力一覧を2列コンパクト表示にし、高さ上限（おおよそ22vh／スマホは18vh）付きの内部スクロールにした。",
+            "戦闘ログ側に最小高さを確保し、ステータスでログ領域が潰れるのを防ぐ。",
+          ],
+        },
+      ],
+    },
+    {
       version: "0.5.3",
       date: "2026-09-23",
       title: "最初の技獲得までリロール無料・無制限",

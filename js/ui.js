@@ -187,10 +187,12 @@
   }
 
   function playerStatsList(stats, hp, opts) {
-    const rows = ui.detail ? STAT_ROWS_DETAIL : STAT_ROWS_CORE;
+    const compact = !!(opts && opts.compact);
+    const rows = ui.detail || compact ? STAT_ROWS_DETAIL : STAT_ROWS_CORE;
     const withTips = !!(opts && opts.tips);
+    const listClass = `stat-list${withTips ? " has-tips" : ""}${compact ? " is-compact" : ""}`;
     return `
-      <dl class="stat-list ${withTips ? "has-tips" : ""}">
+      <dl class="${listClass}">
         ${rows
           .map(([key, label, kind]) => {
             const help = STAT_HELP[key] || "";
@@ -630,14 +632,20 @@
 
     return shell(
       `
-      <div class="battle-pane">
+      <div class="battle-pane${ui.detail ? " is-detail" : ""}">
         <div class="bars">
-          <div>
+          <div class="fighter fighter-player">
             <div class="bar-label"><span>あなた</span><span data-hp-label="player">${Math.max(0, intNum(playerHp))}/${intNum(stats.maxHp)}</span></div>
             <div class="hp"><span data-bar="player" style="width:${pRate}%"></span></div>
-            ${ui.detail ? playerStatsList(stats, playerHp) : ""}
+            ${
+              ui.detail
+                ? `<div class="battle-stats" aria-label="詳細能力">${playerStatsList(stats, playerHp, {
+                    compact: true,
+                  })}</div>`
+                : ""
+            }
           </div>
-          <div>
+          <div class="fighter fighter-enemy">
             <div class="bar-label"><span>敵</span><span data-hp-label="enemy">${Math.max(0, intNum(enemyHp))}/${intNum(enemy.maxHp)}</span></div>
             <div class="hp enemy"><span data-bar="enemy" style="width:${eRate}%"></span></div>
           </div>
