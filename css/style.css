@@ -367,8 +367,30 @@ h1, h2, .brand { font-family: var(--serif); }
   overflow: auto;
   cursor: pointer;
   transform: none !important;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  opacity: 1;
+  isolation: isolate;
+  background: var(--panel);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
   border-color: rgba(212, 175, 106, 0.95);
+}
+/* 通常カードの半透明グラデを打ち消し、拡大時は不透明な色面にする */
+.card-zoom.group-attack {
+  background: linear-gradient(90deg, #3a241f, var(--panel) 40%);
+}
+.card-zoom.group-break {
+  background: linear-gradient(90deg, #2c2436, var(--panel) 40%);
+}
+.card-zoom.group-guard {
+  background: linear-gradient(90deg, #1f2a33, var(--panel) 40%);
+}
+.card-zoom.group-heal {
+  background: linear-gradient(90deg, #1f2e22, var(--panel) 40%);
+}
+.card-zoom.group-buff {
+  background: linear-gradient(90deg, #33291c, var(--panel) 40%);
+}
+.card-zoom.group-other {
+  background: var(--panel);
 }
 .card-zoom .skill-blurb,
 .card-zoom .skill-detail,

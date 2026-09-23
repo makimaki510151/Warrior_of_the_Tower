@@ -17,6 +17,20 @@
   /** @type {{ version: string, date: string, title: string, sections: { heading: string, items: string[] }[] }[]} */
   const PATCH_NOTES = [
     {
+      version: "0.5.10",
+      date: "2026-09-23",
+      title: "スキル拡大表示の半透明をやめて読みやすく",
+      sections: [
+        {
+          heading: "UI",
+          items: [
+            "技カードの拡大表示で、半透明の種類色グラデーションが下の文字と重なって見づらかった問題を修正。",
+            "拡大カードは不透明な背景にし、背面の候補カードが透けないようにした。種類の色味は不透明な左縁グラデで残す。",
+          ],
+        },
+      ],
+    },
+    {
       version: "0.5.9",
       date: "2026-09-23",
       title: "スキルカードから重複ステータスの説明文を削除",
