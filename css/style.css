@@ -10,7 +10,6 @@
   --ok: #8fb58a;
   --danger: #d16b62;
   --radius: 4px;
-  --ui-scale: 1.15;
   --sans: "Zen Maru Gothic", "Hiragino Maru Gothic ProN", "Yu Gothic UI", sans-serif;
   --serif: "Shippori Mincho", "Yu Mincho", serif;
   color-scheme: dark;
@@ -24,7 +23,7 @@ body {
   background:
     radial-gradient(ellipse 80% 40% at 50% -10%, rgba(228, 192, 122, 0.14), transparent 55%),
     var(--bg);
-  font-size: calc(16px * var(--ui-scale));
+  font-size: 16px;
   line-height: 1.45;
   touch-action: manipulation;
   overflow: hidden;

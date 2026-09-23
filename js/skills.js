@@ -221,19 +221,19 @@
       name: "吸血",
       group: "攻撃",
       blurb: "与えたダメージの一部を体力に変える。通らない相手には回復も薄い。",
-      tradeoff: "硬い敵には回復量が落ちる。応急のような安定はない。",
-      cooldown: 2,
-      gain: gain({ maxHp: 4, atk: 2, healEff: 0.02 }),
+      tradeoff: "硬い敵には回復量が落ちる。応急のような安定はない。攻撃の伸びも控えめ。",
+      cooldown: 3,
+      gain: gain({ maxHp: 3, atk: 1, healEff: 0.01, def: -1 }),
       describe(level, stats) {
-        const ratio = scaled(0.34, 0.015, level);
+        const ratio = scaled(0.22, 0.01, level);
         return [
-          multText(1.02, 0.04, level, stats),
-          `与ダメージの${Math.floor(ratio * 100)}%を基礎に回復する。回復効率がさらにかかる。`,
+          multText(1.0, 0.035, level, stats),
+          `与ダメージの${Math.floor(ratio * 100)}%を基礎に回復する。回復効率がかかる。`,
         ];
       },
       use(ctx, level) {
-        const ratio = scaled(0.34, 0.015, level);
-        const r = ctx.damage(scaled(1.02, 0.04, level));
+        const ratio = scaled(0.22, 0.01, level);
+        const r = ctx.damage(scaled(1.0, 0.035, level));
         const healed = ctx.heal(ctx.player, r.dmg * ratio);
         const got = healed.got;
         ctx.log(`${ctx.p}吸血。${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}${got}回復した。${ctx.overNote(healed.over)}`, "attack");
@@ -514,19 +514,19 @@
       id: "mend",
       name: "応急",
       group: "回復",
-      blurb: "その場で体力を戻す。総量は再生より少ない。",
-      tradeoff: "今すぐ足りるが、長い戦いでは再生や脈動に総量で負ける。",
-      cooldown: 3,
-      gain: gain({ maxHp: 10, def: 1, healEff: 0.04 }),
+      blurb: "その場で少し体力を戻す。回復だけでは伸びにくい。",
+      tradeoff: "回復量は控えめ。攻撃力が下がり、再使用も遅い。",
+      cooldown: 5,
+      gain: gain({ maxHp: 4, atk: -3, def: 1, healEff: 0.01, speed: -3 }),
       describe(level, stats) {
-        const rate = scaled(0.15, 0.008, level);
+        const rate = scaled(0.08, 0.004, level);
         return [
           `最大体力の${maxHpPct(rate, stats)}を基礎に、すぐ回復する。`,
-          "回復効率がさらにかかる。",
+          "回復効率がかかる。習得しても攻撃は弱くなる。",
         ];
       },
       use(ctx, level) {
-        const healed = ctx.heal(ctx.player, ctx.player.maxHp * scaled(0.15, 0.008, level));
+        const healed = ctx.heal(ctx.player, ctx.player.maxHp * scaled(0.08, 0.004, level));
         const got = healed.got;
         ctx.log(`${ctx.p}応急。体力が${got}回復した。${ctx.overNote(healed.over)}`, "heal");
       },
@@ -535,24 +535,24 @@
       id: "weave",
       name: "再生",
       group: "回復",
-      blurb: "時間をかけて大きく回復する。今すぐ足りないときには遅い。",
-      tradeoff: "総量は応急より多いが、途中で倒れると取りこぼす。攻撃力は下がる。",
-      cooldown: 4,
-      gain: gain({ maxHp: 8, atk: -1, def: 1, regenAmount: 2, healEff: 0.02 }),
+      blurb: "時間をかけて回復する。今すぐ足りないときには遅い。",
+      tradeoff: "総量は応急より多いが、攻撃が大きく下がり、途中で倒れると取りこぼす。",
+      cooldown: 6,
+      gain: gain({ maxHp: 5, atk: -4, def: 1, regenAmount: 1, healEff: 0.01, speed: -2 }),
       describe(level, stats) {
-        const each = scaled(0.055, 0.004, level);
+        const each = scaled(0.03, 0.002, level);
         return [
-          `4行動にわたり、行動ごとに最大体力の${maxHpPct(each, stats)}を基礎に回復する。`,
+          `3行動にわたり、行動ごとに最大体力の${maxHpPct(each, stats)}を基礎に回復する。`,
           "打ち直すと残り時間は更新される。回復効率がかかる。",
         ];
       },
       use(ctx, level) {
-        const each = Math.max(1, Math.floor(ctx.player.maxHp * scaled(0.055, 0.004, level)));
+        const each = Math.max(1, Math.floor(ctx.player.maxHp * scaled(0.03, 0.002, level)));
         ctx.addEffect(ctx.player, {
           id: "weave",
           kind: "hot",
           value: each,
-          turns: 4,
+          turns: 3,
         });
         ctx.log(`${ctx.p}再生。傷がゆっくり塞がり始める。`, "heal");
       },
@@ -562,45 +562,45 @@
       name: "脈動",
       group: "回復",
       blurb: "しばらく自動回復が増える。短い戦いでは間に合わない。",
-      tradeoff: "即時回復はない。行動速度がわずかに落ちる。",
-      cooldown: 3,
-      gain: gain({ maxHp: 6, def: 1, regenAmount: 2, regenInterval: -1, speed: -1 }),
+      tradeoff: "即時回復はない。行動が大きく遅くなり、攻撃も下がる。",
+      cooldown: 5,
+      gain: gain({ maxHp: 4, atk: -2, def: 1, regenAmount: 1, speed: -5 }),
       describe(level, stats) {
-        const extra = scaled(6, 1, level);
+        const extra = scaled(3, 0.6, level);
         return [
-          `次の4行動、自動回復量+${extra}。`,
-          "習得のたびに自動回復の間隔が1行動短くなる。間隔は1行動より短くならない。",
+          `次の3行動、自動回復量+${extra.toFixed(0)}。`,
+          "即時回復はない。速度低下の代償が大きい。",
         ];
       },
       use(ctx, level) {
         ctx.addEffect(ctx.player, {
           id: "pulse",
           kind: "regenFlat",
-          value: scaled(6, 1, level),
-          turns: 4,
+          value: scaled(3, 0.6, level),
+          turns: 3,
         });
-        ctx.log(`${ctx.p}脈動。自動回復が強くなった。`, "heal");
+        ctx.log(`${ctx.p}脈動。自動回復がわずかに強くなった。`, "heal");
       },
     },
     {
       id: "purify",
       name: "浄化",
       group: "回復",
-      blurb: "弱体を払い、少し回復する。何も受けていなければ応急に劣る。",
-      tradeoff: "毒や呪いに強い。何もない戦いでは回復量が足りない。",
-      cooldown: 3,
-      gain: gain({ maxHp: 7, def: 2, healEff: 0.03 }),
+      blurb: "弱体を払い、わずかに回復する。何も受けていなければほぼ無駄。",
+      tradeoff: "回復量は薄い。弱体がない戦いでは枠を圧迫する。",
+      cooldown: 4,
+      gain: gain({ maxHp: 4, atk: -2, def: 1, healEff: 0.01 }),
       describe(level, stats) {
-        const rate = scaled(0.09, 0.005, level);
+        const rate = scaled(0.04, 0.002, level);
         return [
           "自分の弱体をすべて消す。",
           `最大体力の${maxHpPct(rate, stats)}を基礎に回復する。`,
-          "弱体を1つでも消したときは、さらに最大体力の7%が基礎に加わる。",
+          "弱体を1つでも消したときは、さらに最大体力の3%が基礎に加わる。",
         ];
       },
       use(ctx, level) {
         const removed = ctx.cleanse(ctx.player);
-        const rate = scaled(0.09, 0.005, level) + (removed > 0 ? 0.07 : 0);
+        const rate = scaled(0.04, 0.002, level) + (removed > 0 ? 0.03 : 0);
         const healed = ctx.heal(ctx.player, ctx.player.maxHp * rate);
         const got = healed.got;
         ctx.log(
@@ -760,16 +760,16 @@
       name: "吸命",
       group: "攻撃",
       blurb: "吸血より回復寄り。火力は落ちる。",
-      tradeoff: "通らない相手では回復も薄い。",
-      cooldown: 2,
-      gain: gain({ maxHp: 5, atk: 1, healEff: 0.03 }),
+      tradeoff: "通らない相手では回復も薄い。火力は低く、再使用も遅い。",
+      cooldown: 3,
+      gain: gain({ maxHp: 3, atk: 0, healEff: 0.01, speed: -2 }),
       describe(level, stats) {
-        const ratio = scaled(0.48, 0.02, level);
-        return [multText(0.88, 0.03, level, stats), `与ダメージの${Math.floor(ratio * 100)}%を基礎に回復する。`];
+        const ratio = scaled(0.32, 0.012, level);
+        return [multText(0.82, 0.025, level, stats), `与ダメージの${Math.floor(ratio * 100)}%を基礎に回復する。`];
       },
       use(ctx, level) {
-        const r = ctx.damage(scaled(0.88, 0.03, level));
-        const healed = ctx.heal(ctx.player, r.dmg * scaled(0.48, 0.02, level));
+        const r = ctx.damage(scaled(0.82, 0.025, level));
+        const healed = ctx.heal(ctx.player, r.dmg * scaled(0.32, 0.012, level));
         const got = healed.got;
         ctx.log(`${ctx.p}吸命。${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}${got}回復した。${ctx.overNote(healed.over)}`, "attack");
       },
@@ -1079,110 +1079,22 @@
       },
     },
     {
-      id: "salve",
-      name: "軟膏",
-      group: "回復",
-      blurb: "応急より軽い即時回復。再使用は早い。",
-      tradeoff: "大きな穴は塞げない。",
-      cooldown: 2,
-      gain: gain({ maxHp: 6, healEff: 0.03 }),
-      describe(level, stats) {
-        const rate = scaled(0.09, 0.006, level);
-        return [`最大体力の${maxHpPct(rate, stats)}を基礎にすぐ回復する。`];
-      },
-      use(ctx, level) {
-        const healed = ctx.heal(ctx.player, ctx.player.maxHp * scaled(0.09, 0.006, level));
-        const got = healed.got;
-        ctx.log(`${ctx.p}軟膏。体力が${got}回復した。${ctx.overNote(healed.over)}`, "heal");
-      },
-    },
-    {
-      id: "bloom",
-      name: "芽吹き",
-      group: "回復",
-      blurb: "再生より短い継続回復。",
-      tradeoff: "総量は再生に負ける。",
-      cooldown: 3,
-      gain: gain({ maxHp: 5, def: 1, regenAmount: 1, healEff: 0.02 }),
-      describe(level, stats) {
-        const each = scaled(0.07, 0.005, level);
-        return [`3行動にわたり、行動ごとに最大体力の${maxHpPct(each, stats)}を基礎に回復する。`];
-      },
-      use(ctx, level) {
-        const each = Math.max(1, Math.floor(ctx.player.maxHp * scaled(0.07, 0.005, level)));
-        ctx.addEffect(ctx.player, {
-          id: "bloom",
-          kind: "hot",
-          value: each,
-          turns: 3,
-        });
-        ctx.log(`${ctx.p}芽吹き。短い再生が始まった。`, "heal");
-      },
-    },
-    {
-      id: "tide",
-      name: "潮汐",
-      group: "回復",
-      blurb: "脈動より強い自動回復増強。速度は下がる。",
-      tradeoff: "即時回復はない。",
-      cooldown: 4,
-      gain: gain({ maxHp: 7, regenAmount: 3, speed: -3 }),
-      describe(level, stats) {
-        return [`次の5行動、自動回復量+${scaled(8, 1.2, level).toFixed(0)}。`];
-      },
-      use(ctx, level) {
-        ctx.addEffect(ctx.player, {
-          id: "tide",
-          kind: "regenFlat",
-          value: scaled(8, 1.2, level),
-          turns: 5,
-        });
-        ctx.log(`${ctx.p}潮汐。自動回復が大きくなった。`, "heal");
-      },
-    },
-    {
-      id: "cleanse",
-      name: "祓い",
-      group: "回復",
-      blurb: "浄化より回復は少ないが、弱体除去は同じ。",
-      tradeoff: "弱体がないと応急に負ける。",
-      cooldown: 2,
-      gain: gain({ maxHp: 5, def: 1, healEff: 0.02 }),
-      describe(level, stats) {
-        const rate = scaled(0.05, 0.004, level);
-        return [
-          "自分の弱体をすべて消す。",
-          `最大体力の${maxHpPct(rate, stats)}を基礎に回復。弱体を消したとき+5%。`,
-        ];
-      },
-      use(ctx, level) {
-        const removed = ctx.cleanse(ctx.player);
-        const rate = scaled(0.05, 0.004, level) + (removed > 0 ? 0.05 : 0);
-        const healed = ctx.heal(ctx.player, ctx.player.maxHp * rate);
-        const got = healed.got;
-        ctx.log(
-          `${ctx.p}祓い。${removed > 0 ? `弱体を${removed}つ払い、` : ""}体力が${got}回復した。${ctx.overNote(healed.over)}`,
-          "heal"
-        );
-      },
-    },
-    {
       id: "secondwind",
       name: "息吹",
       group: "回復",
-      blurb: "体力が半分以下のときだけ大きく戻す。",
-      tradeoff: "余裕があるときは使えない。",
-      cooldown: 4,
-      gain: gain({ maxHp: 9, healEff: 0.04 }),
+      blurb: "体力がかなり減ったときだけ戻す。",
+      tradeoff: "条件が厳しく、攻撃も大きく下がる。余裕があるときは使えない。",
+      cooldown: 6,
+      gain: gain({ maxHp: 5, atk: -3, healEff: 0.01, speed: -2 }),
       available(ctx) {
-        return ctx.player.hp / ctx.player.maxHp <= 0.5;
+        return ctx.player.hp / ctx.player.maxHp <= 0.35;
       },
       describe(level, stats) {
-        const rate = scaled(0.22, 0.01, level);
-        return [`体力50%以下のときだけ。最大体力の${maxHpPct(rate, stats)}を基礎に回復する。`];
+        const rate = scaled(0.12, 0.005, level);
+        return [`体力35%以下のときだけ。最大体力の${maxHpPct(rate, stats)}を基礎に回復する。`];
       },
       use(ctx, level) {
-        const healed = ctx.heal(ctx.player, ctx.player.maxHp * scaled(0.22, 0.01, level));
+        const healed = ctx.heal(ctx.player, ctx.player.maxHp * scaled(0.12, 0.005, level));
         const got = healed.got;
         ctx.log(`${ctx.p}息吹。体力が${got}回復した。${ctx.overNote(healed.over)}`, "heal");
       },
