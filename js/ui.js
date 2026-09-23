@@ -152,6 +152,11 @@
             <strong class="brand">塔の戦士</strong>
             ${ui.screen === "title" ? "" : `<span class="chip">第${floor}層</span>`}
             ${ui.screen === "title" ? "" : `<span class="chip muted">最高 ${best || "—"}</span>`}
+            ${
+              ui.screen === "title" || ui.screen === "clear"
+                ? ""
+                : `<span class="chip" title="階層クリアでたまる。候補の入れ替えに1消費">リロール ${state.rerollPoints || 0}</span>`
+            }
           </div>
           <div class="bar-right">
             <button type="button" class="btn btn-ghost" data-action="zoom-out" aria-label="文字を小さく">A-</button>
@@ -329,12 +334,21 @@
     const state = W.getState();
     W.ensureOffer();
     const offer = state.offer || [];
-    return shell(`
+    const points = state.rerollPoints || 0;
+    return shell(
+      `
       <p class="hint">技を1つ選ぶ（${W.SKILLS.length}種から${offer.length}） · いま${ui.detail ? "詳細" : "標準"}表示</p>
       <div class="offer-grid">
         ${offer.map((id) => offerCard(id, state)).join("")}
       </div>
-    `);
+    `,
+      `<footer class="foot">
+        <span class="tiny">リロールポイント ${points}（階層クリアで+1）</span>
+        <button type="button" class="btn btn-ghost" data-action="reroll" ${points < 1 ? "disabled" : ""}>
+          候補を入れ替える（1消費）
+        </button>
+      </footer>`
+    );
   }
 
   function ownedOptions(state, currentId) {
@@ -600,13 +614,15 @@
             <ul>
               <li>100層突破が目標。戦いは自動。</li>
               <li>約${W.SKILLS.length}種の技から毎回5つ提示。1つだけ獲得／強化。</li>
+              <li>階層クリアごとにリロールポイントが1たまる。候補画面で1消費し、5枚を全技から入れ替えられる（上限なし）。</li>
               <li>同じ技を重ねても伸びは一定。完全上位互換はない。</li>
-              <li>手順は上から判定。外れは通常攻撃。</li>
+              <li>手順は最大${W.MAX_FLOW}個。上から判定し、外れは通常攻撃。</li>
               <li>再使用は「自分の行動を何回空けるか」。</li>
               <li>戦闘ログの行動番号は、あなたと敵で別々に数える。</li>
               <li>使用条件は体力・序盤／終盤・直前の行動・強化弱体などから選ぶ。</li>
               <li>技カードはクリックで拡大表示。能力名に触れると説明が出る。</li>
-              <li>敵の詳細は出ない。階層ごとの相手は固定。</li>
+              <li>敵は序盤だけ弱く、以降は急に強くなる。100層は育成と手順が要る。</li>
+              <li>回復技は少なめで代償が大きい。</li>
               <li>標準／詳細で表示量を切り替えられる。</li>
               <li>敗北時は手順の組み直しか諦め。</li>
             </ul>
@@ -874,6 +890,14 @@
           ui.expandedCard = null;
           if (W.sfx) W.sfx.pick();
           ui.screen = "prep";
+          render();
+        }
+        return;
+      }
+      if (action === "reroll") {
+        if (W.rerollOffer()) {
+          ui.expandedCard = null;
+          if (W.sfx) W.sfx.ui();
           render();
         }
         return;

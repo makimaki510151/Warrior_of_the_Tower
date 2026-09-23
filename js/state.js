@@ -1,7 +1,7 @@
 (function (root) {
   const W = root.Wot || (root.Wot = {});
   const KEY = "wot-save-v2";
-  const MAX_FLOW = 6;
+  const MAX_FLOW = 10;
 
   function blank(best) {
     return {
@@ -14,6 +14,8 @@
       flow: [],
       offer: null,
       pendingPick: true,
+      rerollPoints: 0,
+      rerollSalt: 0,
     };
   }
 
@@ -78,16 +80,31 @@
       flow: sanitizeFlow(skills, data.flow),
       offer,
       pendingPick,
+      rerollPoints: Math.max(0, Math.floor(Number(data.rerollPoints) || 0)),
+      rerollSalt: Math.max(0, Math.floor(Number(data.rerollSalt) || 0)),
     };
+  }
+
+  function offerSeed() {
+    return (state.runSeed ^ (state.floor * 2654435761) ^ ((state.rerollSalt || 0) * 1597334677)) >>> 0;
   }
 
   function ensureOffer() {
     if (!state.pendingPick || state.clearedTower) return state.offer;
     if (state.offer && state.offer.length === W.OFFER_COUNT) return state.offer;
-    const seed = (state.runSeed ^ (state.floor * 2654435761)) >>> 0;
-    state.offer = W.rollOffer(seed, W.OFFER_COUNT);
+    state.offer = W.rollOffer(offerSeed(), W.OFFER_COUNT);
     save();
     return state.offer;
+  }
+
+  function rerollOffer() {
+    if (!state.pendingPick || state.clearedTower) return false;
+    if ((state.rerollPoints || 0) < 1) return false;
+    state.rerollPoints -= 1;
+    state.rerollSalt = (state.rerollSalt || 0) + 1;
+    state.offer = W.rollOffer(offerSeed(), W.OFFER_COUNT);
+    save();
+    return true;
   }
 
   function load() {
@@ -193,6 +210,7 @@
   function commitWin() {
     const floor = state.floor;
     state.bestCleared = Math.max(state.bestCleared || 0, floor);
+    state.rerollPoints = (state.rerollPoints || 0) + 1;
     const cleared = floor >= 100;
     state.clearedTower = cleared;
     if (!cleared) {
@@ -205,7 +223,7 @@
       state.offer = null;
     }
     save();
-    return { cleared, floor };
+    return { cleared, floor, rerollPoints: state.rerollPoints };
   }
 
   W.MAX_FLOW = MAX_FLOW;
@@ -216,6 +234,7 @@
   W.hasSave = hasSave;
   W.newRun = newRun;
   W.ensureOffer = ensureOffer;
+  W.rerollOffer = rerollOffer;
   W.pickSkill = pickSkill;
   W.addNode = addNode;
   W.updateNode = updateNode;
