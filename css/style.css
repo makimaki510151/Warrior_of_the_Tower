@@ -352,9 +352,16 @@ h1, h2, .brand { font-family: var(--serif); }
   flex-direction: column;
   gap: 6px;
   min-height: 0;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 2px 4px 4px 2px;
 }
 .owned-card { padding: 6px 8px; }
+/* 狭い列での scale は横スクロールバーの原因になるため、所持技は拡大しない */
+.owned-card.is-interactive:hover,
+.owned-card.is-interactive:focus-visible {
+  transform: none;
+}
 
 .prep-grid {
   display: grid;

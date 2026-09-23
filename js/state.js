@@ -89,6 +89,16 @@
     return (state.runSeed ^ (state.floor * 2654435761) ^ ((state.rerollSalt || 0) * 1597334677)) >>> 0;
   }
 
+  function ownedSkillCount(data) {
+    const skills = (data || state).skills || {};
+    return Object.keys(skills).filter((id) => (skills[id] || 0) > 0).length;
+  }
+
+  /** ラン開始直後の最初の技獲得前なら true（このときリロールは消費なし・無制限） */
+  function isOpeningPick(data) {
+    return ownedSkillCount(data || state) === 0;
+  }
+
   function ensureOffer() {
     if (!state.pendingPick || state.clearedTower) return state.offer;
     if (state.offer && state.offer.length === W.OFFER_COUNT) return state.offer;
@@ -99,8 +109,9 @@
 
   function rerollOffer() {
     if (!state.pendingPick || state.clearedTower) return false;
-    if ((state.rerollPoints || 0) < 1) return false;
-    state.rerollPoints -= 1;
+    const free = isOpeningPick();
+    if (!free && (state.rerollPoints || 0) < 1) return false;
+    if (!free) state.rerollPoints -= 1;
     state.rerollSalt = (state.rerollSalt || 0) + 1;
     state.offer = W.rollOffer(offerSeed(), W.OFFER_COUNT);
     save();
@@ -235,6 +246,7 @@
   W.newRun = newRun;
   W.ensureOffer = ensureOffer;
   W.rerollOffer = rerollOffer;
+  W.isOpeningPick = isOpeningPick;
   W.pickSkill = pickSkill;
   W.addNode = addNode;
   W.updateNode = updateNode;

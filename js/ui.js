@@ -158,7 +158,13 @@
             ${showMeta ? `<span class="chip muted chip-best">最高 ${best || "—"}</span>` : ""}
             ${
               showReroll
-                ? `<span class="chip chip-reroll" title="階層クリアでたまる。候補の入れ替えに1消費">リロール ${state.rerollPoints || 0}</span>`
+                ? `<span class="chip chip-reroll" title="${
+                    W.isOpeningPick && W.isOpeningPick(state)
+                      ? "最初の技獲得までは入れ替え無料・回数無制限"
+                      : "階層クリアでたまる。候補の入れ替えに1消費"
+                  }">リロール ${
+                    W.isOpeningPick && W.isOpeningPick(state) ? "∞" : state.rerollPoints || 0
+                  }</span>`
                 : ""
             }
           </div>
@@ -368,6 +374,8 @@
     W.ensureOffer();
     const offer = state.offer || [];
     const points = state.rerollPoints || 0;
+    const freeReroll = W.isOpeningPick ? W.isOpeningPick(state) : false;
+    const canReroll = freeReroll || points >= 1;
     return shell(
       `
       <p class="hint offer-hint">技を1つ選ぶ（${W.SKILLS.length}種から${offer.length}） · いま${ui.detail ? "詳細" : "標準"}表示 · カードを開いて確認</p>
@@ -383,9 +391,13 @@
       </div>
     `,
       `<footer class="foot foot-offer">
-        <span class="tiny foot-note">リロール ${points}（クリアで+1）</span>
-        <button type="button" class="btn btn-ghost" data-action="reroll" ${points < 1 ? "disabled" : ""}>
-          入れ替え（1）
+        <span class="tiny foot-note">${
+          freeReroll
+            ? "最初の獲得は入れ替え無料・回数無制限"
+            : `リロール ${points}（クリアで+1）`
+        }</span>
+        <button type="button" class="btn btn-ghost" data-action="reroll" ${canReroll ? "" : "disabled"}>
+          ${freeReroll ? "入れ替え（無料）" : "入れ替え（1）"}
         </button>
       </footer>`
     );
@@ -700,6 +712,7 @@
             <ul>
               <li>100層突破が目標。戦いは自動。</li>
               <li>約${W.SKILLS.length}種の技から毎回5つ提示。1つだけ獲得／強化。</li>
+              <li>最初の技を得るまでは候補の入れ替えが無料で何度でもできる。2つ目以降はリロールポイントを1消費。</li>
               <li>階層クリアごとにリロールポイントが1たまる。候補画面で1消費し、5枚を全技から入れ替えられる（上限なし）。</li>
               <li>同じ技を重ねると効果とステータスが伸びる。2枚目以降はステータスに追加ボーナス。</li>
               <li>手順は最大${W.MAX_FLOW}個。上から判定し、外れは通常攻撃。</li>
