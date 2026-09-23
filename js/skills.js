@@ -1319,17 +1319,17 @@
       name: "晩成",
       group: "攻撃",
       blurb: "初期は弱いが、重ねるほど威力が伸びる大器晩成の一撃。",
-      tradeoff: "1枚目は通常攻撃以下。重複とステータス伸びが前提。",
+      tradeoff: "1枚目は通常攻撃以下。4枚付近で斬撃級を超える。",
       cooldown: 2,
       gain: gain({ maxHp: 10, atk: 6, def: 2, atkEff: 0.02 }),
       describe(level, stats) {
         return [
-          multText(0.52, 0.12, level, stats),
-          "初期値は低い。レベルが上がるほど威力が大きく伸びる。",
+          multText(0.55, 0.28, level, stats),
+          "初期値は低い。4枚前後で同系統の初期攻撃（斬撃）を追い抜く想定。",
         ];
       },
       use(ctx, level) {
-        const r = ctx.damage(scaled(0.52, 0.12, level));
+        const r = ctx.damage(scaled(0.55, 0.28, level));
         ctx.log(`${ctx.p}晩成。${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}`, "attack");
       },
     },
@@ -1338,17 +1338,17 @@
       name: "極撃",
       group: "攻撃",
       blurb: "初期は控えめな大技。重複で頂点が跳ね上がる。",
-      tradeoff: "間隔が長い。低レベルでは強打に負ける。",
+      tradeoff: "間隔が長い。低レベルでは強打に負ける。4枚付近で逆転。",
       cooldown: 4,
       gain: gain({ maxHp: 8, atk: 7, atkEff: 0.04, dmgBonus: 0.01 }),
       describe(level, stats) {
         return [
-          multText(0.85, 0.16, level, stats),
-          "再使用は遅い。重ねて育てるほど単発の頂点が伸びる。",
+          multText(0.88, 0.4, level, stats),
+          "再使用は遅い。4枚前後で同系統の初期大技（強打）を超える想定。",
         ];
       },
       use(ctx, level) {
-        const r = ctx.damage(scaled(0.85, 0.16, level));
+        const r = ctx.damage(scaled(0.88, 0.4, level));
         ctx.log(`${ctx.p}極撃。${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}`, "attack");
       },
     },
@@ -1357,20 +1357,20 @@
       name: "積威",
       group: "補助",
       blurb: "弱い攻撃バフから始まり、重ねるほど厚くなる。",
-      tradeoff: "1枚目の上昇は薄い。攻撃力補助効率と重複が本題。",
+      tradeoff: "1枚目の上昇は薄い。4枚付近で鼓舞を超える。",
       cooldown: 3,
       gain: gain({ maxHp: 5, atk: 5, atkEff: 0.07, speed: 1 }),
       describe(level, stats) {
         return [
-          `次の3行動、${atkBuffText(0.08, 0.04, level, stats)}`,
-          "初期の上昇は小さい。レベルと補助効率で育つ。",
+          `次の3行動、${atkBuffText(0.08, 0.07, level, stats)}`,
+          "初期の上昇は小さい。4枚前後で同系統の初期バフ（鼓舞）を追い抜く想定。",
         ];
       },
       use(ctx, level) {
         ctx.addEffect(ctx.player, {
           id: "stackmight",
           kind: "atkPct",
-          value: scaled(0.08, 0.04, level),
+          value: scaled(0.08, 0.07, level),
           turns: 3,
           scale: "atk",
         });
@@ -1382,20 +1382,20 @@
       name: "錬鋭",
       group: "補助",
       blurb: "次の攻撃技への上乗せは最初は薄い。重複で鋭くなる。",
-      tradeoff: "集中より初手は弱い。育つと上乗せが大きい。",
+      tradeoff: "集中より初手は弱い。4枚付近で逆転する。",
       cooldown: 2,
       gain: gain({ maxHp: 4, atk: 4, atkEff: 0.09, def: 1 }),
       describe(level, stats) {
         return [
-          ampText(0.12, 0.07, level, stats),
-          "通常攻撃では消費しない。攻撃技を出すと一度で消える。",
+          ampText(0.12, 0.15, level, stats),
+          "通常攻撃では消費しない。4枚前後で同系統の初期構え（集中）を超える想定。",
         ];
       },
       use(ctx, level) {
         ctx.addEffect(ctx.player, {
           id: "temper",
           kind: "skillAmp",
-          value: scaled(0.12, 0.07, level),
+          value: scaled(0.12, 0.15, level),
           turns: null,
         });
         ctx.log(`${ctx.p}錬鋭。次の攻撃技へ、薄い刃を重ねた。`, "buff");
@@ -1406,20 +1406,20 @@
       name: "厚盾",
       group: "守り",
       blurb: "初期の防御上昇は薄いが、重ねると鉄壁になる。",
-      tradeoff: "攻撃しない。低レベルでは鉄身に劣る。",
+      tradeoff: "攻撃しない。低レベルでは鉄身に劣る。4枚付近で逆転。",
       cooldown: 3,
       gain: gain({ maxHp: 14, def: 7, defEff: 0.05, atk: -1 }),
       describe(level, stats) {
         return [
-          `次の3行動、${defBuffText(0.12, 0.05, level, stats)}`,
-          "この行動では攻撃しない。重複で守りと体力が大きく伸びる。",
+          `次の3行動、${defBuffText(0.12, 0.14, level, stats)}`,
+          "この行動では攻撃しない。4枚前後で同系統の初期守り（鉄身）を超える想定。",
         ];
       },
       use(ctx, level) {
         ctx.addEffect(ctx.player, {
           id: "thickshield",
           kind: "defPct",
-          value: scaled(0.12, 0.05, level),
+          value: scaled(0.12, 0.14, level),
           turns: 3,
           scale: "def",
         });
@@ -1597,6 +1597,260 @@
         ctx.log(
           `${ctx.p}循環。${rate > 0 ? "回復の勢いが刃へ回った。" : "回す勢いが足りなかった。"}`,
           "buff"
+        );
+      },
+    },
+    {
+      id: "corrodeheal",
+      name: "蝕癒",
+      group: "崩し",
+      blurb: "回復の効きそのものを腐らせる。再生型へのメタ。",
+      tradeoff: "回復しない相手には弱い崩しにすぎない。",
+      cooldown: 3,
+      gain: gain({ maxHp: 3, atk: 2, def: 1, regenAmount: 1 }),
+      describe(level, stats) {
+        const down = scaled(0.28, 0.04, level);
+        const next = scaled(0.28, 0.04, level + 1);
+        return [
+          multText(0.72, 0.03, level, stats),
+          `敵の回復効率を${pctNowLabel(down)}下げる（敵の4行動）。即時・自動・再生すべてに掛かる。${growthTail(
+            pctNowLabel(next),
+            pctStepLabel(0.04)
+          )}`,
+        ];
+      },
+      use(ctx, level) {
+        const r = ctx.damage(scaled(0.72, 0.03, level));
+        ctx.addEffect(ctx.enemy, {
+          id: "corrodeheal",
+          kind: "healDown",
+          value: Math.min(0.85, scaled(0.28, 0.04, level)),
+          turns: 4,
+          negative: true,
+        });
+        ctx.log(
+          `${ctx.p}蝕癒。${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}回復の効きを腐らせた。`,
+          "attack"
+        );
+      },
+    },
+    {
+      id: "drytide",
+      name: "干潟",
+      group: "崩し",
+      blurb: "長く自動回復を封じる。枯渇より間が長い。",
+      tradeoff: "即時ダメージはかなり薄い。再生しない相手には過剰。",
+      cooldown: 4,
+      gain: gain({ maxHp: 4, atk: 1, def: 2, regenAmount: 1 }),
+      describe(level, stats) {
+        return [
+          multText(0.48, 0.025, level, stats),
+          "敵の自動回復を、敵の6行動のあいだ止める。",
+          "継続回復そのものは消さない。止めたあいだだけ働かない。",
+        ];
+      },
+      use(ctx, level) {
+        const r = ctx.damage(scaled(0.48, 0.025, level));
+        ctx.addEffect(ctx.enemy, {
+          id: "drytide",
+          kind: "noRegen",
+          value: 1,
+          turns: 6,
+          negative: true,
+        });
+        ctx.log(
+          `${ctx.p}干潟。${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}泉を干した。`,
+          "attack"
+        );
+      },
+    },
+    {
+      id: "backlash",
+      name: "逆療",
+      group: "攻撃",
+      blurb: "敵の自動回復量が高いほど通る。再生型への直撃。",
+      tradeoff: "回復しない相手にはただの弱い攻撃。",
+      cooldown: 2,
+      gain: gain({ maxHp: 3, atk: 3, speed: 2, dmgBonus: 0.005 }),
+      describe(level, stats) {
+        const base = scaled(0.7, 0.03, level);
+        const per = scaled(0.045, 0.01, level);
+        const nextBase = scaled(0.7, 0.03, level + 1);
+        const nextPer = scaled(0.045, 0.01, level + 1);
+        return [
+          `基礎は${atkMult(base, stats)}。敵の自動回復量1ごとに威力+${per.toFixed(3)}。`,
+          "再生する敵ほど重い。回復量0なら基礎のみ。",
+          growthTail(`基礎×${nextBase.toFixed(2)}／+${nextPer.toFixed(3)}毎`, `0.03／0.01`),
+        ];
+      },
+      use(ctx, level) {
+        const base = scaled(0.7, 0.03, level);
+        const per = scaled(0.045, 0.01, level);
+        const mult = base + Math.max(0, ctx.enemy.regenAmount || 0) * per;
+        const r = ctx.damage(mult);
+        ctx.log(`${ctx.p}逆療。${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}`, "attack");
+      },
+    },
+    {
+      id: "stealpulse",
+      name: "奪脈",
+      group: "崩し",
+      blurb: "敵の自動回復量を削り、自分の脈へ少し回す。",
+      tradeoff: "削る量は固定寄り。回復しない相手には弱い。",
+      cooldown: 3,
+      gain: gain({ maxHp: 4, atk: 1, regenAmount: 2, healEff: 0.01 }),
+      describe(level, stats) {
+        const sap = Math.max(1, Math.floor(scaled(4, 1.2, level)));
+        const nextSap = Math.max(1, Math.floor(scaled(4, 1.2, level + 1)));
+        const selfFlat = scaled(2, 0.8, level);
+        const nextFlat = scaled(2, 0.8, level + 1);
+        return [
+          multText(0.58, 0.03, level, stats),
+          `敵の自動回復量を${sap}削る（敵の4行動）。下限0。${growthTail(`${nextSap}`, "1.2")}`,
+          `次の3行動、自分の自動回復量+${selfFlat.toFixed(1)}。${growthTail(`+${nextFlat.toFixed(1)}`, "0.8")}`,
+        ];
+      },
+      use(ctx, level) {
+        const r = ctx.damage(scaled(0.58, 0.03, level));
+        const sap = Math.max(1, Math.floor(scaled(4, 1.2, level)));
+        ctx.addEffect(ctx.enemy, {
+          id: "stealpulse",
+          kind: "regenSap",
+          value: sap,
+          turns: 4,
+          negative: true,
+        });
+        ctx.addEffect(ctx.player, {
+          id: "stealpulse-self",
+          kind: "regenFlat",
+          value: scaled(2, 0.8, level),
+          turns: 3,
+        });
+        ctx.log(
+          `${ctx.p}奪脈。${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}脈を奪った。`,
+          "attack"
+        );
+      },
+    },
+    {
+      id: "healpunish",
+      name: "癒罰",
+      group: "攻撃",
+      blurb: "回復するたびに罰が乗る呪いの一撃。",
+      tradeoff: "回復しない相手には呪いは空振り。素の火力も控えめ。",
+      cooldown: 3,
+      gain: gain({ maxHp: 2, atk: 2, def: 1, dmgBonus: 0.006 }),
+      describe(level, stats) {
+        const ratio = scaled(0.55, 0.05, level);
+        const next = scaled(0.55, 0.05, level + 1);
+        return [
+          multText(0.8, 0.035, level, stats),
+          `敵が回復した量の${pctNowLabel(ratio)}を、その場でダメージに返す呪い（敵の5行動）。${growthTail(
+            pctNowLabel(next),
+            pctStepLabel(0.05)
+          )}`,
+          "自動回復・継続回復・その他の回復すべてに掛かる。",
+        ];
+      },
+      use(ctx, level) {
+        const r = ctx.damage(scaled(0.8, 0.035, level));
+        ctx.addEffect(ctx.enemy, {
+          id: "healpunish",
+          kind: "healPunish",
+          value: Math.min(1.2, scaled(0.55, 0.05, level)),
+          turns: 5,
+          negative: true,
+        });
+        ctx.log(
+          `${ctx.p}癒罰。${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}回復に罰を刻んだ。`,
+          "attack"
+        );
+      },
+    },
+    {
+      id: "underdog",
+      name: "劣勢",
+      group: "攻撃",
+      blurb: "自分の体力割合が相手より低いほど強い。",
+      tradeoff: "体力割合で負けているとき限定。勝ち越していると弱い。",
+      cooldown: 2,
+      gain: gain({ maxHp: 4, atk: 3, speed: 2 }),
+      describe(level, stats) {
+        const even = scaled(0.7, 0.03, level);
+        const behind = scaled(1.75, 0.07, level);
+        return [
+          `自分の体力割合が相手以下なら${atkMult(behind, stats)}。`,
+          `相手より余裕があるときは${atkMult(even, stats)}。`,
+          dualMultGrowth(1.75, 0.07, 0.7, 0.03, level),
+        ];
+      },
+      use(ctx, level) {
+        const pRate = ctx.player.hp / ctx.player.maxHp;
+        const eRate = ctx.enemy.hp / ctx.enemy.maxHp;
+        const behind = pRate <= eRate;
+        const mult = behind ? scaled(1.75, 0.07, level) : scaled(0.7, 0.03, level);
+        const r = ctx.damage(mult);
+        ctx.log(
+          `${ctx.p}劣勢。${behind ? "追い詰められながら" : "余裕がありすぎて"}${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}`,
+          "attack"
+        );
+      },
+    },
+    {
+      id: "overbear",
+      name: "圧潰",
+      group: "攻撃",
+      blurb: "自分の体力割合が相手より高いほど通る。",
+      tradeoff: "自分が削られていると弱い。守りと組む前提。",
+      cooldown: 2,
+      gain: gain({ maxHp: 5, atk: 2, def: 2 }),
+      describe(level, stats) {
+        const lead = scaled(1.7, 0.065, level);
+        const trail = scaled(0.68, 0.025, level);
+        return [
+          `自分の体力割合が相手より高いとき${atkMult(lead, stats)}。`,
+          `相手以下のときは${atkMult(trail, stats)}。`,
+          dualMultGrowth(1.7, 0.065, 0.68, 0.025, level),
+        ];
+      },
+      use(ctx, level) {
+        const pRate = ctx.player.hp / ctx.player.maxHp;
+        const eRate = ctx.enemy.hp / ctx.enemy.maxHp;
+        const ahead = pRate > eRate;
+        const mult = ahead ? scaled(1.7, 0.065, level) : scaled(0.68, 0.025, level);
+        const r = ctx.damage(mult);
+        ctx.log(
+          `${ctx.p}圧潰。${ahead ? "余力で押し潰し、" : "余力がなく、"}${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}`,
+          "attack"
+        );
+      },
+    },
+    {
+      id: "standoff",
+      name: "拮抗",
+      group: "攻撃",
+      blurb: "互いの体力割合が近いときだけ鋭くなる。",
+      tradeoff: "差が開くと一気に弱くなる。手順で体力差を見る技。",
+      cooldown: 2,
+      gain: gain({ maxHp: 3, atk: 3, atkEff: 0.02, speed: 1 }),
+      describe(level, stats) {
+        const close = scaled(1.82, 0.07, level);
+        const far = scaled(0.6, 0.02, level);
+        return [
+          `体力割合の差が20%以内なら${atkMult(close, stats)}。`,
+          `差がそれ以上なら${atkMult(far, stats)}。`,
+          dualMultGrowth(1.82, 0.07, 0.6, 0.02, level),
+        ];
+      },
+      use(ctx, level) {
+        const pRate = ctx.player.hp / ctx.player.maxHp;
+        const eRate = ctx.enemy.hp / ctx.enemy.maxHp;
+        const close = Math.abs(pRate - eRate) <= 0.2;
+        const mult = close ? scaled(1.82, 0.07, level) : scaled(0.6, 0.02, level);
+        const r = ctx.damage(mult);
+        ctx.log(
+          `${ctx.p}拮抗。${close ? "互角の刃が交差し、" : "差が開きすぎて、"}${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}`,
+          "attack"
         );
       },
     },
