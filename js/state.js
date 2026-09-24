@@ -3,8 +3,33 @@
   const KEY = "wot-save-v2";
   const MAX_FLOW = 10;
   const MAX_CONDS = 3;
+  const MAX_CLEAR_HISTORY = 8;
+  const MAX_PICK_LOG = 120;
 
-  function blank(best) {
+  function blankRunStats() {
+    return {
+      startedAt: Date.now(),
+      clearedAt: null,
+      battlesWon: 0,
+      battlesLost: 0,
+      rerollsUsed: 0,
+      damageDealt: 0,
+      damageTaken: 0,
+      playerActions: 0,
+      enemyActions: 0,
+      picks: [],
+      openingSkillId: null,
+    };
+  }
+
+  function blankChronicle() {
+    return {
+      clearCount: 0,
+      clears: [],
+    };
+  }
+
+  function blank(best, chronicle) {
     return {
       v: 2,
       floor: 1,
@@ -17,6 +42,68 @@
       pendingPick: true,
       rerollPoints: 0,
       rerollSalt: 0,
+      runStats: blankRunStats(),
+      chronicle: sanitizeChronicle(chronicle),
+    };
+  }
+
+  function sanitizeRunStats(raw) {
+    const base = blankRunStats();
+    if (!raw || typeof raw !== "object") return base;
+    base.startedAt = Math.max(0, Math.floor(Number(raw.startedAt) || base.startedAt));
+    base.clearedAt = raw.clearedAt == null ? null : Math.max(0, Math.floor(Number(raw.clearedAt) || 0));
+    base.battlesWon = Math.max(0, Math.floor(Number(raw.battlesWon) || 0));
+    base.battlesLost = Math.max(0, Math.floor(Number(raw.battlesLost) || 0));
+    base.rerollsUsed = Math.max(0, Math.floor(Number(raw.rerollsUsed) || 0));
+    base.damageDealt = Math.max(0, Math.floor(Number(raw.damageDealt) || 0));
+    base.damageTaken = Math.max(0, Math.floor(Number(raw.damageTaken) || 0));
+    base.playerActions = Math.max(0, Math.floor(Number(raw.playerActions) || 0));
+    base.enemyActions = Math.max(0, Math.floor(Number(raw.enemyActions) || 0));
+    if (raw.openingSkillId && W.SKILL_BY_ID[raw.openingSkillId]) {
+      base.openingSkillId = raw.openingSkillId;
+    }
+    const picks = Array.isArray(raw.picks) ? raw.picks : [];
+    base.picks = picks
+      .filter((p) => p && W.SKILL_BY_ID[p.id])
+      .slice(0, MAX_PICK_LOG)
+      .map((p) => ({
+        id: p.id,
+        floor: Math.max(1, Math.min(100, Math.floor(Number(p.floor) || 1))),
+        level: Math.max(1, Math.floor(Number(p.level) || 1)),
+        at: Math.max(0, Math.floor(Number(p.at) || 0)),
+      }));
+    return base;
+  }
+
+  function sanitizeChronicle(raw) {
+    const base = blankChronicle();
+    if (!raw || typeof raw !== "object") return base;
+    base.clearCount = Math.max(0, Math.floor(Number(raw.clearCount) || 0));
+    const clears = Array.isArray(raw.clears) ? raw.clears : [];
+    base.clears = clears.slice(0, MAX_CLEAR_HISTORY).map((entry) => sanitizeClearEntry(entry)).filter(Boolean);
+    return base;
+  }
+
+  function sanitizeClearEntry(raw) {
+    if (!raw || typeof raw !== "object") return null;
+    const groups = {};
+    (W.SKILL_GROUPS || []).forEach((g) => {
+      groups[g] = Math.max(0, Math.floor(Number(raw.groups && raw.groups[g]) || 0));
+    });
+    return {
+      at: Math.max(0, Math.floor(Number(raw.at) || 0)),
+      seed: (Number(raw.seed) >>> 0) || 0,
+      durationMs: Math.max(0, Math.floor(Number(raw.durationMs) || 0)),
+      skillKinds: Math.max(0, Math.floor(Number(raw.skillKinds) || 0)),
+      passiveKinds: Math.max(0, Math.floor(Number(raw.passiveKinds) || 0)),
+      battlesWon: Math.max(0, Math.floor(Number(raw.battlesWon) || 0)),
+      battlesLost: Math.max(0, Math.floor(Number(raw.battlesLost) || 0)),
+      rerollsUsed: Math.max(0, Math.floor(Number(raw.rerollsUsed) || 0)),
+      damageDealt: Math.max(0, Math.floor(Number(raw.damageDealt) || 0)),
+      damageTaken: Math.max(0, Math.floor(Number(raw.damageTaken) || 0)),
+      openingSkillId: raw.openingSkillId && W.SKILL_BY_ID[raw.openingSkillId] ? raw.openingSkillId : null,
+      topGroup: raw.topGroup && (W.SKILL_GROUPS || []).includes(raw.topGroup) ? raw.topGroup : null,
+      groups,
     };
   }
 
@@ -96,6 +183,8 @@
       pendingPick,
       rerollPoints: Math.max(0, Math.floor(Number(data.rerollPoints) || 0)),
       rerollSalt: Math.max(0, Math.floor(Number(data.rerollSalt) || 0)),
+      runStats: sanitizeRunStats(data.runStats),
+      chronicle: sanitizeChronicle(data.chronicle),
     };
   }
 
@@ -125,7 +214,10 @@
     if (!state.pendingPick || state.clearedTower) return false;
     const free = isOpeningPick();
     if (!free && (state.rerollPoints || 0) < 1) return false;
-    if (!free) state.rerollPoints -= 1;
+    if (!free) {
+      state.rerollPoints -= 1;
+      ensureRunStats().rerollsUsed += 1;
+    }
     state.rerollSalt = (state.rerollSalt || 0) + 1;
     state.offer = W.rollOffer(offerSeed(), W.OFFER_COUNT, state.skills);
     save();
@@ -158,12 +250,78 @@
   function newRun(options) {
     const opts = options || {};
     const best = opts.keepBest === false ? 0 : state.bestCleared || 0;
-    state = blank(best);
+    const chronicle = opts.keepBest === false ? blankChronicle() : state.chronicle;
+    state = blank(best, chronicle);
     if (opts.persist !== false) {
       ensureOffer();
       save();
     }
     return state;
+  }
+
+  function ensureRunStats() {
+    if (!state.runStats) state.runStats = blankRunStats();
+    return state.runStats;
+  }
+
+  function ensureChronicle() {
+    if (!state.chronicle) state.chronicle = blankChronicle();
+    return state.chronicle;
+  }
+
+  function groupCountsFromSkills(skills) {
+    const groups = {};
+    (W.SKILL_GROUPS || []).forEach((g) => {
+      groups[g] = 0;
+    });
+    let passiveKinds = 0;
+    let activeKinds = 0;
+    Object.keys(skills || {}).forEach((id) => {
+      const lv = skills[id] || 0;
+      if (lv <= 0) return;
+      const skill = W.SKILL_BY_ID[id];
+      if (!skill) return;
+      if (skill.passive) {
+        passiveKinds += 1;
+        return;
+      }
+      activeKinds += 1;
+      if (Object.prototype.hasOwnProperty.call(groups, skill.group)) {
+        groups[skill.group] += lv;
+      }
+    });
+    let topGroup = null;
+    let topVal = 0;
+    Object.keys(groups).forEach((g) => {
+      if (groups[g] > topVal) {
+        topVal = groups[g];
+        topGroup = g;
+      }
+    });
+    return { groups, passiveKinds, activeKinds, topGroup };
+  }
+
+  function buildClearEntry(data) {
+    const st = data || state;
+    const run = st.runStats || blankRunStats();
+    const counts = groupCountsFromSkills(st.skills);
+    const started = run.startedAt || 0;
+    const ended = run.clearedAt || Date.now();
+    return {
+      at: ended,
+      seed: st.runSeed || 0,
+      durationMs: started > 0 ? Math.max(0, ended - started) : 0,
+      skillKinds: Object.keys(st.skills || {}).filter((id) => (st.skills[id] || 0) > 0).length,
+      passiveKinds: counts.passiveKinds,
+      battlesWon: run.battlesWon || 0,
+      battlesLost: run.battlesLost || 0,
+      rerollsUsed: run.rerollsUsed || 0,
+      damageDealt: run.damageDealt || 0,
+      damageTaken: run.damageTaken || 0,
+      openingSkillId: run.openingSkillId || null,
+      topGroup: counts.topGroup,
+      groups: counts.groups,
+    };
   }
 
   function pickSkill(id) {
@@ -172,7 +330,17 @@
     // 開幕（無限リロール中）は候補外の技も直接獲得できる
     if (!isOpeningPick() && (!state.offer || !state.offer.includes(id))) return false;
     const skill = W.SKILL_BY_ID[id];
+    const wasOpening = isOpeningPick();
     state.skills[id] = (state.skills[id] || 0) + 1;
+    const run = ensureRunStats();
+    if (wasOpening) run.openingSkillId = id;
+    run.picks.push({
+      id,
+      floor: state.floor,
+      level: state.skills[id],
+      at: Date.now(),
+    });
+    if (run.picks.length > MAX_PICK_LOG) run.picks = run.picks.slice(-MAX_PICK_LOG);
     state.offer = null;
     state.pendingPick = false;
     if (
@@ -287,6 +455,18 @@
     save();
   }
 
+  function recordBattle(result) {
+    if (!result) return;
+    const run = ensureRunStats();
+    if (result.winner === "player") run.battlesWon += 1;
+    else run.battlesLost += 1;
+    run.damageDealt += Math.max(0, Math.floor(Number(result.damageDealt) || 0));
+    run.damageTaken += Math.max(0, Math.floor(Number(result.damageTaken) || 0));
+    run.playerActions += Math.max(0, Math.floor(Number(result.playerActions) || 0));
+    run.enemyActions += Math.max(0, Math.floor(Number(result.enemyActions) || 0));
+    save();
+  }
+
   function commitWin() {
     const floor = state.floor;
     state.bestCleared = Math.max(state.bestCleared || 0, floor);
@@ -301,9 +481,73 @@
     } else {
       state.pendingPick = false;
       state.offer = null;
+      const run = ensureRunStats();
+      run.clearedAt = Date.now();
+      const chronicle = ensureChronicle();
+      chronicle.clearCount = (chronicle.clearCount || 0) + 1;
+      const entry = buildClearEntry(state);
+      chronicle.clears = [entry, ...(chronicle.clears || [])].slice(0, MAX_CLEAR_HISTORY);
     }
     save();
     return { cleared, floor, rerollPoints: state.rerollPoints };
+  }
+
+  /** クリア画面用の表示データ */
+  function clearReport(data) {
+    const st = data || state;
+    const run = st.runStats || blankRunStats();
+    const chronicle = st.chronicle || blankChronicle();
+    const counts = groupCountsFromSkills(st.skills);
+    const stats = W.computeStats(st.skills);
+    const owned = Object.keys(st.skills || {})
+      .filter((id) => (st.skills[id] || 0) > 0)
+      .map((id) => {
+        const skill = W.SKILL_BY_ID[id];
+        return {
+          id,
+          name: skill ? skill.name : id,
+          group: skill ? skill.group : "",
+          passive: !!(skill && skill.passive),
+          level: st.skills[id],
+        };
+      })
+      .sort((a, b) => {
+        if (a.passive !== b.passive) return a.passive ? 1 : -1;
+        if (a.group !== b.group) return String(a.group).localeCompare(String(b.group), "ja");
+        return a.name.localeCompare(b.name, "ja");
+      });
+    const flow = (st.flow || []).map((node, index) => {
+      const skill = W.SKILL_BY_ID[node.skillId];
+      return {
+        index: index + 1,
+        id: node.skillId,
+        name: skill ? skill.name : node.skillId,
+        group: skill ? skill.group : "",
+      };
+    });
+    const milestones = [1, 25, 50, 75, 100]
+      .map((floor) => {
+        const pick = (run.picks || []).find((p) => p.floor === floor);
+        if (!pick) return null;
+        const skill = W.SKILL_BY_ID[pick.id];
+        return {
+          floor,
+          id: pick.id,
+          name: skill ? skill.name : pick.id,
+          level: pick.level,
+        };
+      })
+      .filter(Boolean);
+    return {
+      run,
+      chronicle,
+      counts,
+      stats,
+      owned,
+      flow,
+      milestones,
+      entry: buildClearEntry(st),
+    };
   }
 
   W.MAX_FLOW = MAX_FLOW;
@@ -324,6 +568,9 @@
   W.moveNode = moveNode;
   W.removeNode = removeNode;
   W.commitWin = commitWin;
+  W.recordBattle = recordBattle;
+  W.clearReport = clearReport;
+  W.groupCountsFromSkills = groupCountsFromSkills;
   W.giveUp = function giveUp() {
     return newRun({ persist: true });
   };

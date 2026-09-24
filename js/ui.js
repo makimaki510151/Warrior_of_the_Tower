@@ -838,7 +838,15 @@
         <p class="eyebrow">${esc(W.GAME_TITLE_EN || "True Warrior of the Tower")}</p>
         <h1>${esc(gameTitle())}</h1>
         <p class="lede">技を1つ選び、手順を組んで自動戦闘で百層を登る。</p>
-        <p class="record">${state.bestCleared ? `最高 ${state.bestCleared}層` : "記録なし"}</p>
+        <p class="record">${
+          state.bestCleared
+            ? `最高 ${state.bestCleared}層${
+                state.chronicle && state.chronicle.clearCount
+                  ? ` · 通算クリア ${state.chronicle.clearCount}回`
+                  : ""
+              }`
+            : "記録なし"
+        }</p>
         <div class="title-actions">
           ${
             ui.hasSave
@@ -975,15 +983,169 @@
     );
   }
 
+  function formatDuration(ms) {
+    const total = Math.max(0, Math.floor((Number(ms) || 0) / 1000));
+    const h = Math.floor(total / 3600);
+    const m = Math.floor((total % 3600) / 60);
+    const s = total % 60;
+    if (h > 0) return `${h}時間${m}分`;
+    if (m > 0) return `${m}分${s}秒`;
+    return `${s}秒`;
+  }
+
+  function formatWhen(ts) {
+    const n = Math.floor(Number(ts) || 0);
+    if (!n) return "—";
+    try {
+      return new Date(n).toLocaleString("ja-JP", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } catch (err) {
+      return "—";
+    }
+  }
+
+  function formatCompact(n) {
+    const v = Math.max(0, Math.floor(Number(n) || 0));
+    if (v >= 10000) return `${Math.floor(v / 1000)}k`;
+    return String(intNum(v));
+  }
+
   function renderClear() {
     const state = W.getState();
+    const report = W.clearReport ? W.clearReport(state) : null;
+    const run = (report && report.run) || {};
+    const counts = (report && report.counts) || { groups: {}, passiveKinds: 0, activeKinds: 0 };
+    const stats = (report && report.stats) || W.computeStats(state.skills);
+    const chronicle = (report && report.chronicle) || { clearCount: 0, clears: [] };
+    const opening = run.openingSkillId && W.SKILL_BY_ID[run.openingSkillId];
+    const groupRows = (W.SKILL_GROUPS || [])
+      .map((g) => {
+        const n = (counts.groups && counts.groups[g]) || 0;
+        if (!n) return "";
+        const style = GROUP_STYLE[g] || { slug: "attack", tag: g };
+        return `<li><span class="skill-tag skill-tag-${esc(style.slug)}">${esc(style.tag)}</span><b>${n}</b></li>`;
+      })
+      .join("");
+    const flowRows = ((report && report.flow) || [])
+      .map((node) => `<li><span class="clear-flow-i">${node.index}</span>${esc(node.name)}</li>`)
+      .join("");
+    const mileRows = ((report && report.milestones) || [])
+      .map(
+        (m) =>
+          `<li><span class="clear-mile-floor">第${m.floor}層</span><span>${esc(m.name)}${
+            m.level > 1 ? ` Lv${m.level}` : ""
+          }</span></li>`
+      )
+      .join("");
+    const ownedPreview = ((report && report.owned) || [])
+      .slice(0, 24)
+      .map((s) => {
+        const tag = s.passive
+          ? `<span class="skill-tag skill-tag-passive">パッシブ</span>`
+          : (() => {
+              const style = GROUP_STYLE[s.group] || { slug: "attack", tag: s.group || "技" };
+              return `<span class="skill-tag skill-tag-${esc(style.slug)}">${esc(style.tag)}</span>`;
+            })();
+        return `<li>${tag}<span>${esc(s.name)}</span><b>Lv${s.level}</b></li>`;
+      })
+      .join("");
+    const ownedMore = ((report && report.owned) || []).length > 24
+      ? `<p class="tiny">ほか ${((report && report.owned) || []).length - 24} 種</p>`
+      : "";
+    const historyRows = (chronicle.clears || [])
+      .slice(0, 5)
+      .map((entry, i) => {
+        const openSkill = entry.openingSkillId && W.SKILL_BY_ID[entry.openingSkillId];
+        const label = i === 0 ? "今回" : `${i + 1}回前`;
+        return `<li>
+          <div class="clear-hist-top">
+            <strong>${label}</strong>
+            <span>${esc(formatWhen(entry.at))}</span>
+          </div>
+          <p class="tiny">
+            技${entry.skillKinds}種 · 敗北${entry.battlesLost} · リロール${entry.rerollsUsed}
+            ${entry.topGroup ? ` · 主軸 ${esc(entry.topGroup)}` : ""}
+            ${openSkill ? ` · 開幕 ${esc(openSkill.name)}` : ""}
+            ${entry.durationMs ? ` · ${esc(formatDuration(entry.durationMs))}` : ""}
+          </p>
+        </li>`;
+      })
+      .join("");
+
     return shell(`
-      <div class="title-pane">
-        <p class="eyebrow">第100層</p>
-        <h1>塔の頂</h1>
-        <p class="lede">百層を越えた。</p>
-        <p class="record">最高 ${state.bestCleared}層</p>
-        <button type="button" class="btn btn-primary" data-action="climb-again">もう一度</button>
+      <div class="clear-pane">
+        <header class="clear-hero">
+          <p class="eyebrow">第100層</p>
+          <h1>塔の頂</h1>
+          <p class="lede">百層を越え、頂に立った。</p>
+          <p class="record">通算クリア ${intNum(chronicle.clearCount || 1)}回 · 最高 ${intNum(state.bestCleared)}層</p>
+        </header>
+
+        <section class="clear-section" aria-label="この登頂の統計">
+          <h2>この登頂</h2>
+          <ul class="clear-stat-grid">
+            <li><span>勝利</span><b>${intNum(run.battlesWon || 0)}</b></li>
+            <li><span>敗北</span><b>${intNum(run.battlesLost || 0)}</b></li>
+            <li><span>リロール</span><b>${intNum(run.rerollsUsed || 0)}</b></li>
+            <li><span>所要</span><b>${esc(formatDuration(run.clearedAt && run.startedAt ? run.clearedAt - run.startedAt : 0))}</b></li>
+            <li><span>与ダメ</span><b>${esc(formatCompact(run.damageDealt))}</b></li>
+            <li><span>被ダメ</span><b>${esc(formatCompact(run.damageTaken))}</b></li>
+            <li><span>自分の行動</span><b>${esc(formatCompact(run.playerActions))}</b></li>
+            <li><span>敵の行動</span><b>${esc(formatCompact(run.enemyActions))}</b></li>
+          </ul>
+        </section>
+
+        <section class="clear-section" aria-label="ビルド">
+          <h2>登り切った構え</h2>
+          <p class="tiny clear-build-lead">
+            体力 ${intNum(stats.maxHp)} · 攻撃 ${intNum(stats.atk)} · 防御 ${intNum(stats.def)} · 速度 ${intNum(stats.speed)}
+            · 技 ${intNum((counts.activeKinds || 0) + (counts.passiveKinds || 0))}種
+            （アクティブ ${intNum(counts.activeKinds || 0)} / パッシブ ${intNum(counts.passiveKinds || 0)}）
+            ${opening ? ` · 開幕 ${esc(opening.name)}` : ""}
+          </p>
+          ${
+            groupRows
+              ? `<ul class="clear-group-bars" aria-label="系統の厚み">${groupRows}</ul>`
+              : `<p class="tiny">系統記録なし</p>`
+          }
+          ${
+            flowRows
+              ? `<h3 class="clear-sub">最終手順</h3><ol class="clear-flow">${flowRows}</ol>`
+              : `<p class="tiny">手順なし（通常攻撃のみ）</p>`
+          }
+        </section>
+
+        <section class="clear-section" aria-label="旅の記録">
+          <h2>旅の節目</h2>
+          ${
+            mileRows
+              ? `<ul class="clear-miles">${mileRows}</ul>`
+              : `<p class="tiny">この登頂では途中の獲得記録が残っていません（旧セーブや途中開始の場合）。</p>`
+          }
+          ${
+            ownedPreview
+              ? `<h3 class="clear-sub">所持技</h3><ul class="clear-owned">${ownedPreview}</ul>${ownedMore}`
+              : ""
+          }
+        </section>
+
+        <section class="clear-section" aria-label="過去の登頂">
+          <h2>登頂の歴史</h2>
+          ${
+            historyRows
+              ? `<ul class="clear-history">${historyRows}</ul>`
+              : `<p class="tiny">まだ過去の登頂はありません。</p>`
+          }
+        </section>
+
+        <div class="clear-actions">
+          <button type="button" class="btn btn-primary" data-action="climb-again">もう一度登る</button>
+        </div>
       </div>
     `);
   }
@@ -1513,6 +1675,7 @@
       flow: state.flow,
       keepLog: true,
     });
+    if (W.recordBattle) W.recordBattle(result);
     let cleared = false;
     if (result.winner === "player") {
       cleared = W.commitWin().cleared;
