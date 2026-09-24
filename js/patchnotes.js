@@ -17,6 +17,20 @@
   /** @type {{ version: string, date: string, title: string, sections: { heading: string, items: string[] }[] }[]} */
   const PATCH_NOTES = [
     {
+      version: "0.5.33",
+      date: "2026-09-24",
+      title: "開幕の技検索でIME入力できるように修正",
+      sections: [
+        {
+          heading: "バグ修正",
+          items: [
+            "開幕の「名前・説明で絞る」入力で、ローマ字などIME変換中に画面全体が再描画され、母音・子音の入力が潰れる問題を修正。",
+            "検索は一覧部分だけ更新し、変換確定時に絞り込む。",
+          ],
+        },
+      ],
+    },
+    {
       version: "0.5.32",
       date: "2026-09-24",
       title: "パッシブ技システムと不人気技の全面リワーク",
