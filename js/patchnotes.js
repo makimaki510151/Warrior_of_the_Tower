@@ -17,7 +17,7 @@
   /** @type {{ version: string, date: string, title: string, sections: { heading: string, items: string[] }[] }[]} */
   const PATCH_NOTES = [
     {
-      version: "0.5.38",
+      version: "0.5.39",
       date: "2026-09-24",
       title: "ヘッダーからいつでもタイトルへ戻れるように",
       sections: [
