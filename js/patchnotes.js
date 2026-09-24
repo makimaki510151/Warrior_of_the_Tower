@@ -17,9 +17,21 @@
   /** @type {{ version: string, date: string, title: string, sections: { heading: string, items: string[] }[] }[]} */
   const PATCH_NOTES = [
     {
+      version: "0.5.39",
+      date: "2026-09-24",
+      title: "戦闘結果画面でもログ倍速を変更可能に",
+      sections: [
+        {
+          heading: "UI",
+          items: [
+            "戦闘終了後の結果フッタにもログ倍速（1x〜16x）ボタンを出し、次の戦闘に向けて倍率を変えられるようにした。",
+          ],
+        },
+      ],
+    },
+    {
       version: "0.5.38",
       date: "2026-09-24",
-<<<<<<< HEAD
       title: "戦闘ログのパッシブ反応の順序を修正",
       sections: [
         {
@@ -27,14 +39,6 @@
           items: [
             "回復や攻撃の本体ログより先に、療刃・追撃・被弾反応などのパッシブログが出ることがあった問題を修正。",
             "damage／heal／敵バフ反応のログを一時保留し、本体の一文の直後に続けて出すようにした。",
-=======
-      title: "戦闘結果画面でもログ倍速を変更可能に",
-      sections: [
-        {
-          heading: "UI",
-          items: [
-            "戦闘終了後の結果フッタにもログ倍速（1x〜16x）ボタンを出し、次の戦闘に向けて倍率を変えられるようにした。",
->>>>>>> origin/cursor/post-battle-speed-220b
           ],
         },
       ],
