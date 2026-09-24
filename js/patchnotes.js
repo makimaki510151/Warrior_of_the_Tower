@@ -17,6 +17,20 @@
   /** @type {{ version: string, date: string, title: string, sections: { heading: string, items: string[] }[] }[]} */
   const PATCH_NOTES = [
     {
+      version: "0.5.35",
+      date: "2026-09-24",
+      title: "パッシブ表示の重複を解消",
+      sections: [
+        {
+          heading: "UI",
+          items: [
+            "パッシブ技で「パッシブ」タグが二重に出ていた箇所を整理し、バッジは1つだけ表示するようにした。",
+            "メタ表示は「常時」、説明文への「パッシブ」追記や一覧行の重複表記を削除。",
+          ],
+        },
+      ],
+    },
+    {
       version: "0.5.34",
       date: "2026-09-24",
       title: "開幕一覧でパッシブ絞り込み",
