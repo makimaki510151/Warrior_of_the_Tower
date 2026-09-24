@@ -17,6 +17,20 @@
   /** @type {{ version: string, date: string, title: string, sections: { heading: string, items: string[] }[] }[]} */
   const PATCH_NOTES = [
     {
+      version: "0.5.38",
+      date: "2026-09-24",
+      title: "ヘッダーからいつでもタイトルへ戻れるように",
+      sections: [
+        {
+          heading: "UI",
+          items: [
+            "上部ヘッダーに「タイトル」ボタンを追加。開幕・手順・戦闘・頂など、タイトル以外の画面から常にタイトル画面へ戻れる。",
+            "進行中のセーブはそのまま残る（タイトルの「続きから」で再開可能）。",
+          ],
+        },
+      ],
+    },
+    {
       version: "0.5.37",
       date: "2026-09-24",
       title: "開幕の技選択で二重スクロールと横はみ出しを修正",
