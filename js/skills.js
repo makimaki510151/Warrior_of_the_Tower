@@ -3070,6 +3070,13 @@
   const OFFER_COUNT = 5;
   /** 2枚目以降に乗る付随ステータス係数（1枚目は満額、追加分は基礎gain×この値） */
   const STACK_GAIN_BONUS = 0.3;
+  /**
+   * 所持している同系統アクティブ技1レベルあたりの候補重み加算。
+   * パッシブは系統カウント・重み補正のどちらにも入らない。
+   */
+  const GROUP_AFFINITY_STEP = 0.08;
+  /** 系統ボーナスの上限（+100%＝重み最大2） */
+  const GROUP_AFFINITY_CAP = 1;
 
   function gainFromSkill(skill, level) {
     const lv = Math.max(0, Math.floor(level || 0));
@@ -3117,17 +3124,63 @@
     };
   }
 
-  function rollOffer(seed, count) {
+  /** パッシブ以外の所持技から、5系統それぞれのレベル合計を数える */
+  function groupAffinity(levels) {
+    const counts = Object.create(null);
+    GROUPS.forEach((g) => {
+      counts[g] = 0;
+    });
+    Object.keys(levels || {}).forEach((id) => {
+      const lv = Math.max(0, Math.floor(levels[id] || 0));
+      if (lv <= 0) return;
+      const skill = BY_ID[id];
+      if (!skill || skill.passive) return;
+      if (!Object.prototype.hasOwnProperty.call(counts, skill.group)) return;
+      counts[skill.group] += lv;
+    });
+    return counts;
+  }
+
+  /** 候補1枚の抽選重み。パッシブは常に1（系統ボーナスなし） */
+  function offerWeight(skill, affinity) {
+    if (!skill || skill.passive) return 1;
+    const owned = affinity && affinity[skill.group] ? affinity[skill.group] : 0;
+    if (owned <= 0) return 1;
+    const bonus = Math.min(GROUP_AFFINITY_CAP, GROUP_AFFINITY_STEP * owned);
+    return 1 + bonus;
+  }
+
+  /**
+   * 所持系統に応じた重み付き抽選（非復元抽出）。
+   * @param {number} seed
+   * @param {number} [count]
+   * @param {Record<string, number>} [levels] 所持スキルレベル
+   */
+  function rollOffer(seed, count, levels) {
     const n = Math.min(count || OFFER_COUNT, SKILLS.length);
     const rand = mulberry32(seed >>> 0 || 1);
-    const pool = SKILLS.map((skill) => skill.id);
-    for (let i = pool.length - 1; i > 0; i -= 1) {
-      const j = Math.floor(rand() * (i + 1));
-      const tmp = pool[i];
-      pool[i] = pool[j];
-      pool[j] = tmp;
+    const affinity = groupAffinity(levels);
+    const pool = SKILLS.map((skill) => ({
+      id: skill.id,
+      weight: offerWeight(skill, affinity),
+    }));
+    const picked = [];
+    for (let k = 0; k < n; k += 1) {
+      let total = 0;
+      for (let i = 0; i < pool.length; i += 1) total += pool[i].weight;
+      let r = rand() * total;
+      let idx = pool.length - 1;
+      for (let i = 0; i < pool.length; i += 1) {
+        r -= pool[i].weight;
+        if (r < 0) {
+          idx = i;
+          break;
+        }
+      }
+      picked.push(pool[idx].id);
+      pool.splice(idx, 1);
     }
-    return pool.slice(0, n);
+    return picked;
   }
 
   W.BASE_STATS = BASE_STATS;
@@ -3136,8 +3189,12 @@
   W.SKILL_BY_ID = BY_ID;
   W.OFFER_COUNT = OFFER_COUNT;
   W.STACK_GAIN_BONUS = STACK_GAIN_BONUS;
+  W.GROUP_AFFINITY_STEP = GROUP_AFFINITY_STEP;
+  W.GROUP_AFFINITY_CAP = GROUP_AFFINITY_CAP;
   W.gainFromSkill = gainFromSkill;
   W.computeStats = computeStats;
+  W.groupAffinity = groupAffinity;
+  W.offerWeight = offerWeight;
   W.rollOffer = rollOffer;
   W.scaled = scaled;
   W.overNote = overNote;
