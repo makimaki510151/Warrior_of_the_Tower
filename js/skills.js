@@ -2571,7 +2571,389 @@
         });
         ctx.log(`${ctx.p}裂膜。${ctx.enemy.name}の防護の膜を裂いた。`, "buff");
       },
-    },,
+    },
+    // ---- 穴埋め12種（剥印〜戒律）----
+    {
+      id: "stripseal",
+      name: "剥印",
+      group: "崩し",
+      blurb: "敵の強化を引き剥がす。攻撃はしない。",
+      tradeoff: "強化していない相手には何も起きない。",
+      cooldown: 3,
+      gain: gain({ maxHp: 3, atk: 1, def: 2, atkEff: 0.02 }),
+      describe(level) {
+        const n = Math.max(1, Math.floor(scaled(1, 0.35, level)));
+        const next = Math.max(1, Math.floor(scaled(1, 0.35, level + 1)));
+        return [
+          `敵の強化を最大${n}つ外す。${growthTail(`${next}つ`, "0.35切捨")}`,
+          "弱体や毒は対象外。強化がなければ何もしない。",
+        ];
+      },
+      use(ctx, level) {
+        const n = Math.max(1, Math.floor(scaled(1, 0.35, level)));
+        const stripped = ctx.stripBuffs(ctx.enemy, n);
+        ctx.log(
+          stripped > 0
+            ? `${ctx.p}剥印。${ctx.enemy.name}の強化を${stripped}つ剥がした。`
+            : `${ctx.p}剥印。剥がす強化がなかった。`,
+          "buff"
+        );
+      },
+    },
+    {
+      id: "triumph",
+      name: "凱斬",
+      group: "攻撃",
+      blurb: "敵が強化中なら大きく斬る。何もなければ弱い。",
+      tradeoff: "剥印や弱体のあとでは伸びない。強化を残して斬るかが腕。",
+      cooldown: 2,
+      gain: gain({ maxHp: 2, atk: 3, speed: 2, atkEff: 0.02 }),
+      describe(level, stats) {
+        return [
+          `敵が強化中なら${atkMult(scaled(2.2, 0.08, level), stats)}。`,
+          `強化がなければ${atkMult(scaled(0.9, 0.03, level), stats)}。`,
+          dualMultGrowth(2.2, 0.08, 0.9, 0.03, level),
+        ];
+      },
+      use(ctx, level) {
+        const buffed = ctx.hasBuff(ctx.enemy);
+        const mult = buffed ? scaled(2.2, 0.08, level) : scaled(0.9, 0.03, level);
+        const r = ctx.damage(mult);
+        ctx.log(
+          `${ctx.p}凱斬。${buffed ? "盛り上がった隙を斬り、" : "勢いがなく、"}${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}`,
+          "attack"
+        );
+      },
+    },
+    {
+      id: "hexblade",
+      name: "呪刃",
+      group: "攻撃",
+      blurb: "自分が弱体を負っているほど鋭い刃になる。",
+      tradeoff: "弱体がないと弱い。浄化と両立しにくい。",
+      cooldown: 2,
+      gain: gain({ maxHp: 3, atk: 3, def: 1, atkEff: 0.02 }),
+      describe(level, stats) {
+        return [
+          `自分が弱体中なら${atkMult(scaled(2.15, 0.08, level), stats)}。`,
+          `弱体がなければ${atkMult(scaled(0.88, 0.03, level), stats)}。`,
+          dualMultGrowth(2.15, 0.08, 0.88, 0.03, level),
+        ];
+      },
+      use(ctx, level) {
+        const cursed = ctx.hasDebuff(ctx.player);
+        const mult = cursed ? scaled(2.15, 0.08, level) : scaled(0.88, 0.03, level);
+        const r = ctx.damage(mult);
+        ctx.log(
+          `${ctx.p}呪刃。${cursed ? "呪いを刃に乗せ、" : "呪いがなく、"}${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}`,
+          "attack"
+        );
+      },
+    },
+    {
+      id: "twinflash",
+      name: "双閃",
+      group: "攻撃",
+      blurb: "二連の閃光。一発目で反射を消費しやすい。",
+      tradeoff: "一発あたりは控えめ。単発の大技には劣る。",
+      cooldown: 3,
+      gain: gain({ maxHp: 2, atk: 3, speed: 3, dmgBonus: 0.006 }),
+      describe(level, stats) {
+        const each = scaled(0.72, 0.03, level);
+        return [
+          `二回攻撃。各${atkMult(each, stats)}。`,
+          growthTail(`各×${scaled(0.72, 0.03, level + 1).toFixed(2)}`, "0.03"),
+          "反射や一度きりの防護は、一発目で落ちることが多い。",
+        ];
+      },
+      use(ctx, level) {
+        const each = scaled(0.72, 0.03, level);
+        const a = ctx.damage(each);
+        if (ctx.enemy.hp <= 0) {
+          ctx.log(`${ctx.p}双閃。一閃で${ctx.enemy.name}に${a.dmg}。${ctx.overNote(a.over)}`, "attack");
+          return;
+        }
+        const b = ctx.damage(each, { amp: false });
+        ctx.log(
+          `${ctx.p}双閃。${ctx.enemy.name}に${a.dmg}と${b.dmg}、合計${a.dmg + b.dmg}。${ctx.overNote(a.over + b.over)}`,
+          "attack"
+        );
+      },
+    },
+    {
+      id: "layerguard",
+      name: "層盾",
+      group: "守り",
+      blurb: "何発分かの薄い盾を重ね、連続攻撃に耐える。",
+      tradeoff: "一発の大技には弱い。攻撃はしない。",
+      cooldown: 4,
+      gain: gain({ maxHp: 6, def: 3, defEff: 0.02, dmgReduction: 0.01 }),
+      describe(level) {
+        const charges = Math.max(2, Math.floor(scaled(2, 0.4, level)));
+        const rate = scaled(0.28, 0.03, level);
+        return [
+          `次の被弾を最大${charges}回、各${pctNowLabel(rate)}軽減する。`,
+          growthTail(
+            `${Math.max(2, Math.floor(scaled(2, 0.4, level + 1)))}回／${pctNowLabel(scaled(0.28, 0.03, level + 1))}`,
+            "0.4切捨／3%"
+          ),
+        ];
+      },
+      use(ctx, level) {
+        const charges = Math.max(2, Math.floor(scaled(2, 0.4, level)));
+        const rate = scaled(0.28, 0.03, level);
+        ctx.addEffect(ctx.player, {
+          id: "layerguard",
+          kind: "hitShield",
+          value: rate,
+          charges,
+          turns: 6,
+        });
+        ctx.log(`${ctx.p}層盾。薄い盾を${charges}枚重ねた。`, "buff");
+      },
+    },
+    {
+      id: "outpace",
+      name: "先手",
+      group: "攻撃",
+      blurb: "自分の方が速いとき、先に深く斬る。",
+      tradeoff: "遅い相手には弱い。疾風や足枷と組む前提。",
+      cooldown: 2,
+      gain: gain({ maxHp: 2, atk: 2, speed: 6, atkEff: 0.02 }),
+      describe(level, stats) {
+        return [
+          `自分の行動速度が敵より高いとき${atkMult(scaled(2.05, 0.07, level), stats)}。`,
+          `そうでなければ${atkMult(scaled(0.85, 0.025, level), stats)}。`,
+          dualMultGrowth(2.05, 0.07, 0.85, 0.025, level),
+        ];
+      },
+      use(ctx, level) {
+        const fast = ctx.effectiveSpeed(ctx.player) > ctx.effectiveSpeed(ctx.enemy);
+        const mult = fast ? scaled(2.05, 0.07, level) : scaled(0.85, 0.025, level);
+        const r = ctx.damage(mult);
+        ctx.log(
+          `${ctx.p}先手。${fast ? "先手を取り、" : "後れを取り、"}${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}`,
+          "attack"
+        );
+      },
+    },
+    {
+      id: "wardfocus",
+      name: "守集",
+      group: "補助",
+      blurb: "次の守り技を厚くする。攻撃はしない。",
+      tradeoff: "次が攻撃や回復だと乗らずに残る。",
+      cooldown: 2,
+      gain: gain({ maxHp: 4, def: 2, defEff: 0.05 }),
+      describe(level) {
+        return [
+          `次に使う守り技の効果量を${pctNowLabel(scaled(0.45, 0.04, level))}上乗せする。`,
+          growthTail(pctNowLabel(scaled(0.45, 0.04, level + 1)), "4%"),
+          "防御上昇・軽減・層盾・反射・虚盾などに乗る。一度使うと消える。",
+        ];
+      },
+      use(ctx, level) {
+        ctx.addEffect(ctx.player, {
+          id: "wardfocus",
+          kind: "guardAmp",
+          value: scaled(0.45, 0.04, level),
+          turns: null,
+        });
+        ctx.log(`${ctx.p}守集。次の守りに厚みをためた。`, "buff");
+      },
+    },
+    {
+      id: "stackvenom",
+      name: "積毒",
+      group: "崩し",
+      blurb: "すでに毒がある相手には毒を濃くする。なければ新しい毒を回す。",
+      tradeoff: "毒がない開幕は普通の毒刃に近い。",
+      cooldown: 2,
+      gain: gain({ maxHp: 2, atk: 3, speed: 2, healEff: -0.015 }),
+      describe(level, stats) {
+        const base = scaled(0.4, 0.03, level);
+        const boost = scaled(0.58, 0.04, level);
+        return [
+          `毒がなければ、5行動の毒（${atkMult(base, stats)}／回）。`,
+          `すでに毒があるときは上書きして濃くし、6行動の毒（${atkMult(boost, stats)}／回）。`,
+          growthTail(
+            `基礎×${scaled(0.4, 0.03, level + 1).toFixed(2)}／濃縮×${scaled(0.58, 0.04, level + 1).toFixed(2)}`,
+            "0.03／0.04"
+          ),
+        ];
+      },
+      use(ctx, level) {
+        const existing = ctx.findEffect(ctx.enemy, "dot");
+        const boosted = !!existing;
+        const ratio = boosted ? scaled(0.58, 0.04, level) : scaled(0.4, 0.03, level);
+        const turns = boosted ? 6 : 5;
+        const offense = ctx.snapshotOffense({ consumeAmp: false });
+        ctx.addEffect(ctx.enemy, {
+          id: "stackvenom",
+          kind: "dot",
+          mult: ratio,
+          offense,
+          turns,
+          negative: true,
+        });
+        ctx.log(
+          boosted
+            ? `${ctx.p}積毒。${ctx.enemy.name}の毒を濃くした。`
+            : `${ctx.p}積毒。${ctx.enemy.name}に毒が回る。`,
+          "buff"
+        );
+      },
+    },
+    {
+      id: "breakglass",
+      name: "破鏡",
+      group: "崩し",
+      blurb: "反射や吸収の構えを砕き、その拍子に削る。",
+      tradeoff: "構えがない相手には軽い弱体だけ。",
+      cooldown: 3,
+      gain: gain({ maxHp: 2, atk: 3, def: 1, dmgBonus: 0.008 }),
+      describe(level, stats) {
+        return [
+          `敵に反射または吸収があるとき、それを外し${atkMult(scaled(1.55, 0.06, level), stats)}。`,
+          `なければ攻撃力を${pctNowLabel(scaled(0.16, 0.015, level))}下げる（敵の3行動）。`,
+          growthTail(
+            `破砕×${scaled(1.55, 0.06, level + 1).toFixed(2)}／低下${pctNowLabel(scaled(0.16, 0.015, level + 1))}`,
+            "0.06／1.5%"
+          ),
+        ];
+      },
+      use(ctx, level) {
+        const purged = ctx.purgeKinds(ctx.enemy, ["reflect", "absorb"]);
+        if (purged > 0) {
+          const r = ctx.damage(scaled(1.55, 0.06, level));
+          ctx.log(
+            `${ctx.p}破鏡。構えを砕き、${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}`,
+            "attack"
+          );
+          return;
+        }
+        ctx.addEffect(ctx.enemy, {
+          id: "breakglass",
+          kind: "atkPct",
+          value: -scaled(0.16, 0.015, level),
+          turns: 3,
+          negative: true,
+        });
+        ctx.log(`${ctx.p}破鏡。砕く構えはなく、${ctx.enemy.name}の攻撃を少し下げた。`, "buff");
+      },
+    },
+    {
+      id: "burnbright",
+      name: "献閃",
+      group: "攻撃",
+      blurb: "自分の強化をすべて燃やし、一瞬の大技にする。",
+      tradeoff: "強化を空にする。何もなければ弱い。",
+      cooldown: 3,
+      gain: gain({ maxHp: 3, atk: 4, atkEff: 0.03, dmgBonus: 0.01 }),
+      describe(level, stats) {
+        const base = scaled(0.7, 0.03, level);
+        const per = scaled(0.35, 0.04, level);
+        return [
+          `基礎${atkMult(base, stats)}。自分の強化1つにつき威力+${per.toFixed(2)}（すべて消費）。`,
+          growthTail(
+            `基礎×${scaled(0.7, 0.03, level + 1).toFixed(2)}／+${scaled(0.35, 0.04, level + 1).toFixed(2)}毎`,
+            "0.03／0.04"
+          ),
+        ];
+      },
+      use(ctx, level) {
+        const n = ctx.countBuffs(ctx.player);
+        ctx.stripBuffs(ctx.player, 99);
+        const mult = scaled(0.7, 0.03, level) + n * scaled(0.35, 0.04, level);
+        const r = ctx.damage(mult, { amp: false });
+        ctx.log(
+          `${ctx.p}献閃。強化${n}つを燃やし、${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}`,
+          "attack"
+        );
+      },
+    },
+    {
+      id: "punishwall",
+      name: "逆療壁",
+      group: "守り",
+      blurb: "回復した分の一部を光にして敵へ返す壁。",
+      tradeoff: "回復しないと反撃もない。攻撃はしない。",
+      cooldown: 4,
+      gain: gain({ maxHp: 5, def: 2, healEff: 0.02, regenAmount: 1 }),
+      describe(level) {
+        const rate = scaled(0.45, 0.05, level);
+        return [
+          `次の4行動、自分が回復した量の${pctNowLabel(rate)}を敵へのダメージにする。`,
+          growthTail(pctNowLabel(scaled(0.45, 0.05, level + 1)), "5%"),
+        ];
+      },
+      use(ctx, level) {
+        ctx.addEffect(ctx.player, {
+          id: "punishwall",
+          kind: "punishwall",
+          value: scaled(0.45, 0.05, level),
+          turns: 4,
+        });
+        ctx.log(`${ctx.p}逆療壁。傷が光に変わる構え。`, "buff");
+      },
+    },
+    {
+      id: "vow",
+      name: "戒律",
+      group: "回復",
+      blurb: "攻撃を控えたあとほど、大きく回復する。",
+      tradeoff: "攻撃し続けているとほとんど回復しない。",
+      cooldown: 4,
+      gain: gain({ maxHp: 7, healEff: 0.03, def: 1, regenAmount: 1 }),
+      describe(level, stats) {
+        const base = scaled(0.06, 0.008, level);
+        const per = scaled(0.04, 0.006, level);
+        return [
+          `最大体力の${pctNowLabel(base)}を回復し、直近で攻撃技（または通常攻撃）を使っていない自分の行動1回ごとに+${pctNowLabel(per)}。`,
+          "攻撃技や通常攻撃を挟むとカウントは戻る。",
+          growthTail(
+            `${pctNowLabel(scaled(0.06, 0.008, level + 1))}＋毎${pctNowLabel(scaled(0.04, 0.006, level + 1))}`,
+            "0.8%／0.6%"
+          ),
+        ];
+      },
+      use(ctx, level) {
+        const wait = Math.max(0, ctx.player.sinceAttackSkill || 0);
+        const rate = scaled(0.06, 0.008, level) + wait * scaled(0.04, 0.006, level);
+        const healed = ctx.heal(ctx.player, ctx.player.maxHp * Math.min(0.55, rate));
+        ctx.log(
+          `${ctx.p}戒律。静かさ${wait}を糧に、体力が${healed.got}回復した。${ctx.overNote(healed.over)}`,
+          "heal"
+        );
+      },
+    },
+    {
+      id: "siphonseal",
+      name: "奪印",
+      group: "崩し",
+      blurb: "敵の強化を1つ奪い取り、自分のものにする。",
+      tradeoff: "強化がない相手には何も起きない。攻撃はしない。",
+      cooldown: 3,
+      gain: gain({ maxHp: 3, atk: 2, def: 1, atkEff: 0.02, speed: 1 }),
+      describe(level) {
+        const keep = scaled(0.65, 0.04, level);
+        return [
+          `敵の強化を1つ奪い、自分に移す（残り行動は約${pctNowLabel(keep)}に短縮）。`,
+          growthTail(pctNowLabel(scaled(0.65, 0.04, level + 1)), "4%"),
+          "弱体や毒は奪えない。強化がなければ何もしない。",
+        ];
+      },
+      use(ctx, level) {
+        const keep = scaled(0.65, 0.04, level);
+        const stolen = ctx.stealBuff(ctx.enemy, ctx.player, keep);
+        ctx.log(
+          stolen
+            ? `${ctx.p}奪印。${ctx.enemy.name}の強化を奪い取った。`
+            : `${ctx.p}奪印。奪える強化がなかった。`,
+          "buff"
+        );
+      },
+    },
   ];
 
   const GROUPS = ["攻撃", "崩し", "守り", "回復", "補助"];
