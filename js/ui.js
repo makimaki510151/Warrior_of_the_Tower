@@ -644,17 +644,6 @@
         <section class="pane pane-flow ${ui.prepTab === "flow" ? "is-active" : ""}" data-prep-pane="flow">
           <h2>手順 <span class="tiny">上から判定・外れは通常攻撃</span></h2>
           <p class="flow-guide m-only">上から順に判定。条件が合えばその技、どれも外れれば通常攻撃。</p>
-          ${
-            canAdd
-              ? `<div class="flow-palette" aria-label="手順に追加できる技">
-                  <p class="tiny pc-only">ドラッグして手順のすき間へ（間にも挿入可）</p>
-                  <p class="flow-palette-title m-only">未使用の技 <span class="tiny">タップで末尾に追加</span></p>
-                  <div class="flow-chips">${unused.map((id) => flowPaletteChip(id)).join("")}</div>
-                </div>`
-              : state.flow.length >= W.MAX_FLOW
-                ? `<p class="flow-full m-only">手順は最大${W.MAX_FLOW}個まで（外して入れ替え）</p>`
-                : ""
-          }
           <ol class="flow-list" data-flow-list>
             ${
               state.flow.length
@@ -665,6 +654,17 @@
             }
             <li class="fallback">↓ 通常攻撃</li>
           </ol>
+          ${
+            canAdd
+              ? `<div class="flow-palette" aria-label="手順に追加できる技">
+                  <p class="tiny pc-only">ドラッグして手順のすき間へ（間にも挿入可）</p>
+                  <p class="flow-palette-title m-only">未使用の技を追加 <span class="tiny">タップで末尾へ</span></p>
+                  <div class="flow-chips">${unused.map((id) => flowPaletteChip(id)).join("")}</div>
+                </div>`
+              : state.flow.length >= W.MAX_FLOW
+                ? `<p class="flow-full m-only">手順は最大${W.MAX_FLOW}個まで（外して入れ替え）</p>`
+                : ""
+          }
           ${
             canAdd
               ? `<div class="add-row pc-only">

@@ -1175,13 +1175,14 @@ select {
   }
 
   .flow-palette {
-    margin: 0 0 10px;
+    margin: 12px 0 4px;
     padding: 10px;
     border-width: 1px;
     border-style: solid;
     border-color: rgba(212, 175, 106, 0.55);
     border-radius: 10px;
     background: rgba(255, 244, 220, 0.06);
+    order: 2;
   }
   .flow-palette-title {
     margin: 0 0 8px;
@@ -1191,21 +1192,22 @@ select {
   }
   .flow-chips {
     display: grid;
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr 1fr;
     gap: 8px;
     margin-top: 0;
   }
   .flow-chip {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-rows: auto auto;
     align-items: center;
-    gap: 8px;
+    gap: 2px 6px;
     width: 100%;
-    min-height: 52px;
-    padding: 10px 12px;
+    min-height: 56px;
+    padding: 8px 10px;
     border-radius: 10px;
     border-width: 1px;
-    font-size: 1em;
+    font-size: 0.92em;
     text-align: left;
     cursor: pointer;
     box-shadow: inset 0 0 0 1px rgba(255, 244, 220, 0.04);
@@ -1213,36 +1215,61 @@ select {
   .flow-chip-tag {
     display: inline-grid !important;
     place-items: center;
-    min-width: 2.4em;
-    padding: 2px 6px;
+    grid-row: 1;
+    grid-column: 1;
+    min-width: 2.2em;
+    padding: 2px 5px;
     border-radius: 4px;
-    font-size: 0.72em;
+    font-size: 0.68em;
     font-weight: 800;
     background: rgba(12, 10, 8, 0.45);
   }
   .flow-chip-name {
-    font-size: 1.05em;
+    grid-row: 1;
+    grid-column: 2;
+    font-size: 0.98em;
     font-weight: 800;
     line-height: 1.2;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .flow-chip-lv {
+    grid-row: 2;
+    grid-column: 1;
     color: var(--muted);
-    font-size: 0.82em;
+    font-size: 0.72em;
     font-weight: 600;
+    text-align: center;
   }
   .flow-chip-cta {
-    flex: none;
-    padding: 6px 10px;
-    border-radius: 6px;
+    grid-row: 2;
+    grid-column: 2;
+    justify-self: start;
+    padding: 3px 8px;
+    border-radius: 5px;
     background: var(--gold-deep);
     color: var(--ink);
-    font-size: 0.82em;
+    font-size: 0.72em;
     font-weight: 800;
     white-space: nowrap;
   }
 
   .flow-list {
     gap: 12px;
+    order: 1;
+  }
+  .flow-full {
+    order: 2;
+  }
+  .pane-flow.is-active {
+    display: flex;
+    flex-direction: column;
+  }
+  .pane-flow h2,
+  .pane-flow .flow-guide {
+    order: 0;
   }
   .flow-drop:not(.is-empty) {
     display: none;
@@ -1443,6 +1470,17 @@ select {
     font-size: 0.92em;
     line-height: 1.35;
   }
+  /* 入れ替え操作を優先：標準表示では詳細行を抑えめに */
+  .owned-card:not(.is-detail) .skill-detail-lite,
+  .owned-card:not(.is-detail) .skill-gains {
+    display: none;
+  }
+  .owned-card:not(.is-detail) .skill-blurb {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
   .owned-status {
     margin: 8px 0 0;
     font-size: 0.82em;
@@ -1466,6 +1504,12 @@ select {
     border-radius: 6px;
     background: rgba(255, 244, 220, 0.06);
     font-weight: 700;
+    text-align: center;
+    color: var(--muted);
+    pointer-events: none;
+  }
+  .owned-card:not(.is-in-flow) {
+    padding-bottom: 10px;
   }
 
   select {
