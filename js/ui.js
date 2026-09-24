@@ -8,6 +8,8 @@
     modal: null,
     help: false,
     patchNotes: false,
+    tutorial: false,
+    tutorialChapter: "loop",
     offerStats: false,
     prepTab: "flow",
     battle: null,
@@ -189,6 +191,7 @@
                 : ""
             }
             <button type="button" class="btn btn-ghost btn-compact" data-action="patch-notes">履歴</button>
+            <button type="button" class="btn btn-ghost btn-compact" data-action="tutorial">講座</button>
             <button type="button" class="btn btn-ghost btn-compact" data-action="help">遊び方</button>
           </div>
         </header>
@@ -699,6 +702,7 @@
                  <button type="button" class="btn btn-ghost" data-action="restart">はじめから</button>`
               : `<button type="button" class="btn btn-primary" data-action="start">塔に入る</button>`
           }
+          <button type="button" class="btn btn-ghost" data-action="tutorial">チュートリアル</button>
           <button type="button" class="btn btn-ghost" data-action="patch-notes">更新履歴${
             ver ? ` <span class="tiny">v${esc(ver)}</span>` : ""
           }</button>
@@ -925,6 +929,7 @@
           "技カードをクリック／タップすると拡大表示。能力名に触れると説明が出る。",
           "「標準／詳細」で表示量を切り替えられる。",
           "「更新履歴」にパッチノートがある。数値調整はそこに追記される。",
+          "「チュートリアル／講座」で、流れ・ビルド・手順の考え方向けの任意ガイドを読める（強制ではない）。",
           "ブラウザの戻るで、拡大や履歴・確認などを一段ずつ閉じる（ページ自体は閉じない）。",
         ],
       },
@@ -946,6 +951,83 @@
           </section>`;
       })
       .join("");
+  }
+
+  function renderTutorialBody(chapterId) {
+    const chapters = W.TUTORIAL_CHAPTERS || [];
+    const current = (W.tutorialChapter && W.tutorialChapter(chapterId)) || chapters[0];
+    if (!current) {
+      return `<p class="muted">チュートリアルはまだありません。</p>`;
+    }
+    const nav = chapters
+      .map((ch) => {
+        const active = ch.id === current.id ? " is-active" : "";
+        return `<button type="button" class="tutorial-chip${active}" data-action="tutorial-chapter" data-chapter="${esc(
+          ch.id
+        )}" aria-current="${ch.id === current.id ? "page" : "false"}">${esc(ch.title)}</button>`;
+      })
+      .join("");
+    const sections = (current.sections || [])
+      .map((sec) => {
+        const lead = sec.lead ? `<p class="help-lead">${esc(sec.lead)}</p>` : "";
+        const items =
+          sec.items && sec.items.length
+            ? `<ul class="help-list">${sec.items.map((item) => `<li>${esc(item)}</li>`).join("")}</ul>`
+            : "";
+        const example = sec.example
+          ? `<p class="tutorial-example"><span class="tutorial-example-label">具体例</span>${esc(sec.example)}</p>`
+          : "";
+        return `
+          <section class="help-section">
+            <h3 class="help-h">${esc(sec.heading)}</h3>
+            ${lead}
+            ${items}
+            ${example}
+          </section>`;
+      })
+      .join("");
+    const idx = chapters.findIndex((ch) => ch.id === current.id);
+    const prev = idx > 0 ? chapters[idx - 1] : null;
+    const next = idx >= 0 && idx < chapters.length - 1 ? chapters[idx + 1] : null;
+    const pager = `
+      <div class="tutorial-pager">
+        ${
+          prev
+            ? `<button type="button" class="btn btn-ghost" data-action="tutorial-chapter" data-chapter="${esc(
+                prev.id
+              )}">← ${esc(prev.title)}</button>`
+            : `<span class="tutorial-pager-spacer"></span>`
+        }
+        <span class="tiny muted">${idx + 1} / ${chapters.length}</span>
+        ${
+          next
+            ? `<button type="button" class="btn btn-ghost" data-action="tutorial-chapter" data-chapter="${esc(
+                next.id
+              )}">${esc(next.title)} →</button>`
+            : `<button type="button" class="btn btn-primary" data-action="close-modal">閉じる</button>`
+        }
+      </div>`;
+    return `
+      <nav class="tutorial-nav" aria-label="チュートリアルの章">${nav}</nav>
+      <article class="tutorial-article">
+        <header class="tutorial-article-head">
+          <h3 class="tutorial-article-title">${esc(current.title)}</h3>
+          <p class="help-sub">${esc(current.blurb || "")}</p>
+        </header>
+        ${sections}
+      </article>
+      ${pager}`;
+  }
+
+  function openTutorial(chapterId) {
+    const chapters = W.TUTORIAL_CHAPTERS || [];
+    const id = chapterId || ui.tutorialChapter || (chapters[0] && chapters[0].id) || "loop";
+    ui.tutorial = true;
+    ui.tutorialChapter = id;
+    ui.help = false;
+    ui.patchNotes = false;
+    ui.offerStats = false;
+    ui.modal = null;
   }
 
   function modal() {
@@ -981,9 +1063,27 @@
             <header class="help-head">
               <h2>遊び方</h2>
               <p class="help-sub">塔を登るための要点だけ、見出しごとにまとめました。</p>
+              <p class="help-sub">
+                流れや考え方は
+                <button type="button" class="linkish" data-action="tutorial">チュートリアル</button>
+                （任意）へ。
+              </p>
             </header>
             <div class="help-scroll">${renderHelpBody()}</div>
             <button type="button" class="btn btn-primary" data-action="close-modal">閉じる</button>
+          </div>
+        </div>`;
+    }
+    if (ui.tutorial) {
+      return `
+        <div class="modal" role="dialog" aria-modal="true" aria-label="チュートリアル">
+          <div class="modal-card modal-card-wide help-card tutorial-card">
+            <header class="help-head">
+              <h2>チュートリアル</h2>
+              <p class="help-sub">強制ではありません。読みたい章だけ開いて、いつでも閉じられます。</p>
+            </header>
+            <div class="help-scroll tutorial-scroll">${renderTutorialBody(ui.tutorialChapter)}</div>
+            <button type="button" class="btn btn-ghost" data-action="close-modal">閉じる</button>
           </div>
         </div>`;
     }
@@ -1030,6 +1130,7 @@
     ui.modal = null;
     ui.help = false;
     ui.patchNotes = false;
+    ui.tutorial = false;
     ui.offerStats = false;
   }
 
@@ -1068,7 +1169,7 @@
       closeCardZoom(true);
       return true;
     }
-    if (ui.modal || ui.help || ui.patchNotes || ui.offerStats) {
+    if (ui.modal || ui.help || ui.patchNotes || ui.tutorial || ui.offerStats) {
       closeOverlays();
       if (W.sfx) W.sfx.ui();
       render();
@@ -1290,6 +1391,7 @@
         ui.modal = "restart";
         ui.help = false;
         ui.patchNotes = false;
+        ui.tutorial = false;
         render();
         return;
       }
@@ -1302,14 +1404,31 @@
         if (W.sfx) W.sfx.ui();
         ui.help = true;
         ui.patchNotes = false;
+        ui.tutorial = false;
         ui.modal = null;
         render();
+        return;
+      }
+      if (action === "tutorial") {
+        if (W.sfx) W.sfx.ui();
+        openTutorial(ui.tutorialChapter || "loop");
+        render();
+        return;
+      }
+      if (action === "tutorial-chapter") {
+        if (W.sfx) W.sfx.ui();
+        const chapter = button.getAttribute("data-chapter");
+        openTutorial(chapter || "loop");
+        render();
+        const scroll = document.querySelector(".tutorial-scroll");
+        if (scroll) scroll.scrollTop = 0;
         return;
       }
       if (action === "patch-notes") {
         if (W.sfx) W.sfx.ui();
         ui.patchNotes = true;
         ui.help = false;
+        ui.tutorial = false;
         ui.modal = null;
         render();
         return;
@@ -1325,6 +1444,7 @@
         ui.offerStats = true;
         ui.help = false;
         ui.patchNotes = false;
+        ui.tutorial = false;
         ui.modal = null;
         render();
         return;
@@ -1462,6 +1582,7 @@
         ui.modal = "giveup";
         ui.help = false;
         ui.patchNotes = false;
+        ui.tutorial = false;
         render();
         return;
       }
@@ -1598,7 +1719,7 @@
       closeCardZoom(true);
       return;
     }
-    if (!ui.modal && !ui.help && !ui.patchNotes && !ui.offerStats) return;
+    if (!ui.modal && !ui.help && !ui.patchNotes && !ui.tutorial && !ui.offerStats) return;
     closeOverlays();
     if (W.sfx) W.sfx.ui();
     render();

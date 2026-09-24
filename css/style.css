@@ -956,6 +956,95 @@ select {
   box-shadow: 0 0 0 2px rgba(228, 192, 122, 0.2);
 }
 
+.linkish {
+  appearance: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  color: var(--gold);
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.tutorial-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 10px;
+}
+.tutorial-chip {
+  appearance: none;
+  border: 1px solid rgba(109, 87, 56, 0.7);
+  border-radius: 999px;
+  background: rgba(255, 244, 220, 0.04);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.82em;
+  font-weight: 700;
+  padding: 6px 10px;
+  min-height: 36px;
+  cursor: pointer;
+}
+.tutorial-chip.is-active {
+  background: var(--gold-deep);
+  color: var(--ink);
+  border-color: var(--gold);
+}
+.tutorial-article-head {
+  margin-bottom: 4px;
+}
+.tutorial-article-title {
+  margin: 0 0 4px;
+  font-size: 1.15em;
+  font-weight: 800;
+  color: var(--text);
+}
+.tutorial-example {
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px dashed rgba(212, 175, 106, 0.45);
+  background: rgba(228, 192, 122, 0.08);
+  font-size: 0.9em;
+  line-height: 1.45;
+  color: var(--text);
+}
+.tutorial-example-label {
+  display: inline-block;
+  margin-right: 8px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--gold-deep);
+  color: var(--ink);
+  font-size: 0.78em;
+  font-weight: 800;
+  vertical-align: 1px;
+}
+.tutorial-pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(228, 192, 122, 0.18);
+}
+.tutorial-pager .btn {
+  min-height: 40px;
+}
+.tutorial-pager-spacer {
+  display: inline-block;
+  min-width: 4em;
+}
+.tutorial-card > .btn-ghost {
+  flex-shrink: 0;
+}
+
 .title-actions .tiny { opacity: 0.75; }
 
 .sr {
@@ -1683,6 +1772,17 @@ select {
   .help-list li {
     padding: 10px 12px 10px 30px;
     font-size: 0.95em;
+  }
+  .tutorial-chip {
+    min-height: 40px;
+    font-size: 0.84em;
+  }
+  .tutorial-pager {
+    gap: 10px;
+  }
+  .tutorial-pager .btn {
+    flex: 1 1 auto;
+    min-width: 0;
   }
 }
 
