@@ -452,7 +452,9 @@
 
     function log(text, kind) {
       let line = text;
-      if (amped && kind === "attack") {
+      // 集中などの「が乗り」表示は、本体の攻撃ログ（hold外）にだけ付ける。
+      // hold中のパッシブ／療刃などの attack ログに先に乗ると、見た目も消費先も狂う。
+      if (amped && kind === "attack" && logHold === 0) {
         const label = `${amped}が乗り、`;
         line = text.includes("〕") ? text.replace("〕", `〕${label}`) : `${label}${text}`;
         amped = null;
@@ -680,15 +682,18 @@
 
     function applyHit(context, attacker, defender, mult, opts) {
       return withLogHold(() => {
-      const amp = opts.amp === false ? null : attacker.effects.find((effect) => effect.kind === "skillAmp");
-      const crescendo = opts.amp === false ? null : attacker.effects.find((effect) => effect.kind === "crescendo");
+      // パッシブ反応や追撃では集中／階調／溢光を消費・乗算しない
+      const inPassive = !!(opts.fromPassive || (ctx._passiveDepth || 0) > 0);
+      const allowAmp = opts.amp !== false && !inPassive;
+      const amp = allowAmp ? attacker.effects.find((effect) => effect.kind === "skillAmp") : null;
+      const crescendo = allowAmp ? attacker.effects.find((effect) => effect.kind === "crescendo") : null;
       let power = mult;
       if (amp) power *= 1 + amp.value;
       if (crescendo && crescendo.charges > 0) {
         power *= 1 + crescendo.charges * (crescendo.perCharge || 0);
       }
       let dealt = rawDamage(attacker, defender, power, opts.ignore || 0);
-      const glow = opts.amp === false ? null : attacker.effects.find((effect) => effect.kind === "overglow");
+      const glow = allowAmp ? attacker.effects.find((effect) => effect.kind === "overglow") : null;
       if (glow && glow.value > 0) {
         dealt += Math.floor(glow.value);
         attacker.effects = attacker.effects.filter((effect) => effect !== glow);
@@ -756,7 +761,7 @@
           amped = (skill && skill.name) || "構え";
         }
       }
-      if (crescendo && crescendo.charges > 0 && opts.amp !== false) {
+      if (crescendo && crescendo.charges > 0 && allowAmp) {
         crescendo.charges = 0;
         if (attacker === player) {
           amped = amped ? `${amped}／階調` : "階調";
