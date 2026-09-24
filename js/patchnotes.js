@@ -17,6 +17,20 @@
   /** @type {{ version: string, date: string, title: string, sections: { heading: string, items: string[] }[] }[]} */
   const PATCH_NOTES = [
     {
+      version: "0.5.27",
+      date: "2026-09-24",
+      title: "遊び方を見出し付きで読みやすく",
+      sections: [
+        {
+          heading: "表示",
+          items: [
+            "遊び方を長い箇条書きから、目的・技・手順・戦闘・比較・敵・操作の見出し付きセクションに再構成。",
+            "要点をリード文、詳細をカード型の項目にし、スクロールしやすい広いモーダルに変更。",
+          ],
+        },
+      ],
+    },
+    {
       version: "0.5.26",
       date: "2026-09-24",
       title: "持続・遅延ダメージは付与時の攻撃を参照",
