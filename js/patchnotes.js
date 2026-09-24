@@ -17,6 +17,20 @@
   /** @type {{ version: string, date: string, title: string, sections: { heading: string, items: string[] }[] }[]} */
   const PATCH_NOTES = [
     {
+      version: "0.5.42",
+      date: "2026-09-24",
+      title: "集中などがパッシブ反応に乗ってしまう問題を修正",
+      sections: [
+        {
+          heading: "バグ修正",
+          items: [
+            "集中・錬鋭・階調などの「が乗り」表示が、本体攻撃より先にパッシブ／療刃などの反応ログへ付くことがあった問題を修正。本体の攻撃ログにだけ乗る。",
+            "パッシブ追撃が集中／階調／溢光を消費・乗算しないよう、パッシブ深度からのダメージを防護した。",
+          ],
+        },
+      ],
+    },
+    {
       version: "0.5.41",
       date: "2026-09-24",
       title: "所持系統に応じて候補の出やすさがわずかに偏る",
