@@ -17,6 +17,20 @@
   /** @type {{ version: string, date: string, title: string, sections: { heading: string, items: string[] }[] }[]} */
   const PATCH_NOTES = [
     {
+      version: "0.5.31",
+      date: "2026-09-24",
+      title: "開幕は候補に加え一覧から任意の技を選べる",
+      sections: [
+        {
+          heading: "技の獲得",
+          items: [
+            "最初の1個目（入れ替え無料・無制限のあいだ）は、従来の5枚候補と無料入れ替えに加え、全技一覧から任意の1つを直接獲得できる。",
+            "一覧はグループ絞り込みと名前・説明の検索に対応。2個目以降は従来どおり候補からのみ。",
+          ],
+        },
+      ],
+    },
+    {
       version: "0.5.30",
       date: "2026-09-24",
       title: "新技で総数100、手順操作のスクロール維持",

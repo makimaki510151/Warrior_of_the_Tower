@@ -18,6 +18,9 @@
     pinnedStat: null,
     dragSkill: null,
     suppressCardClick: false,
+    /** 開幕の全技一覧フィルタ（"all" またはグループ名） */
+    offerCatalogGroup: "all",
+    offerCatalogQuery: "",
   };
 
   let app = null;
@@ -368,6 +371,89 @@
     `;
   }
 
+  function offerCatalogRows(state) {
+    const group = ui.offerCatalogGroup || "all";
+    const q = String(ui.offerCatalogQuery || "")
+      .trim()
+      .toLowerCase();
+    const rows = W.SKILLS.filter((skill) => {
+      if (group !== "all" && skill.group !== group) return false;
+      if (!q) return true;
+      const hay = `${skill.name} ${skill.blurb} ${skill.group} ${skill.id}`.toLowerCase();
+      return hay.includes(q);
+    });
+    if (!rows.length) {
+      return `<p class="tiny offer-catalog-empty">該当する技がありません。</p>`;
+    }
+    return rows
+      .map((skill) => {
+        const g = groupStyle(skill);
+        return `
+          <article
+            class="offer-catalog-row is-interactive group-${esc(g.slug)}"
+            data-card-kind="offer"
+            data-card-id="${esc(skill.id)}"
+            data-group="${esc(skill.group || "")}"
+            role="button"
+            tabindex="0"
+            aria-label="${esc(g.tag)} ${esc(skill.name)}の詳細を開く"
+          >
+            <div class="offer-catalog-main">
+              <div class="offer-catalog-title">
+                ${skillGroupTag(skill)}
+                <strong>${esc(skill.name)}</strong>
+                <span class="tiny">${esc(W.cooldownShort(skill.cooldown))}</span>
+              </div>
+              <p class="offer-catalog-blurb">${esc(skill.blurb)}</p>
+            </div>
+            <button type="button" class="btn btn-primary btn-compact" data-action="pick" data-skill="${esc(skill.id)}">獲得</button>
+          </article>
+        `;
+      })
+      .join("");
+  }
+
+  function offerCatalog(state) {
+    const groups = ["all", ...(W.SKILL_GROUPS || [])];
+    const labels = { all: "すべて", 攻撃: "攻撃", 崩し: "弱体", 守り: "守り", 回復: "回復", 補助: "強化" };
+    return `
+      <section class="offer-catalog" aria-label="全技から選ぶ">
+        <div class="offer-catalog-head">
+          <h2 class="offer-catalog-heading">または一覧から選ぶ</h2>
+          <p class="tiny offer-catalog-lead">最初の1個だけ、全${W.SKILLS.length}種から直接選べます。上の候補カードや無料の入れ替えもそのまま使えます。</p>
+        </div>
+        <div class="offer-catalog-tools">
+          <div class="offer-catalog-groups" role="tablist" aria-label="グループ">
+            ${groups
+              .map((g) => {
+                const active = (ui.offerCatalogGroup || "all") === g;
+                return `<button type="button" class="btn btn-ghost btn-compact offer-catalog-group${
+                  active ? " is-active" : ""
+                }" data-action="offer-catalog-group" data-group="${esc(g)}" role="tab" aria-selected="${
+                  active ? "true" : "false"
+                }">${esc(labels[g] || g)}</button>`;
+              })
+              .join("")}
+          </div>
+          <label class="offer-catalog-search">
+            <span class="sr">技を検索</span>
+            <input
+              type="search"
+              data-bind="offer-catalog-q"
+              data-offer-catalog-q
+              placeholder="名前・説明で絞る"
+              value="${esc(ui.offerCatalogQuery || "")}"
+              autocomplete="off"
+            />
+          </label>
+        </div>
+        <div class="offer-catalog-list" data-offer-catalog-list>
+          ${offerCatalogRows(state)}
+        </div>
+      </section>
+    `;
+  }
+
   function ownedSkillCard(id, state) {
     const skill = W.SKILL_BY_ID[id];
     if (!skill) return "";
@@ -463,7 +549,9 @@
     const ownedCount = Object.keys(state.skills).filter((id) => state.skills[id] > 0).length;
     return shell(
       `
-      <p class="hint offer-hint">技を1つ選ぶ（${W.SKILLS.length}種から${offer.length}） · いま${ui.detail ? "詳細" : "標準"}表示 · カードを開いて確認</p>
+      <p class="hint offer-hint">技を1つ選ぶ（${W.SKILLS.length}種から${offer.length}） · いま${ui.detail ? "詳細" : "標準"}表示 · カードを開いて確認${
+        freeReroll ? " · 下の一覧からも選べます" : ""
+      }</p>
       <div class="offer-self">
         <div class="offer-self-stats" aria-label="いまの能力（要約）">
           <span><b>体力</b>${intNum(stats.maxHp)}</span>
@@ -485,11 +573,12 @@
       <div class="offer-grid">
         ${offer.map((id) => offerCard(id, state)).join("")}
       </div>
+      ${freeReroll ? offerCatalog(state) : ""}
     `,
       `<footer class="foot foot-offer">
         <span class="tiny foot-note">${
           freeReroll
-            ? "最初の獲得は入れ替え無料・回数無制限"
+            ? "最初の獲得は入れ替え無料・一覧からも直接選べる"
             : `リロール ${points}（クリアで+1）`
         }</span>
         <button type="button" class="btn btn-ghost" data-action="reroll" ${canReroll ? "" : "disabled"}>
@@ -885,7 +974,7 @@
         items: [
           "同じ技を重ねると効果は伸びる。",
           `付随ステータスは1枚目が満額。2枚目以降は基礎gainの約${stackPct}%だけ追加（例: +6なら2枚で約+7.8）。`,
-          "最初の1枚を取るまでは、候補の入れ替えが無料で何度でもできる。",
+          "最初の1枚を取るまでは、候補の入れ替えが無料で何度でもできる。あわせて下の一覧から任意の技を1つ直接選べる。",
           "2枚目以降の入れ替えはリロールポイントを1消費。階層クリアごとに+1（上限なし）。",
           "候補画面の「能力を見る」で、いまのステータスを確認できる。",
         ],
@@ -1128,6 +1217,9 @@
       panes,
       help: document.querySelector(".help-scroll") ? document.querySelector(".help-scroll").scrollTop : null,
       patch: document.querySelector(".patch-scroll") ? document.querySelector(".patch-scroll").scrollTop : null,
+      catalog: document.querySelector("[data-offer-catalog-list]")
+        ? document.querySelector("[data-offer-catalog-list]").scrollTop
+        : null,
     };
   }
 
@@ -1150,6 +1242,10 @@
       if (snap.patch != null) {
         const patch = document.querySelector(".patch-scroll");
         if (patch) patch.scrollTop = snap.patch;
+      }
+      if (snap.catalog != null) {
+        const catalog = document.querySelector("[data-offer-catalog-list]");
+        if (catalog) catalog.scrollTop = snap.catalog;
       }
       if (typeof window !== "undefined" && snap.windowY != null) {
         window.scrollTo(0, snap.windowY);
@@ -1275,6 +1371,8 @@
     W.newRun();
     ui.hasSave = true;
     ui.screen = "offer";
+    ui.offerCatalogGroup = "all";
+    ui.offerCatalogQuery = "";
     closeOverlays();
     ui.battle = null;
     render();
@@ -1534,6 +1632,13 @@
         }
         return;
       }
+      if (action === "offer-catalog-group") {
+        if (W.sfx) W.sfx.ui();
+        const group = button.getAttribute("data-group") || "all";
+        ui.offerCatalogGroup = group;
+        render();
+        return;
+      }
       if (action === "add-node") {
         if (W.sfx) W.sfx.ui();
         const select = document.querySelector("[data-new-skill]");
@@ -1765,6 +1870,25 @@
     }
   }
 
+  function onInput(event) {
+    const el = event.target;
+    if (el && el.dataset && el.dataset.bind === "offer-catalog-q") {
+      const start = el.selectionStart;
+      const end = el.selectionEnd;
+      ui.offerCatalogQuery = el.value || "";
+      render();
+      const next = document.querySelector("[data-offer-catalog-q]");
+      if (next) {
+        next.focus();
+        try {
+          if (typeof start === "number") next.setSelectionRange(start, end);
+        } catch (err) {
+          /* ignore */
+        }
+      }
+    }
+  }
+
   function onKey(event) {
     if (event.key !== "Escape") return;
     if (ui.expandedCard) {
@@ -1801,6 +1925,7 @@
       app.addEventListener("click", onClick);
       app.addEventListener("click", onBackdrop);
       app.addEventListener("change", onChange);
+      app.addEventListener("input", onInput);
       app.addEventListener("pointerover", onPointerOver);
       app.addEventListener("dragstart", onDragStart);
       app.addEventListener("dragend", onDragEnd);

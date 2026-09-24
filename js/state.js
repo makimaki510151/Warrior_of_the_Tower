@@ -165,8 +165,10 @@
   }
 
   function pickSkill(id) {
-    if (!state.pendingPick || !state.offer || !state.offer.includes(id)) return false;
+    if (!state.pendingPick || state.clearedTower) return false;
     if (!W.SKILL_BY_ID[id]) return false;
+    // 開幕（無限リロール中）は候補外の技も直接獲得できる
+    if (!isOpeningPick() && (!state.offer || !state.offer.includes(id))) return false;
     state.skills[id] = (state.skills[id] || 0) + 1;
     state.offer = null;
     state.pendingPick = false;
