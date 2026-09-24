@@ -1537,8 +1537,10 @@
     if (snap) restoreScroll(snap);
   }
 
-  function closeOverlays() {
-    if (ui.modal === "spec-notice") return;
+  /** @param {{ force?: boolean }} [opts] force で仕様周知モーダルも閉じる（了解ボタン用） */
+  function closeOverlays(opts) {
+    // 仕様周知は誤って Esc／戻る／背景タップで閉じない。了解操作だけ force で閉じる。
+    if (ui.modal === "spec-notice" && !(opts && opts.force)) return;
     ui.modal = null;
     ui.help = false;
     ui.patchNotes = false;
@@ -2061,7 +2063,7 @@
         if (W.sfx) W.sfx.ui();
         if (W.ackSpecNotice) W.ackSpecNotice();
         ui.hasSave = true;
-        closeOverlays();
+        closeOverlays({ force: true });
         ui.battle = null;
         ui.screen = "offer";
         render();

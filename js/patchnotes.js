@@ -17,6 +17,19 @@
   /** @type {{ version: string, date: string, title: string, sections: { heading: string, items: string[] }[] }[]} */
   const PATCH_NOTES = [
     {
+      version: "0.6.2",
+      date: "2026-09-24",
+      title: "仕様周知モーダルが閉じない不具合を修正",
+      sections: [
+        {
+          heading: "修正",
+          items: [
+            "旧セーブ読み込み時の「了解して始める」を押しても小ウィンドウが残る不具合を修正。",
+          ],
+        },
+      ],
+    },
+    {
       version: "0.6.1",
       date: "2026-09-24",
       title: "クリア後の敵強化を任意選択に",
