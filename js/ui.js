@@ -21,6 +21,8 @@
   let app = null;
   let timer = 0;
   let logFollow = true;
+  let historyArmed = false;
+  let historyQuiet = false;
 
   const STAT_ROWS_CORE = [
     ["maxHp", "体力", "plain"],
@@ -912,6 +914,7 @@
               <li>残響・階調・血契・返礼・共鳴・時縫い・終焔・虚盾・溢光・無限廊など、ビルドを変える癖の強い技もある。</li>
               <li>標準／詳細で表示量を切り替えられる。</li>
               <li>「更新履歴」にパッチノートがある。数値調整はそこに追記される。</li>
+              <li>ブラウザの戻るで、カード拡大や履歴・確認ダイアログなどを一段ずつ閉じる（ページ自体は閉じない）。</li>
               <li>敗北時は手順の組み直しか諦め。</li>
             </ul>
             <button type="button" class="btn btn-primary" data-action="close-modal">閉じる</button>
@@ -962,6 +965,91 @@
     ui.help = false;
     ui.patchNotes = false;
     ui.offerStats = false;
+  }
+
+  /** ブラウザ履歴を1段足し、戻る操作をアプリ内で受け取る */
+  function armHistoryTrap() {
+    if (typeof history === "undefined" || !history.pushState) return;
+    historyQuiet = true;
+    try {
+      if (!history.state || !history.state.wot) {
+        history.replaceState({ wot: true, root: true }, "", location.href);
+      }
+      history.pushState({ wot: true, t: Date.now() }, "", location.href);
+      historyArmed = true;
+    } catch (err) {
+      historyArmed = false;
+    }
+    historyQuiet = false;
+  }
+
+  function goTitleScreen() {
+    stopPlayback();
+    ui.battle = null;
+    closeOverlays();
+    ui.expandedCard = null;
+    ui.screen = "title";
+    ui.hasSave = W.hasSave ? W.hasSave() : ui.hasSave;
+    render();
+  }
+
+  /**
+   * 戻るキー／ジェスチャ1回分。上から順に UI を閉じる。
+   * @returns {boolean} 何かしらの UI を戻したら true
+   */
+  function undoUiStep() {
+    if (ui.expandedCard) {
+      closeCardZoom(true);
+      return true;
+    }
+    if (ui.modal || ui.help || ui.patchNotes || ui.offerStats) {
+      closeOverlays();
+      if (W.sfx) W.sfx.ui();
+      render();
+      return true;
+    }
+    if (ui.screen === "prep" && ui.prepTab && ui.prepTab !== "flow") {
+      ui.prepTab = "flow";
+      if (W.sfx) W.sfx.ui();
+      render();
+      return true;
+    }
+    if (ui.screen === "battle" && ui.battle) {
+      if (ui.battle.phase === "playing") {
+        // 再生中の戻る → 結果へ（セーブは戦闘開始時に確定済み）
+        stopPlayback();
+        ui.battle.index = ui.battle.events.length;
+        ui.battle.phase = "done";
+        if (W.sfx) {
+          if (ui.battle.winner === "player") W.sfx.win();
+          else W.sfx.lose();
+        }
+        if (W.sfx) W.sfx.ui();
+        render();
+        return true;
+      }
+      // 結果画面の戻る → 手順へ（敗北の「組み直す」と同じ）
+      stopPlayback();
+      ui.battle = null;
+      ui.screen = "prep";
+      if (W.sfx) W.sfx.ui();
+      render();
+      return true;
+    }
+    if (ui.screen === "offer" || ui.screen === "prep" || ui.screen === "clear") {
+      goTitleScreen();
+      if (W.sfx) W.sfx.ui();
+      return true;
+    }
+    // タイトルでは何もしない（サイトを閉じない）
+    return false;
+  }
+
+  function onPopState() {
+    if (historyQuiet) return;
+    // すぐ再アームして、連続の戻るでもページ外へ出ない
+    armHistoryTrap();
+    undoUiStep();
   }
 
   function beginRun() {
@@ -1481,6 +1569,12 @@
       app.addEventListener("dragleave", onDragLeave);
       app.addEventListener("drop", onDrop);
       document.addEventListener("keydown", onKey);
+      window.addEventListener("popstate", onPopState);
+      armHistoryTrap();
+      // bfcache 復帰時もトラップを張り直す
+      window.addEventListener("pageshow", (event) => {
+        if (event.persisted) armHistoryTrap();
+      });
     },
     render,
   };

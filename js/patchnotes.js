@@ -17,6 +17,21 @@
   /** @type {{ version: string, date: string, title: string, sections: { heading: string, items: string[] }[] }[]} */
   const PATCH_NOTES = [
     {
+      version: "0.5.25",
+      date: "2026-09-24",
+      title: "ブラウザの戻るでUIだけ戻す",
+      sections: [
+        {
+          heading: "操作",
+          items: [
+            "ブラウザの戻る（スワイプ戻る含む）でページを閉じず、アプリ内のUIを一段ずつ戻す。",
+            "優先順: カード拡大 → 履歴／遊び方／確認ダイアログ → 準備タブ → 戦闘（再生中は結果へ／結果は手順へ） → 候補・準備・頂はタイトルへ。",
+            "タイトル画面では戻ってもサイトを離れない。",
+          ],
+        },
+      ],
+    },
+    {
       version: "0.5.24",
       date: "2026-09-24",
       title: "崩し技から弱い攻撃を外し、弱体に特化",
