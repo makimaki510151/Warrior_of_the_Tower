@@ -1,7 +1,7 @@
 (function (root) {
   const W = root.Wot || (root.Wot = {});
 
-  const MAX_ACTIONS = 220;
+  const MAX_ACTIONS = 300;
 
   /**
    * 比較の言葉と判定の対応（ゲーム全体で統一）
@@ -1447,14 +1447,11 @@
       winner = "enemy";
       reason = "kill";
     } else {
-      const playerRate = player.hp / player.maxHp;
-      const enemyRate = enemy.hp / enemy.maxHp;
-      winner = playerRate > enemyRate ? "player" : "enemy";
+      // お互いの手番合計が上限に達しても決着しない場合はプレイヤー敗北
+      winner = "enemy";
       reason = "timeout";
       log(
-        winner === "player"
-          ? "長い戦いの末、相手の体力の割合が先に尽きた。"
-          : "長い戦いの末、こちらの体力の割合が先に尽きた。",
+        `お互い合わせて${MAX_ACTIONS}手番を超えても決着がつかず、力尽きた。`,
         "system"
       );
     }
