@@ -628,7 +628,7 @@
       tradeoff: "戦闘中に一度きり。余裕がある戦いでは眠る。",
       passive: true,
       cooldown: 0,
-      gain: gain({ maxHp: 8, def: 4, defEff: 0.02 }),
+      gain: gain({ maxHp: 12, def: 6, defEff: 0.04 }),
       describe(level, stats) {
         return [
           "戦闘中、体力が最大の50%未満へ落ちた最初の瞬間に一度だけ発動する。",
@@ -713,7 +713,7 @@
       tradeoff: "即時の大きな回復はない。自動回復量が低いと薄い。",
       passive: true,
       cooldown: 0,
-      gain: gain({ maxHp: 5, regenAmount: 2, healEff: 0.01 }),
+      gain: gain({ maxHp: 9, regenAmount: 3, healEff: 0.025 }),
       describe(level, stats) {
         const mult = scaled(1.4, 0.15, level);
         const next = scaled(1.4, 0.15, level + 1);
@@ -865,7 +865,7 @@
       tradeoff: "追撃は軽い。技のあとは乗らない。",
       passive: true,
       cooldown: 0,
-      gain: gain({ maxHp: 1, atk: 1, speed: 6 }),
+      gain: gain({ maxHp: 3, atk: 2, speed: 9 }),
       describe(level, stats) {
         return [
           "通常攻撃のあと、追撃が1回入る。",
@@ -945,7 +945,7 @@
       tradeoff: "単発の回復技より弱い。通らない相手では戻らない。",
       passive: true,
       cooldown: 0,
-      gain: gain({ maxHp: 4, atk: 1, healEff: 0.015 }),
+      gain: gain({ maxHp: 7, atk: 2, healEff: 0.03 }),
       describe(level, stats) {
         const ratio = scaled(0.12, 0.01, level);
         const next = scaled(0.12, 0.01, level + 1);
@@ -1157,7 +1157,7 @@
       tradeoff: "再生しない相手にはほぼ効かない。",
       passive: true,
       cooldown: 0,
-      gain: gain({ maxHp: 3, atk: 1, regenAmount: 1 }),
+      gain: gain({ maxHp: 6, atk: 2, regenAmount: 2 }),
       describe(level) {
         const turns = Math.max(1, Math.floor(scaled(1, 0.35, level)));
         const next = Math.max(1, Math.floor(scaled(1, 0.35, level + 1)));
@@ -1201,7 +1201,7 @@
       tradeoff: "戦闘中に印の付与は一度きり。単発では伸びない。",
       passive: true,
       cooldown: 0,
-      gain: gain({ maxHp: 2, atk: 2, speed: 2 }),
+      gain: gain({ maxHp: 4, atk: 4, speed: 3 }),
       describe(level, stats) {
         return [
           "戦闘中、攻撃グループの技で初めて命中したとき、敵に印を刻む。",
@@ -1284,7 +1284,7 @@
       tradeoff: "毎回は返らない。軽減そのものはない。",
       passive: true,
       cooldown: 0,
-      gain: gain({ maxHp: 4, def: 3, speed: 1 }),
+      gain: gain({ maxHp: 7, def: 5, speed: 2 }),
       describe(level) {
         const ratio = scaled(0.28, 0.02, level);
         const next = scaled(0.28, 0.02, level + 1);
@@ -1341,7 +1341,7 @@
       tradeoff: "戦闘中に一度きり。早めに落とされると間に合わない。",
       passive: true,
       cooldown: 0,
-      gain: gain({ maxHp: 6, healEff: 0.02 }),
+      gain: gain({ maxHp: 10, healEff: 0.035, regenAmount: 1 }),
       describe(level, stats) {
         return [
           "戦闘中、体力が最大の35%以下へ落ちた最初の瞬間に一度だけ発動する。",
@@ -1392,7 +1392,7 @@
       tradeoff: "攻撃技以外では貯まらない。通常攻撃にも乗る。",
       passive: true,
       cooldown: 0,
-      gain: gain({ maxHp: 2, atk: 2, atkEff: 0.03 }),
+      gain: gain({ maxHp: 4, atk: 4, atkEff: 0.05 }),
       describe(level, stats) {
         return [
           "攻撃グループの技を使ったあと、次に出す攻撃技の威力上乗せが乗る（通常攻撃では消費しない）。",
@@ -1969,7 +1969,7 @@
       tradeoff: "差が開くと追撃は出ない。",
       passive: true,
       cooldown: 0,
-      gain: gain({ maxHp: 3, atk: 2, atkEff: 0.02, speed: 1 }),
+      gain: gain({ maxHp: 5, atk: 4, atkEff: 0.035, speed: 2 }),
       describe(level, stats) {
         return [
           "自分と敵の体力割合の差が18%以内のとき、命中のあとに追撃が入る。",
@@ -2442,7 +2442,7 @@
       tradeoff: "敵が攻撃バフを張らないと発動しない。",
       passive: true,
       cooldown: 0,
-      gain: gain({ maxHp: 3, atk: 1, def: 2 }),
+      gain: gain({ maxHp: 5, atk: 2, def: 4 }),
       describe(level) {
         return [
           "敵が攻撃力上昇（割合）を得たとき、攻撃力補助効率を下げる弱体を付与する。",
@@ -2490,7 +2490,7 @@
       tradeoff: "敵が防御バフを張らないと発動しない。",
       passive: true,
       cooldown: 0,
-      gain: gain({ maxHp: 3, atk: 1, def: 3 }),
+      gain: gain({ maxHp: 5, atk: 2, def: 5 }),
       describe(level) {
         return [
           "敵が防御力上昇（割合）を得たとき、防御力補助効率を下げる弱体を付与する。",
@@ -2538,7 +2538,7 @@
       tradeoff: "再生しない相手には発動しない。",
       passive: true,
       cooldown: 0,
-      gain: gain({ maxHp: 4, atk: 1, regenAmount: 1 }),
+      gain: gain({ maxHp: 7, atk: 2, regenAmount: 2 }),
       describe(level) {
         const down = scaled(0.22, 0.025, level);
         const next = scaled(0.22, 0.025, level + 1);
@@ -2616,7 +2616,7 @@
       tradeoff: "再発動まで自分の行動2回を空ける。",
       passive: true,
       cooldown: 0,
-      gain: gain({ maxHp: 5, def: 2, dmgReduction: 0.01 }),
+      gain: gain({ maxHp: 8, def: 4, dmgReduction: 0.015 }),
       describe(level) {
         const now = scaled(0.14, 0.015, level);
         const next = scaled(0.14, 0.015, level + 1);
@@ -2732,7 +2732,7 @@
       tradeoff: "弱体がないと沈黙する。浄化と両立しにくい。",
       passive: true,
       cooldown: 0,
-      gain: gain({ maxHp: 3, atk: 2, def: 1, atkEff: 0.02 }),
+      gain: gain({ maxHp: 5, atk: 4, def: 2, atkEff: 0.035 }),
       describe(level, stats) {
         return [
           "自分が弱体中の攻撃命中で、短い追撃が入る。",
@@ -2827,7 +2827,7 @@
       tradeoff: "敵より遅いと発動しない。",
       passive: true,
       cooldown: 0,
-      gain: gain({ maxHp: 2, atk: 2, speed: 5, atkEff: 0.02 }),
+      gain: gain({ maxHp: 4, atk: 3, atkEff: 0.035, speed: 8 }),
       describe(level, stats) {
         const bonus = scaled(0.1, 0.012, level);
         const next = scaled(0.1, 0.012, level + 1);
@@ -2865,7 +2865,7 @@
       tradeoff: "守りを張らないビルドでは沈黙する。",
       passive: true,
       cooldown: 0,
-      gain: gain({ maxHp: 4, def: 2, defEff: 0.04 }),
+      gain: gain({ maxHp: 7, def: 4, defEff: 0.06 }),
       describe(level) {
         const now = scaled(0.22, 0.03, level);
         const next = scaled(0.22, 0.03, level + 1);
@@ -2928,7 +2928,7 @@
       tradeoff: "構えがない相手には発動しない。",
       passive: true,
       cooldown: 0,
-      gain: gain({ maxHp: 2, atk: 3, def: 1, dmgBonus: 0.008 }),
+      gain: gain({ maxHp: 4, atk: 5, def: 2, dmgBonus: 0.012 }),
       describe(level, stats) {
         return [
           "攻撃命中時、敵に反射または吸収があればそれを外し、追撃する。",
@@ -2986,7 +2986,7 @@
       tradeoff: "回復しないと光も出ない。",
       passive: true,
       cooldown: 0,
-      gain: gain({ maxHp: 5, def: 2, healEff: 0.02, regenAmount: 1 }),
+      gain: gain({ maxHp: 8, def: 3, regenAmount: 2, healEff: 0.03 }),
       describe(level) {
         const rate = scaled(0.2, 0.025, level);
         const next = scaled(0.2, 0.025, level + 1);
@@ -3036,7 +3036,7 @@
       tradeoff: "強化がない相手には発動しない。再発動まで自分の行動2回。",
       passive: true,
       cooldown: 0,
-      gain: gain({ maxHp: 3, atk: 2, def: 1, atkEff: 0.02, speed: 1 }),
+      gain: gain({ maxHp: 5, atk: 3, def: 2, atkEff: 0.035, speed: 2 }),
       describe(level) {
         const keep = scaled(0.55, 0.04, level);
         return [
