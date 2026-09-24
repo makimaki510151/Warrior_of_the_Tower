@@ -910,14 +910,16 @@
     const eRate = Math.max(0, Math.min(100, (enemyHp / enemy.maxHp) * 100));
     const actLabel = formatActLabel(battle, latest);
 
+    const speedBtn = `<button type="button" class="btn btn-ghost" data-action="speed">${ui.speed}x</button>`;
     let foot = "";
     if (battle.phase === "done") {
       if (battle.winner === "player" && battle.cleared) {
-        foot = `<footer class="foot result win"><span>第100層突破</span><button type="button" class="btn btn-primary" data-action="to-clear">頂へ</button></footer>`;
+        foot = `<footer class="foot result win">${speedBtn}<span>第100層突破</span><button type="button" class="btn btn-primary" data-action="to-clear">頂へ</button></footer>`;
       } else if (battle.winner === "player") {
-        foot = `<footer class="foot result win"><span>第${battle.floor}層突破</span><button type="button" class="btn btn-primary" data-action="next-floor">次へ</button></footer>`;
+        foot = `<footer class="foot result win">${speedBtn}<span>第${battle.floor}層突破</span><button type="button" class="btn btn-primary" data-action="next-floor">次へ</button></footer>`;
       } else {
         foot = `<footer class="foot result lose">
+          ${speedBtn}
           <span>敗北</span>
           <button type="button" class="btn btn-primary" data-action="rebuild">手順を組み直す</button>
           <button type="button" class="btn btn-danger" data-action="give-up">諦める</button>
@@ -925,7 +927,7 @@
       }
     } else {
       foot = `<footer class="foot">
-        <button type="button" class="btn btn-ghost" data-action="speed">${ui.speed}x</button>
+        ${speedBtn}
         <button type="button" class="btn btn-primary" data-action="skip">結果へ</button>
       </footer>`;
     }
