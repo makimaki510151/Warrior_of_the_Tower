@@ -361,11 +361,7 @@
           </div>
           <span class="skill-meta">${esc(meta)}</span>
         </header>
-        <p class="skill-blurb">${esc(skill.blurb)}${
-          sourceKind === "offer" && skill.passive
-            ? `<span class="skill-passive-note"> · パッシブ（手順不要）</span>`
-            : ""
-        }</p>
+        <p class="skill-blurb">${esc(skill.blurb)}</p>
         ${bodyExtra}
       </div>
       ${
@@ -433,11 +429,8 @@
             <div class="offer-catalog-main">
               <div class="offer-catalog-title">
                 ${skillGroupTag(skill)}
-                ${skill.passive ? `<span class="skill-tag skill-tag-passive" title="パッシブ技">パッシブ</span>` : ""}
                 <strong>${esc(skill.name)}</strong>
-                <span class="tiny">${esc(skillCdShort(skill))}${
-                  skill.passive ? " · パッシブ" : ""
-                }</span>
+                <span class="tiny">${esc(skillCdShort(skill))}</span>
               </div>
               <p class="offer-catalog-blurb">${esc(skill.blurb)}</p>
             </div>
@@ -528,7 +521,6 @@
       >
         ${skillCardInner(skill, state, "owned")}
         ${inFlow ? `<p class="tiny owned-used">手順で使用中</p>` : ""}
-        ${isPassive && !inFlow ? `<p class="tiny owned-used">パッシブ（所持で発動）</p>` : ""}
         ${mobileExtra}
       </article>
     `;

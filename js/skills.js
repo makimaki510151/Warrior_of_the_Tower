@@ -184,7 +184,7 @@
   }
 
   function passiveShort() {
-    return "常時（パッシブ）";
+    return "常時";
   }
 
 
