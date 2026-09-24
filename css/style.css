@@ -1472,7 +1472,7 @@ select {
   }
   /* 入れ替え操作を優先：標準表示では詳細行を抑えめに */
   .owned-card:not(.is-detail) .skill-detail-lite,
-  .owned-card:not(.is-detail) .skill-gains {
+  .owned-card:not(.is-detail) .gains {
     display: none;
   }
   .owned-card:not(.is-detail) .skill-blurb {
