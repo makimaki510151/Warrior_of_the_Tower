@@ -680,6 +680,9 @@
       },
     };
 
+    let damageDealt = 0;
+    let damageTaken = 0;
+
     function applyHit(context, attacker, defender, mult, opts) {
       return withLogHold(() => {
       // パッシブ反応や追撃では集中／階調／溢光を消費・乗算しない
@@ -754,6 +757,8 @@
       const over = Math.max(0, dealt - hpBefore);
       if (dealt > 0) defender.tookHit = true;
       if (dealt > 0 && defender === player) defender.pain += dealt;
+      if (attacker === player && defender === enemy) damageDealt += dealt;
+      if (attacker === enemy && defender === player) damageTaken += dealt;
       if (amp) {
         attacker.effects = attacker.effects.filter((effect) => effect !== amp);
         if (attacker === player) {
@@ -775,7 +780,10 @@
         attacker.hp = Math.max(0, attacker.hp - back);
         const backOver = Math.max(0, back - atkBefore);
         attacker.tookHit = true;
-        if (attacker === player) attacker.pain += back;
+        if (attacker === player) {
+          attacker.pain += back;
+          damageTaken += Math.min(back, atkBefore);
+        }
         trailer = {
           text: `${attacker.name}の攻撃に対し、${back}が跳ね返った。${backOver > 0 ? `(${backOver}オーバー)` : ""}`,
           kind: "hit",
@@ -1742,6 +1750,8 @@
       playerMax: player.maxHp,
       enemyHp: enemy.hp,
       enemyMax: enemy.maxHp,
+      damageDealt,
+      damageTaken,
     };
   }
 
