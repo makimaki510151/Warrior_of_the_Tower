@@ -17,6 +17,19 @@
   /** @type {{ version: string, date: string, title: string, sections: { heading: string, items: string[] }[] }[]} */
   const PATCH_NOTES = [
     {
+      version: "0.5.38",
+      date: "2026-09-24",
+      title: "戦闘結果画面でもログ倍速を変更可能に",
+      sections: [
+        {
+          heading: "UI",
+          items: [
+            "戦闘終了後の結果フッタにもログ倍速（1x〜16x）ボタンを出し、次の戦闘に向けて倍率を変えられるようにした。",
+          ],
+        },
+      ],
+    },
+    {
       version: "0.5.37",
       date: "2026-09-24",
       title: "開幕の技選択で二重スクロールと横はみ出しを修正",
