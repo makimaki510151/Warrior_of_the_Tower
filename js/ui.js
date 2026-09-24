@@ -187,6 +187,11 @@
           </div>
           <div class="bar-right">
             ${
+              ui.screen !== "title"
+                ? `<button type="button" class="btn btn-ghost btn-compact" data-action="to-title" title="タイトル画面へ戻る">タイトル</button>`
+                : ""
+            }
+            ${
               showDetail
                 ? `<button type="button" class="btn btn-ghost btn-compact" data-action="toggle-detail" aria-pressed="${ui.detail}">${
                     ui.detail ? "標準" : "詳細"
@@ -1582,6 +1587,12 @@
       if (action === "continue") {
         if (W.sfx) W.sfx.ui();
         enterRunScreen();
+        return;
+      }
+      if (action === "to-title") {
+        if (ui.screen === "title") return;
+        if (W.sfx) W.sfx.ui();
+        goTitleScreen();
         return;
       }
       if (action === "restart") {
