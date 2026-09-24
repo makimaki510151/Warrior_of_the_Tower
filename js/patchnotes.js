@@ -17,6 +17,20 @@
   /** @type {{ version: string, date: string, title: string, sections: { heading: string, items: string[] }[] }[]} */
   const PATCH_NOTES = [
     {
+      version: "0.5.29",
+      date: "2026-09-24",
+      title: "300手番で決着しなければ敗北",
+      sections: [
+        {
+          heading: "戦闘",
+          items: [
+            "お互いの手番合計の上限を 220 → 300 に変更。",
+            "上限に達しても双方生存の場合、体力割合比較ではなくプレイヤー敗北に統一。",
+          ],
+        },
+      ],
+    },
+    {
       version: "0.5.28",
       date: "2026-09-24",
       title: "任意チュートリアルを追加",
