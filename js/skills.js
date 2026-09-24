@@ -471,7 +471,7 @@
         const ratio = scaled(0.52, 0.04, level);
         const next = scaled(0.52, 0.04, level + 1);
         return [
-          `敵に毒を回す。6行動のあいだ行動ごとに${atkMult(ratio, stats)}の毒を受ける。${growthTail(
+          `敵に毒を回す。6行動のあいだ行動ごとに、付与時の攻撃力で${atkMult(ratio, stats)}相当（発生時の防御・軽減で減衰）。${growthTail(
             `×${next.toFixed(2)}`,
             "0.04"
           )}`,
@@ -479,11 +479,12 @@
         ];
       },
       use(ctx, level) {
-        const dot = Math.max(1, Math.floor(ctx.effectiveAtk(ctx.player) * scaled(0.52, 0.04, level)));
+        const offense = ctx.snapshotOffense({ consumeAmp: false });
         ctx.addEffect(ctx.enemy, {
           id: "venom",
           kind: "dot",
-          value: dot,
+          mult: scaled(0.52, 0.04, level),
+          offense,
           turns: 6,
           negative: true,
         });
@@ -1038,7 +1039,7 @@
         const ratio = scaled(0.42, 0.025, level);
         const next = scaled(0.42, 0.025, level + 1);
         return [
-          `8行動のあいだ、行動ごとに${atkMult(ratio, stats)}の毒。${growthTail(
+          `8行動のあいだ、行動ごとに付与時の攻撃力で${atkMult(ratio, stats)}相当（発生時の防御・軽減で減衰）。${growthTail(
             `×${next.toFixed(2)}`,
             "0.025"
           )}`,
@@ -1046,11 +1047,12 @@
         ];
       },
       use(ctx, level) {
-        const dot = Math.max(1, Math.floor(ctx.effectiveAtk(ctx.player) * scaled(0.42, 0.025, level)));
+        const offense = ctx.snapshotOffense({ consumeAmp: false });
         ctx.addEffect(ctx.enemy, {
           id: "plague",
           kind: "dot",
-          value: dot,
+          mult: scaled(0.42, 0.025, level),
+          offense,
           turns: 8,
           negative: true,
         });
@@ -2156,9 +2158,9 @@
         const boom = scaled(2.35, 0.18, level);
         const delay = Math.max(2, Math.floor(scaled(3, -0.25, level)));
         return [
-          `終焔の印を付与する（即時ダメージなし）。`,
-          `敵の行動がおよそ${delay}回終わると印が弾け、${atkMult(boom, stats)}相当の爆発が起きる。`,
-          "打ち直すと爆発倍率は更新され、残り時間も振り直される。",
+          `終焔の印を付与する（即時ダメージなし）。爆発の攻撃力・与ダメ補正・集中／階調は付与時に固定される。`,
+          `敵の行動がおよそ${delay}回終わると印が弾け、付与時基準で${atkMult(boom, stats)}相当（発生時の防御・軽減で減衰）。`,
+          "打ち直すと爆発倍率と攻撃スナップは更新され、残り時間も振り直される。",
           growthTail(
             `爆発×${scaled(2.35, 0.18, level + 1).toFixed(2)}`,
             "0.18"
@@ -2168,10 +2170,12 @@
       use(ctx, level) {
         const boom = scaled(2.35, 0.18, level);
         const delay = Math.max(2, Math.floor(scaled(3, -0.25, level)));
+        const offense = ctx.snapshotOffense({ consumeAmp: true });
         ctx.addEffect(ctx.enemy, {
           id: "doommark",
           kind: "doom",
           mult: boom,
+          offense,
           stored: 0,
           value: boom,
           turns: delay,

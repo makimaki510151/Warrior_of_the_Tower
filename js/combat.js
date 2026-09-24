@@ -245,14 +245,65 @@
   }
 
   function rawDamage(attacker, defender, mult, ignore) {
-    const atk = effectiveAtk(attacker);
+    return rawDamageOffense(
+      {
+        atk: effectiveAtk(attacker),
+        dmgBonus: effectiveDmgBonus(attacker),
+      },
+      defender,
+      mult,
+      ignore
+    );
+  }
+
+  /**
+   * 攻撃側はスナップショット、防御側は現在の防御／軽減で算出する。
+   * @param {{ atk: number, dmgBonus?: number }} offense
+   */
+  function rawDamageOffense(offense, defender, mult, ignore) {
+    const atk = Math.max(1, Number(offense && offense.atk) || 1);
+    const dmgBonus = Number(offense && offense.dmgBonus) || 0;
     const ignoreRate = Math.min(0.7, Math.max(0, ignore || 0));
     const def = effectiveDef(defender) * (1 - ignoreRate);
     const pen = atk * 0.55;
     const reduction = def <= 0 ? 0 : def / (def + 65 + pen);
-    let damage = atk * (1 + effectiveDmgBonus(attacker)) * mult * (1 - reduction);
+    let damage = atk * (1 + dmgBonus) * mult * (1 - reduction);
     damage *= 1 - effectiveDr(defender);
     return Math.max(1, Math.floor(damage));
+  }
+
+  /**
+   * 技発生時点の攻撃力・与ダメ補正（と任意で集中／階調／溢光）を固定する。
+   * @param {object} unit
+   * @param {{ consumeAmp?: boolean }} [opts]
+   */
+  function captureOffense(unit, opts) {
+    const consumeAmp = !!(opts && opts.consumeAmp);
+    let powerMult = 1;
+    let flatBonus = 0;
+    if (consumeAmp) {
+      const amp = unit.effects.find((effect) => effect.kind === "skillAmp");
+      const crescendo = unit.effects.find((effect) => effect.kind === "crescendo");
+      const glow = unit.effects.find((effect) => effect.kind === "overglow");
+      if (amp) {
+        powerMult *= 1 + amp.value;
+        unit.effects = unit.effects.filter((effect) => effect !== amp);
+      }
+      if (crescendo && crescendo.charges > 0) {
+        powerMult *= 1 + crescendo.charges * (crescendo.perCharge || 0);
+        crescendo.charges = 0;
+      }
+      if (glow && glow.value > 0) {
+        flatBonus += Math.floor(glow.value);
+        unit.effects = unit.effects.filter((effect) => effect !== glow);
+      }
+    }
+    return {
+      atk: effectiveAtk(unit),
+      dmgBonus: effectiveDmgBonus(unit),
+      powerMult,
+      flatBonus,
+    };
   }
 
   function conditionMet(cond, ctx) {
@@ -373,6 +424,13 @@
       effectiveDefEff,
       effectiveHealEff,
       effectiveDr,
+      snapshotOffense(opts) {
+        return captureOffense(ctx.actor || player, opts || {});
+      },
+      /** 指定ユニット基準で攻撃スナップを取る（敵の毒など） */
+      snapshotOffenseOf(unit, opts) {
+        return captureOffense(unit, opts || {});
+      },
       damage(mult, opts) {
         return applyHit(ctx, player, enemy, mult, opts || {});
       },
@@ -577,7 +635,16 @@
       }
       let dot = 0;
       unit.effects.forEach((effect) => {
-        if (effect.kind === "dot") dot += effect.value;
+        if (effect.kind !== "dot") return;
+        if (effect.offense && effect.mult != null) {
+          const power = (effect.mult || 0) * (effect.offense.powerMult || 1);
+          const tick = rawDamageOffense(effect.offense, unit, power, effect.ignore || 0);
+          dot += tick + Math.max(0, Math.floor(effect.offense.flatBonus || 0));
+          // flatBonus は初回のみ（溢光など）
+          if (effect.offense.flatBonus) effect.offense.flatBonus = 0;
+        } else {
+          dot += effect.value || 0;
+        }
       });
       if (dot > 0) {
         const hurt = ctx.hurt(unit, dot, "dot");
@@ -589,9 +656,17 @@
     function explodeDoom(unit, effect) {
       if (!effect || effect.kind !== "doom") return;
       const source = unit === enemy ? player : enemy;
-      const mult = effect.mult || 1;
-      const bonus = Math.max(0, Math.floor(effect.stored || 0));
-      const base = rawDamage(source, unit, mult, 0);
+      const offense =
+        effect.offense ||
+        {
+          atk: effectiveAtk(source),
+          dmgBonus: effectiveDmgBonus(source),
+          powerMult: 1,
+          flatBonus: 0,
+        };
+      const mult = (effect.mult || 1) * (offense.powerMult || 1);
+      const bonus = Math.max(0, Math.floor(effect.stored || 0)) + Math.max(0, Math.floor(offense.flatBonus || 0));
+      const base = rawDamageOffense(offense, unit, mult, 0);
       const dealt = base + bonus;
       const before = unit.hp;
       unit.hp = Math.max(0, unit.hp - dealt);
@@ -717,12 +792,12 @@
       }
       if (enemy.pattern === "venom" && enemy.actionCount % 3 === 0) {
         const hit = applyHit(ctx, enemy, player, 0.55, { amp: false });
-        const dot = Math.max(1, Math.floor(effectiveAtk(enemy) * 0.24));
         ctx.actor = enemy;
         ctx.addEffect(player, {
           id: "enemy-venom",
           kind: "dot",
-          value: dot,
+          mult: 0.24,
+          offense: captureOffense(enemy, { consumeAmp: false }),
           turns: 4,
           negative: true,
         });
@@ -867,12 +942,12 @@
       }
       if (enemy.pattern === "plaguebearer" && enemy.actionCount % 2 === 0) {
         const hit = applyHit(ctx, enemy, player, 0.5, { amp: false });
-        const dot = Math.max(1, Math.floor(effectiveAtk(enemy) * 0.34));
         ctx.actor = enemy;
         ctx.addEffect(player, {
           id: "enemy-plague",
           kind: "dot",
-          value: dot,
+          mult: 0.34,
+          offense: captureOffense(enemy, { consumeAmp: false }),
           turns: 5,
           negative: true,
         });
@@ -1073,12 +1148,12 @@
         }
         if (phase === 1) {
           const hit = applyHit(ctx, enemy, player, 0.95, { amp: false });
-          const dot = Math.max(1, Math.floor(effectiveAtk(enemy) * 0.18));
           ctx.actor = enemy;
           ctx.addEffect(player, {
             id: "ironthorn-dot",
             kind: "dot",
-            value: dot,
+            mult: 0.18,
+            offense: captureOffense(enemy, { consumeAmp: false }),
             turns: 3,
             negative: true,
           });

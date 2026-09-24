@@ -17,6 +17,28 @@
   /** @type {{ version: string, date: string, title: string, sections: { heading: string, items: string[] }[] }[]} */
   const PATCH_NOTES = [
     {
+      version: "0.5.26",
+      date: "2026-09-24",
+      title: "持続・遅延ダメージは付与時の攻撃を参照",
+      sections: [
+        {
+          heading: "仕様",
+          items: [
+            "毒（DoT）や終焔などの遅延ダメージは、ダメージ発生時ではなく技（効果）付与時の攻撃力・与ダメ補正を固定して参照する。",
+            "ダメージ対象の防御力・被ダメージ軽減は、これまでどおりダメージ発生時の値を使う。",
+            "終焔は付与時に集中／階調／溢光も爆発側へ取り込み、消費する。",
+          ],
+        },
+        {
+          heading: "対象",
+          items: [
+            "毒刃・疫刃（および敵の毒／疫／茨の持続）。",
+            "終焔の爆発。",
+          ],
+        },
+      ],
+    },
+    {
       version: "0.5.25",
       date: "2026-09-24",
       title: "ブラウザの戻るでUIだけ戻す",
