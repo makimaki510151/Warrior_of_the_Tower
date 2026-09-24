@@ -187,6 +187,11 @@
           </div>
           <div class="bar-right">
             ${
+              ui.screen !== "title"
+                ? `<button type="button" class="btn btn-ghost btn-compact" data-action="to-title" title="タイトル画面へ戻る">タイトル</button>`
+                : ""
+            }
+            ${
               showDetail
                 ? `<button type="button" class="btn btn-ghost btn-compact" data-action="toggle-detail" aria-pressed="${ui.detail}">${
                     ui.detail ? "標準" : "詳細"
@@ -588,11 +593,16 @@
     const canReroll = freeReroll || points >= 1;
     const stats = W.computeStats(state.skills);
     const ownedCount = Object.keys(state.skills).filter((id) => state.skills[id] > 0).length;
+    const affinity = W.groupAffinity ? W.groupAffinity(state.skills) : null;
+    const affinityTip =
+      affinity && Object.values(affinity).some((n) => n > 0)
+        ? " · 所持系統の技は候補に少し出やすい（パッシブ除外）"
+        : "";
     return shell(
       `
       <p class="hint offer-hint">技を1つ選ぶ（${W.SKILLS.length}種から${offer.length}） · いま${ui.detail ? "詳細" : "標準"}表示 · カードを開いて確認${
         freeReroll ? " · 下の一覧からも選べます" : ""
-      }</p>
+      }${affinityTip}</p>
       <div class="offer-self">
         <div class="offer-self-stats" aria-label="いまの能力（要約）">
           <span><b>体力</b>${intNum(stats.maxHp)}</span>
@@ -910,14 +920,16 @@
     const eRate = Math.max(0, Math.min(100, (enemyHp / enemy.maxHp) * 100));
     const actLabel = formatActLabel(battle, latest);
 
+    const speedBtn = `<button type="button" class="btn btn-ghost" data-action="speed">${ui.speed}x</button>`;
     let foot = "";
     if (battle.phase === "done") {
       if (battle.winner === "player" && battle.cleared) {
-        foot = `<footer class="foot result win"><span>第100層突破</span><button type="button" class="btn btn-primary" data-action="to-clear">頂へ</button></footer>`;
+        foot = `<footer class="foot result win">${speedBtn}<span>第100層突破</span><button type="button" class="btn btn-primary" data-action="to-clear">頂へ</button></footer>`;
       } else if (battle.winner === "player") {
-        foot = `<footer class="foot result win"><span>第${battle.floor}層突破</span><button type="button" class="btn btn-primary" data-action="next-floor">次へ</button></footer>`;
+        foot = `<footer class="foot result win">${speedBtn}<span>第${battle.floor}層突破</span><button type="button" class="btn btn-primary" data-action="next-floor">次へ</button></footer>`;
       } else {
         foot = `<footer class="foot result lose">
+          ${speedBtn}
           <span>敗北</span>
           <button type="button" class="btn btn-primary" data-action="rebuild">手順を組み直す</button>
           <button type="button" class="btn btn-danger" data-action="give-up">諦める</button>
@@ -925,7 +937,7 @@
       }
     } else {
       foot = `<footer class="foot">
-        <button type="button" class="btn btn-ghost" data-action="speed">${ui.speed}x</button>
+        ${speedBtn}
         <button type="button" class="btn btn-primary" data-action="skip">結果へ</button>
       </footer>`;
     }
@@ -1019,6 +1031,7 @@
         items: [
           "同じ技を重ねると効果は伸びる。",
           `付随ステータスは1枚目が満額。2枚目以降は基礎gainの約${stackPct}%だけ追加（例: +6なら2枚で約+7.8）。`,
+          "持っている系統（攻撃・崩し・守り・回復・補助）と同じ技は、候補にほんの少し出やすくなる。パッシブは系統ボーナスの対象外。",
           "最初の1枚を取るまでは、候補の入れ替えが無料で何度でもできる。あわせて下の一覧から任意の技を1つ直接選べる。",
           "2枚目以降の入れ替えはリロールポイントを1消費。階層クリアごとに+1（上限なし）。",
           "候補画面の「能力を見る」で、いまのステータスを確認できる。",
@@ -1580,6 +1593,12 @@
       if (action === "continue") {
         if (W.sfx) W.sfx.ui();
         enterRunScreen();
+        return;
+      }
+      if (action === "to-title") {
+        if (ui.screen === "title") return;
+        if (W.sfx) W.sfx.ui();
+        goTitleScreen();
         return;
       }
       if (action === "restart") {
