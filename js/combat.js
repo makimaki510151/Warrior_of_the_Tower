@@ -180,6 +180,8 @@
       regenCounter: 0,
       tookHit: false,
       lastAction: null,
+      lastSkillGroup: null,
+      sinceAttackSkill: 99,
       pain: 0,
       pattern: stats.pattern,
       boss: !!stats.boss,
@@ -416,6 +418,7 @@
         return n > 0 ? `(${n}オーバー)` : "";
       },
       hasDebuff,
+      hasBuff,
       effectiveAtk,
       effectiveDef,
       effectiveSpeed,
@@ -466,6 +469,20 @@
             log(`${unit.name}の回復に罰が乗り、${dealt}のダメージ。`, "dot");
           }
         }
+        // 逆療壁: 回復した分の一部を相手へ返す
+        if (got > 0 && unit === player) {
+          const wall = player.effects.find((effect) => effect.kind === "punishwall");
+          if (wall && wall.value > 0 && enemy.hp > 0) {
+            const back = Math.max(1, Math.floor(got * wall.value));
+            const beforeE = enemy.hp;
+            enemy.hp = Math.max(0, enemy.hp - back);
+            const dealt = beforeE - enemy.hp;
+            if (dealt > 0) {
+              enemy.tookHit = true;
+              log(`${player.name}の逆療壁が輝き、${enemy.name}に${dealt}のダメージ。`, "attack");
+            }
+          }
+        }
         return { got, over: Math.max(0, amount - got), raw: amount, punish };
       },
       addEffect(unit, effect) {
@@ -476,6 +493,18 @@
           else if (next.scale === "atk") next.value *= effectiveAtkEff(unit);
           if (next.kind === "defPct") next.value *= effectiveDefEff(unit);
           else if (next.scale === "def") next.value *= effectiveDefEff(unit);
+        }
+        // 守集: 次の守り系効果を厚くする
+        const guardKinds = { defPct: 1, dr: 1, absorb: 1, reflect: 1, hitShield: 1 };
+        if (guardKinds[next.kind] && (next.value > 0 || next.charges > 0)) {
+          const gAmp = unit.effects.find((item) => item.kind === "guardAmp");
+          if (gAmp) {
+            const bonus = 1 + (gAmp.value || 0);
+            if (typeof next.value === "number") next.value *= bonus;
+            if (next.reduction) next.reduction = Math.min(0.9, next.reduction * bonus);
+            if (next.charges) next.charges = Math.max(1, Math.floor(next.charges * bonus));
+            unit.effects = unit.effects.filter((item) => item !== gAmp);
+          }
         }
         unit.effects = unit.effects.filter((item) => item.id !== next.id);
         unit.effects.push(next);
@@ -499,6 +528,30 @@
         unit.effects = unit.effects.filter((effect) => !effect.negative);
         return before - unit.effects.length;
       },
+      listBuffs(unit) {
+        return unit.effects.filter((effect) => !effect.negative && effect.kind !== "dot");
+      },
+      stripBuffs(unit, count) {
+        const buffs = unit.effects.filter((effect) => !effect.negative && effect.kind !== "dot");
+        const take = buffs.slice(0, Math.max(0, Math.floor(count || 1)));
+        if (!take.length) return 0;
+        const ids = new Set(take.map((effect) => effect.id));
+        unit.effects = unit.effects.filter((effect) => !ids.has(effect.id));
+        return take.length;
+      },
+      stealBuff(from, to, turnFactor) {
+        const buffs = from.effects.filter((effect) => !effect.negative && effect.kind !== "dot");
+        if (!buffs.length) return null;
+        const picked = buffs[0];
+        from.effects = from.effects.filter((effect) => effect !== picked);
+        const copy = { ...picked, id: `${picked.id}-stolen`, fresh: true };
+        if (copy.turns != null) {
+          copy.turns = Math.max(1, Math.floor(copy.turns * (turnFactor == null ? 0.6 : turnFactor)));
+        }
+        to.effects = to.effects.filter((effect) => effect.id !== copy.id);
+        to.effects.push(copy);
+        return copy;
+      },
       countBuffs(unit) {
         return unit.effects.filter((effect) => !effect.negative && effect.kind !== "dot").length;
       },
@@ -508,11 +561,20 @@
       findEffect(unit, kind) {
         return unit.effects.find((effect) => effect.kind === kind) || null;
       },
+      findEffectById(unit, id) {
+        return unit.effects.find((effect) => effect.id === id) || null;
+      },
       consumeEffect(unit, kind) {
         const found = unit.effects.find((effect) => effect.kind === kind);
         if (!found) return null;
         unit.effects = unit.effects.filter((effect) => effect !== found);
         return found;
+      },
+      purgeKinds(unit, kinds) {
+        const set = new Set(kinds || []);
+        const before = unit.effects.length;
+        unit.effects = unit.effects.filter((effect) => !set.has(effect.kind));
+        return before - unit.effects.length;
       },
     };
 
@@ -537,7 +599,12 @@
         const kept = Math.max(1, Math.floor(dealt * (1 - rate)));
         absorbed = Math.max(0, dealt - kept);
         dealt = kept;
-        defender.effects = defender.effects.filter((effect) => effect !== absorb);
+        const charges = absorb.charges == null ? 1 : absorb.charges;
+        if (charges <= 1) {
+          defender.effects = defender.effects.filter((effect) => effect !== absorb);
+        } else {
+          absorb.charges = charges - 1;
+        }
         if (absorbed > 0 && absorb.convertHeal) {
           const healed = ctx.heal(defender, absorbed * absorb.convertHeal);
           if (healed.got > 0 || healed.over > 0) {
@@ -558,6 +625,16 @@
             fresh: true,
             scale: "atk",
           });
+        }
+      }
+      // 層盾: 被弾回数シールド
+      const hitShield = defender.effects.find((effect) => effect.kind === "hitShield");
+      if (hitShield && hitShield.charges > 0) {
+        const rate = Math.min(0.9, Math.max(0, hitShield.value || 0));
+        dealt = Math.max(1, Math.floor(dealt * (1 - rate)));
+        hitShield.charges -= 1;
+        if (hitShield.charges <= 0) {
+          defender.effects = defender.effects.filter((effect) => effect !== hitShield);
         }
       }
       const reflect = defender.effects.find((effect) => effect.kind === "reflect");
@@ -754,12 +831,17 @@
         }
         startCooldown(player, skill.id, skill.cooldown);
         player.lastAction = "skill";
+        player.lastSkillGroup = skill.group || null;
+        if (skill.group === "攻撃") player.sinceAttackSkill = 0;
+        else player.sinceAttackSkill = (player.sinceAttackSkill || 0) + 1;
         return;
       }
       const hit = applyHit(ctx, player, enemy, 1, { amp: false });
       const waitText = waiting.length ? `${waiting.join("、")}は再使用を待っていて、` : "";
       log(`${waitText}条件に合う技がなく、通常攻撃。${enemy.name}に${hit.dmg}のダメージ。${ctx.overNote(hit.over)}`, "attack");
       player.lastAction = "normal";
+      player.lastSkillGroup = null;
+      player.sinceAttackSkill = 0;
     }
 
     function enemyAttack(mult, label) {

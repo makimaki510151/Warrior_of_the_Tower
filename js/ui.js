@@ -921,7 +921,7 @@
           "50層以降は浅い層の敵を混ぜず、専用ローテのビルドのみ。",
           "100層は育成と手順の両方が要る。",
           "回復技は少なめ。自動回復に注目した技もある。",
-          "残響・階調・血契・返礼・共鳴・時縫い・終焔・虚盾・溢光・無限廊など、癖の強い技もある。",
+          "残響・階調・血契・返礼・共鳴・時縫い・終焔・虚盾・溢光・無限廊・剥印・凱斬・呪刃・双閃・層盾・先手・守集・積毒・破鏡・献閃・逆療壁・戒律など、癖の強い技もある。",
         ],
       },
       {
@@ -1111,7 +1111,57 @@
     return "prep";
   }
 
-  function render() {
+  function captureScroll() {
+    if (typeof document === "undefined") return null;
+    const main =
+      document.querySelector(".shell-prep .main") ||
+      document.querySelector(".shell-offer .main") ||
+      document.querySelector(".shell .main");
+    const panes = {};
+    document.querySelectorAll("[data-prep-pane]").forEach((el) => {
+      const key = el.getAttribute("data-prep-pane");
+      if (key) panes[key] = el.scrollTop;
+    });
+    return {
+      main: main ? main.scrollTop : 0,
+      windowY: typeof window !== "undefined" ? window.scrollY || 0 : 0,
+      panes,
+      help: document.querySelector(".help-scroll") ? document.querySelector(".help-scroll").scrollTop : null,
+      patch: document.querySelector(".patch-scroll") ? document.querySelector(".patch-scroll").scrollTop : null,
+    };
+  }
+
+  function restoreScroll(snap) {
+    if (!snap || typeof document === "undefined") return;
+    const apply = () => {
+      const main =
+        document.querySelector(".shell-prep .main") ||
+        document.querySelector(".shell-offer .main") ||
+        document.querySelector(".shell .main");
+      if (main && snap.main != null) main.scrollTop = snap.main;
+      Object.keys(snap.panes || {}).forEach((key) => {
+        const el = document.querySelector(`[data-prep-pane="${key}"]`);
+        if (el) el.scrollTop = snap.panes[key];
+      });
+      if (snap.help != null) {
+        const help = document.querySelector(".help-scroll");
+        if (help) help.scrollTop = snap.help;
+      }
+      if (snap.patch != null) {
+        const patch = document.querySelector(".patch-scroll");
+        if (patch) patch.scrollTop = snap.patch;
+      }
+      if (typeof window !== "undefined" && snap.windowY != null) {
+        window.scrollTo(0, snap.windowY);
+      }
+    };
+    apply();
+    if (typeof requestAnimationFrame === "function") requestAnimationFrame(apply);
+  }
+
+  function render(opts) {
+    const keepScroll = !opts || opts.preserveScroll !== false;
+    const snap = keepScroll ? captureScroll() : null;
     let body = "";
     if (ui.screen === "title") body = renderTitle();
     else if (ui.screen === "offer") body = renderOffer();
@@ -1125,6 +1175,7 @@
       bindLogScroll(log);
       if (logFollow) scrollLogToBottom(log);
     }
+    if (snap) restoreScroll(snap);
   }
 
   function closeOverlays() {
@@ -1420,7 +1471,7 @@
         if (W.sfx) W.sfx.ui();
         const chapter = button.getAttribute("data-chapter");
         openTutorial(chapter || "loop");
-        render();
+        render({ preserveScroll: false });
         const scroll = document.querySelector(".tutorial-scroll");
         if (scroll) scroll.scrollTop = 0;
         return;
