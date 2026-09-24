@@ -17,6 +17,20 @@
   /** @type {{ version: string, date: string, title: string, sections: { heading: string, items: string[] }[] }[]} */
   const PATCH_NOTES = [
     {
+      version: "0.5.36",
+      date: "2026-09-24",
+      title: "パッシブ技の付随ステータス初期値を引き上げ",
+      sections: [
+        {
+          heading: "バランス",
+          items: [
+            "パッシブ20種の付随ステータス（gain）初期値を全体的に多めへ引き上げ。手順枠を使わない代わりに、所持時点の基礎ステータスを厚くする。",
+            "例: 血脈 体力+8/防御+4 → +12/+6、針継 体力+1/攻撃+1/速度+6 → +3/+2/+9、先制牙 速度+5 → +8 など。",
+          ],
+        },
+      ],
+    },
+    {
       version: "0.5.35",
       date: "2026-09-24",
       title: "パッシブ表示の重複を解消",
