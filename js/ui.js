@@ -370,8 +370,7 @@
     const inFlow = state.flow.some((node) => node.skillId === id);
     const canDrag = !inFlow && state.flow.length < W.MAX_FLOW;
     const mobileExtra = canDrag
-      ? `<p class="owned-status is-ready m-only">「手順へ追加」で入れられる</p>
-         <button type="button" class="btn btn-primary btn-add-flow m-only" data-action="add-flow-skill" data-skill="${esc(id)}">手順へ追加</button>`
+      ? `<button type="button" class="btn btn-primary btn-add-flow m-only" data-action="add-flow-skill" data-skill="${esc(id)}">手順へ追加</button>`
       : !inFlow
         ? `<p class="owned-status is-full m-only">手順がいっぱい</p>`
         : "";
