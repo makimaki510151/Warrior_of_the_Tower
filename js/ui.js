@@ -172,6 +172,13 @@
           <div class="bar-left">
             <strong class="brand">${esc(gameTitle())}</strong>
             ${showMeta ? `<span class="chip chip-floor">第${floor}層</span>` : ""}
+            ${
+              showMeta && (state.scaleTier || 0) > 0
+                ? `<span class="chip chip-scale" title="クリアするたびに敵の基礎能力が+50%ずつ上がる">${esc(
+                    W.scaleLabel ? W.scaleLabel(state.scaleTier) : `+${(state.scaleTier || 0) * 50}%`
+                  )}</span>`
+                : ""
+            }
             ${showMeta ? `<span class="chip muted chip-best">最高 ${best || "—"}</span>` : ""}
             ${
               showReroll
@@ -766,6 +773,7 @@
 
     return shell(
       `
+      ${renderEnemyScout(state)}
       <nav class="prep-tabs" role="tablist" aria-label="準備画面の切替">
         <button type="button" class="prep-tab ${ui.prepTab === "stats" ? "is-active" : ""}" data-action="prep-tab" data-tab="stats" role="tab" aria-selected="${ui.prepTab === "stats"}">能力</button>
         <button type="button" class="prep-tab ${ui.prepTab === "skills" ? "is-active" : ""}" data-action="prep-tab" data-tab="skills" role="tab" aria-selected="${ui.prepTab === "skills"}">習得技 ${ownedIds.length}</button>
@@ -830,15 +838,60 @@
     );
   }
 
+  function renderEnemyScout(state) {
+    if (!W.previewEnemy) return "";
+    const preview = W.previewEnemy(state.floor, state.scaleTier || 0);
+    if (!preview) return "";
+    const specials = (preview.specials || []).map((line) => `<li>${esc(line)}</li>`).join("");
+    const scaleNote =
+      (preview.scalePct || 0) > 0
+        ? `<p class="tiny scout-scale">現在の試練: 敵能力 <b>+${preview.scalePct}%</b></p>`
+        : "";
+    return `
+      <section class="enemy-scout" aria-label="次の敵">
+        <div class="scout-head">
+          <h2>次の敵</h2>
+          <span class="scout-badge">${esc(preview.badge || "敵")}</span>
+        </div>
+        <p class="scout-name">${esc(preview.name)}</p>
+        <p class="scout-hint">${esc(preview.hint || "")}</p>
+        ${scaleNote}
+        <dl class="scout-stats">
+          <div><dt>体力</dt><dd>${intNum(preview.maxHp)}</dd></div>
+          <div><dt>攻撃</dt><dd>${intNum(preview.atk)}</dd></div>
+          <div><dt>防御</dt><dd>${intNum(preview.def)}</dd></div>
+          <div><dt>速度</dt><dd>${intNum(preview.speed)}</dd></div>
+          ${
+            preview.regenAmount
+              ? `<div><dt>自動回復</dt><dd>${intNum(preview.regenAmount)} / ${intNum(
+                  preview.regenInterval
+                )}行動</dd></div>`
+              : ""
+          }
+        </dl>
+        ${specials ? `<ul class="scout-specials">${specials}</ul>` : ""}
+      </section>
+    `;
+  }
+
   function renderTitle() {
     const state = W.getState();
     const ver = W.latestPatchVersion ? W.latestPatchVersion() : "";
+    const height = W.TOWER_HEIGHT || 30;
+    const scale = state.scaleTier || 0;
+    const clears = (state.chronicle && state.chronicle.clearCount) || 0;
     return shell(`
       <div class="title-pane">
         <p class="eyebrow">${esc(W.GAME_TITLE_EN || "True Warrior of the Tower")}</p>
         <h1>${esc(gameTitle())}</h1>
-        <p class="lede">技を1つ選び、手順を組んで自動戦闘で百層を登る。</p>
-        <p class="record">${state.bestCleared ? `最高 ${state.bestCleared}層` : "記録なし"}</p>
+        <p class="lede">技を1つ選び、手順を組んで自動戦闘で第${height}層を目指す。クリア後は、強化された敵に挑むかどうかを自分で選べる。</p>
+        <p class="record">${
+          state.bestCleared
+            ? `最高 ${state.bestCleared}層${clears ? ` · 通算クリア ${clears}回` : ""}${
+                scale > 0 ? ` · ${esc(W.scaleLabel ? W.scaleLabel(scale) : "")}` : ""
+              }`
+            : "記録なし"
+        }</p>
         <div class="title-actions">
           ${
             ui.hasSave
@@ -924,7 +977,7 @@
     let foot = "";
     if (battle.phase === "done") {
       if (battle.winner === "player" && battle.cleared) {
-        foot = `<footer class="foot result win">${speedBtn}<span>第100層突破</span><button type="button" class="btn btn-primary" data-action="to-clear">頂へ</button></footer>`;
+        foot = `<footer class="foot result win">${speedBtn}<span>第${W.TOWER_HEIGHT || 30}層突破</span><button type="button" class="btn btn-primary" data-action="to-clear">頂へ</button></footer>`;
       } else if (battle.winner === "player") {
         foot = `<footer class="foot result win">${speedBtn}<span>第${battle.floor}層突破</span><button type="button" class="btn btn-primary" data-action="next-floor">次へ</button></footer>`;
       } else {
@@ -958,7 +1011,7 @@
             }
           </div>
           <div class="fighter fighter-enemy">
-            <div class="bar-label"><span>敵</span><span data-hp-label="enemy">${Math.max(0, intNum(enemyHp))}/${intNum(enemy.maxHp)}</span></div>
+            <div class="bar-label"><span>${esc(enemy.name || "敵")}</span><span data-hp-label="enemy">${Math.max(0, intNum(enemyHp))}/${intNum(enemy.maxHp)}</span></div>
             <div class="hp enemy"><span data-bar="enemy" style="width:${eRate}%"></span></div>
           </div>
         </div>
@@ -975,15 +1028,148 @@
     );
   }
 
+  function formatDuration(ms) {
+    const total = Math.max(0, Math.floor((Number(ms) || 0) / 1000));
+    const h = Math.floor(total / 3600);
+    const m = Math.floor((total % 3600) / 60);
+    const s = total % 60;
+    if (h > 0) return `${h}時間${m}分`;
+    if (m > 0) return `${m}分${s}秒`;
+    return `${s}秒`;
+  }
+
+  function formatWhen(ts) {
+    const n = Math.floor(Number(ts) || 0);
+    if (!n) return "—";
+    try {
+      return new Date(n).toLocaleString("ja-JP", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } catch (err) {
+      return "—";
+    }
+  }
+
+  function formatCompact(n) {
+    const v = Math.max(0, Math.floor(Number(n) || 0));
+    if (v >= 10000) return `${Math.floor(v / 1000)}k`;
+    return String(intNum(v));
+  }
+
   function renderClear() {
     const state = W.getState();
+    const report = W.clearReport ? W.clearReport(state) : null;
+    const run = (report && report.run) || {};
+    const counts = (report && report.counts) || { groups: {}, passiveKinds: 0, activeKinds: 0 };
+    const stats = (report && report.stats) || W.computeStats(state.skills);
+    const chronicle = (report && report.chronicle) || { clearCount: 0, clears: [] };
+    const height = (report && report.towerHeight) || W.TOWER_HEIGHT || 30;
+    const scalePct = (report && report.scalePct) || 0;
+    const nextPct = (report && report.nextScalePct) || 50;
+    const opening = run.openingSkillId && W.SKILL_BY_ID[run.openingSkillId];
+    const groupRows = (W.SKILL_GROUPS || [])
+      .map((g) => {
+        const n = (counts.groups && counts.groups[g]) || 0;
+        if (!n) return "";
+        const style = GROUP_STYLE[g] || { slug: "attack", tag: g };
+        return `<li><span class="skill-tag skill-tag-${esc(style.slug)}">${esc(style.tag)}</span><b>${n}</b></li>`;
+      })
+      .join("");
+    const flowRows = ((report && report.flow) || [])
+      .map((node) => `<li><span class="clear-flow-i">${node.index}</span>${esc(node.name)}</li>`)
+      .join("");
+    const mileRows = ((report && report.milestones) || [])
+      .map(
+        (m) =>
+          `<li><span class="clear-mile-floor">第${m.floor}層</span><span>${esc(m.name)}${
+            m.level > 1 ? ` Lv${m.level}` : ""
+          }</span></li>`
+      )
+      .join("");
+    const historyRows = (chronicle.clears || [])
+      .slice(0, 5)
+      .map((entry, i) => {
+        const label = i === 0 ? "今回" : `${i + 1}回前`;
+        const tierPct = Math.round((entry.scaleTier || 0) * (W.SCALE_STEP || 0.5) * 100);
+        return `<li>
+          <div class="clear-hist-top">
+            <strong>${label}${tierPct ? `（+${tierPct}%）` : ""}</strong>
+            <span>${esc(formatWhen(entry.at))}</span>
+          </div>
+          <p class="tiny">技${entry.skillKinds}種 · 敗北${entry.battlesLost} · リロール${entry.rerollsUsed}${
+            entry.topGroup ? ` · 主軸 ${esc(entry.topGroup)}` : ""
+          }${entry.durationMs ? ` · ${esc(formatDuration(entry.durationMs))}` : ""}</p>
+        </li>`;
+      })
+      .join("");
+
     return shell(`
-      <div class="title-pane">
-        <p class="eyebrow">第100層</p>
-        <h1>塔の頂</h1>
-        <p class="lede">百層を越えた。</p>
-        <p class="record">最高 ${state.bestCleared}層</p>
-        <button type="button" class="btn btn-primary" data-action="climb-again">もう一度</button>
+      <div class="clear-pane">
+        <header class="clear-hero">
+          <p class="eyebrow">第${height}層</p>
+          <h1>塔の頂</h1>
+          <p class="lede">第${height}層を突破した。ビルドはここで一度リセットされる。次に挑む敵の強さは自分で選べる。</p>
+          <p class="record">通算クリア ${intNum(chronicle.clearCount || 1)}回 · 今回 ${
+            scalePct > 0 ? `敵強化 +${scalePct}%` : "通常"
+          }</p>
+        </header>
+
+        <section class="clear-section" aria-label="この登頂の統計">
+          <h2>この登頂</h2>
+          <ul class="clear-stat-grid">
+            <li><span>勝利</span><b>${intNum(run.battlesWon || 0)}</b></li>
+            <li><span>敗北</span><b>${intNum(run.battlesLost || 0)}</b></li>
+            <li><span>リロール</span><b>${intNum(run.rerollsUsed || 0)}</b></li>
+            <li><span>所要</span><b>${esc(
+              formatDuration(run.clearedAt && run.startedAt ? run.clearedAt - run.startedAt : 0)
+            )}</b></li>
+            <li><span>与ダメ</span><b>${esc(formatCompact(run.damageDealt))}</b></li>
+            <li><span>被ダメ</span><b>${esc(formatCompact(run.damageTaken))}</b></li>
+            <li><span>自分の行動</span><b>${esc(formatCompact(run.playerActions))}</b></li>
+            <li><span>敵の行動</span><b>${esc(formatCompact(run.enemyActions))}</b></li>
+          </ul>
+        </section>
+
+        <section class="clear-section" aria-label="ビルド">
+          <h2>登り切った構え</h2>
+          <p class="tiny clear-build-lead">
+            体力 ${intNum(stats.maxHp)} · 攻撃 ${intNum(stats.atk)} · 防御 ${intNum(stats.def)} · 速度 ${intNum(
+              stats.speed
+            )}
+            · 技 ${intNum((counts.activeKinds || 0) + (counts.passiveKinds || 0))}種
+            ${opening ? ` · 開幕 ${esc(opening.name)}` : ""}
+          </p>
+          ${groupRows ? `<ul class="clear-group-bars">${groupRows}</ul>` : ""}
+          ${flowRows ? `<h3 class="clear-sub">最終手順</h3><ol class="clear-flow">${flowRows}</ol>` : ""}
+          ${mileRows ? `<h3 class="clear-sub">旅の節目</h3><ul class="clear-miles">${mileRows}</ul>` : ""}
+        </section>
+
+        <section class="clear-section" aria-label="過去の登頂">
+          <h2>登頂の歴史</h2>
+          ${historyRows ? `<ul class="clear-history">${historyRows}</ul>` : `<p class="tiny">まだ過去の登頂はありません。</p>`}
+        </section>
+
+        <div class="clear-actions">
+          <p class="tiny clear-next-note">所持技・手順はリセットされます。強化された敵に挑むか、同じ強さ（または通常）で再挑戦するか選べます。</p>
+          <button type="button" class="btn btn-primary" data-action="begin-scale" data-tier="${
+            (state.scaleTier || 0) + 1
+          }">強化された敵に挑む（+${nextPct}%）</button>
+          <button type="button" class="btn btn-ghost" data-action="begin-scale" data-tier="${
+            state.scaleTier || 0
+          }">${
+            scalePct > 0 ? `同じ強さでもう一度（+${scalePct}%）` : "通常の敵でもう一度"
+          }</button>
+          ${
+            (state.scaleTier || 0) > 0
+              ? `<button type="button" class="btn btn-ghost" data-action="begin-scale" data-tier="0">通常の敵で始める</button>`
+              : ""
+          }
+          <button type="button" class="btn btn-ghost" data-action="to-title">タイトルへ</button>
+        </div>
       </div>
     `);
   }
@@ -1018,7 +1204,7 @@
     const sections = [
       {
         heading: "このゲームでやること",
-        lead: "100層を突破すればクリア。戦闘はすべて自動です。",
+        lead: `${W.TOWER_HEIGHT || 30}層を突破すればクリア。クリア後は強化された敵に挑むかどうかを自分で選べる。戦闘はすべて自動です。`,
         items: [
           "技を選んで強くし、使う順番と条件（手順）を組む。",
           "階層をクリアするたびに新しい技を1つ獲得／強化できる。",
@@ -1065,9 +1251,8 @@
       {
         heading: "敵と育成",
         items: [
-          "敵は序盤だけ弱く、以降は急に強くなる。",
-          "50層以降は浅い層の敵を混ぜず、専用ローテのビルドのみ。",
-          "100層は育成と手順の両方が要る。",
+          "敵は序盤だけ弱く、以降は急に強くなる。1〜30層はそれぞれ固有の敵。",
+          `${W.TOWER_HEIGHT || 30}層は育成と手順の両方が要る。クリア後はビルドをリセットし、次の敵強化段階（+50%ずつ）に挑むか選べる。`,
           "回復技は少なめ。自動回復に注目した技もある。",
           "残響・階調・血契・返礼・共鳴・時縫い・終焔・虚盾・溢光・無限廊・剥印・凱斬・双閃・層盾・積毒・献閃・戒律など、癖の強い技もある。パッシブ技（針継・余刃・血脈など）は手順不要で所持するだけで発動する。",
         ],
@@ -1236,6 +1421,25 @@
           </div>
         </div>`;
     }
+    if (ui.modal === "spec-notice") {
+      const height = W.TOWER_HEIGHT || 30;
+      return `
+        <div class="modal" role="dialog" aria-modal="true">
+          <div class="modal-card modal-card-wide">
+            <h2>仕様が大きく変わりました</h2>
+            <div class="help-scroll spec-notice-body">
+              <p>塔の目標が<strong>第100層</strong>から<strong>第${height}層</strong>へ変わりました。</p>
+              <ul class="patch-list">
+                <li>1〜${height}層は、それぞれ異なる固有の敵が待ちます。戦闘前に能力と特殊行動を確認できます。</li>
+                <li>${height}層をクリアすると統計が見られ、その後ビルドはリセットされます。</li>
+                <li>次の登塔では、敵を<strong>+50%</strong>強化して挑むか、同じ強さ／通常のまま再挑戦するかを自分で選べます。強化を選ぶたび+50%ずつ上がります。</li>
+                <li>旧セーブの進行中ビルドは引き継げません。了解後、新しい登塔から始めます（最高到達の記録は可能な範囲で残します）。</li>
+              </ul>
+            </div>
+            <button type="button" class="btn btn-primary" data-action="ack-spec-notice">了解して始める</button>
+          </div>
+        </div>`;
+    }
     if (ui.modal === "giveup" || ui.modal === "restart") {
       const give = ui.modal === "giveup";
       return `
@@ -1334,6 +1538,7 @@
   }
 
   function closeOverlays() {
+    if (ui.modal === "spec-notice") return;
     ui.modal = null;
     ui.help = false;
     ui.patchNotes = false;
@@ -1504,7 +1709,7 @@
       render();
       return;
     }
-    const enemy = W.createEnemy(state.floor);
+    const enemy = W.createEnemy(state.floor, state.scaleTier || 0);
     const stats = W.computeStats(state.skills);
     const result = W.simulate({
       stats,
@@ -1513,6 +1718,7 @@
       flow: state.flow,
       keepLog: true,
     });
+    if (W.recordBattle) W.recordBattle(result);
     let cleared = false;
     if (result.winner === "player") {
       cleared = W.commitWin().cleared;
@@ -1612,7 +1818,14 @@
       }
       if (action === "confirm-restart") {
         if (W.sfx) W.sfx.ui();
-        beginRun();
+        W.newRun({ persist: true, keepScale: false, scaleTier: 0 });
+        ui.hasSave = true;
+        closeOverlays();
+        ui.battle = null;
+        ui.screen = "offer";
+        ui.offerCatalogGroup = "all";
+        ui.offerCatalogQuery = "";
+        render();
         return;
       }
       if (action === "help") {
@@ -1819,7 +2032,40 @@
       }
       if (action === "climb-again") {
         if (W.sfx) W.sfx.ui();
-        beginRun();
+        if (W.beginScaledRun) W.beginScaledRun(0);
+        else if (W.beginNextScale) W.beginNextScale();
+        else beginRun();
+        ui.battle = null;
+        ui.screen = "offer";
+        render();
+        return;
+      }
+      if (action === "begin-scale" || action === "next-scale") {
+        if (W.sfx) W.sfx.ui();
+        const tier =
+          action === "begin-scale"
+            ? Number(button.dataset.tier)
+            : (W.getState().scaleTier || 0) + 1;
+        const ok = W.beginScaledRun
+          ? W.beginScaledRun(tier)
+          : W.beginNextScale && W.beginNextScale();
+        if (ok) {
+          ui.battle = null;
+          closeOverlays();
+          ui.screen = "offer";
+          render();
+        }
+        return;
+      }
+      if (action === "ack-spec-notice") {
+        if (W.sfx) W.sfx.ui();
+        if (W.ackSpecNotice) W.ackSpecNotice();
+        ui.hasSave = true;
+        closeOverlays();
+        ui.battle = null;
+        ui.screen = "offer";
+        render();
+        return;
       }
       return;
     }
@@ -1989,6 +2235,13 @@
       if (!ui.hasSave) W.newRun({ persist: false });
       if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
         ui.speed = 4;
+      }
+      const state = W.getState();
+      if (state.needsSpecNotice) {
+        ui.modal = "spec-notice";
+        ui.screen = "title";
+      } else if (ui.hasSave) {
+        ui.screen = "title";
       }
       app.addEventListener("click", onClick);
       app.addEventListener("click", onBackdrop);
