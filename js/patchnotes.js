@@ -17,6 +17,20 @@
   /** @type {{ version: string, date: string, title: string, sections: { heading: string, items: string[] }[] }[]} */
   const PATCH_NOTES = [
     {
+      version: "0.5.38",
+      date: "2026-09-24",
+      title: "戦闘ログのパッシブ反応の順序を修正",
+      sections: [
+        {
+          heading: "バグ修正",
+          items: [
+            "回復や攻撃の本体ログより先に、療刃・追撃・被弾反応などのパッシブログが出ることがあった問題を修正。",
+            "damage／heal／敵バフ反応のログを一時保留し、本体の一文の直後に続けて出すようにした。",
+          ],
+        },
+      ],
+    },
+    {
       version: "0.5.37",
       date: "2026-09-24",
       title: "開幕の技選択で二重スクロールと横はみ出しを修正",
