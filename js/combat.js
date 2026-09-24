@@ -187,6 +187,7 @@
       boss: !!stats.boss,
       buildTier: stats.buildTier || 1,
       floor: stats.floor || 1,
+      passiveMem: {},
     };
   }
 
@@ -377,6 +378,42 @@
     let currentAction = 0;
     let currentSide = null;
 
+    function runPassives(hookName, a, b, c) {
+      Object.keys(levels).forEach((id) => {
+        const level = levels[id] || 0;
+        if (level <= 0) return;
+        const skill = W.SKILL_BY_ID[id];
+        if (!skill || !skill.passive) return;
+        const fn = skill[hookName];
+        if (typeof fn !== "function") return;
+        fn(ctx, level, a, b, c);
+      });
+    }
+
+    function notifyPlayerDeal(hit, opts) {
+      if (!hit || enemy.hp <= 0) return;
+      const depth = ctx._passiveDepth || 0;
+      if (depth >= 2) return;
+      ctx._passiveDepth = depth + 1;
+      try {
+        runPassives("afterPlayerDeal", hit);
+      } finally {
+        ctx._passiveDepth = depth;
+      }
+    }
+
+    function notifyPlayerTake(hit) {
+      if (!hit || player.hp <= 0) return;
+      const depth = ctx._passiveDepth || 0;
+      if (depth >= 2) return;
+      ctx._passiveDepth = depth + 1;
+      try {
+        runPassives("afterPlayerTake", hit);
+      } finally {
+        ctx._passiveDepth = depth;
+      }
+    }
+
     function pushEvent(text, kind) {
       if (!keepLog) return;
       events.push({
@@ -413,6 +450,8 @@
       sawHit: false,
       actor: null,
       p: "",
+      _passiveDepth: 0,
+      _castingSkill: null,
       log,
       overNote(n) {
         return n > 0 ? `(${n}オーバー)` : "";
@@ -469,7 +508,7 @@
             log(`${unit.name}の回復に罰が乗り、${dealt}のダメージ。`, "dot");
           }
         }
-        // 逆療壁: 回復した分の一部を相手へ返す
+        // 逆療壁（旧アクティブ効果）: 回復した分の一部を相手へ返す
         if (got > 0 && unit === player) {
           const wall = player.effects.find((effect) => effect.kind === "punishwall");
           if (wall && wall.value > 0 && enemy.hp > 0) {
@@ -482,8 +521,26 @@
               log(`${player.name}の逆療壁が輝き、${enemy.name}に${dealt}のダメージ。`, "attack");
             }
           }
+          // 療刃（パッシブ）: 回復量の一部を敵ダメージに
+          const pwLv = levels.punishwall || 0;
+          const pwSkill = W.SKILL_BY_ID.punishwall;
+          if (pwLv > 0 && pwSkill && pwSkill.passive && enemy.hp > 0) {
+            const rate = W.scaled(0.2, 0.025, pwLv);
+            const back = Math.max(1, Math.floor(got * rate));
+            const beforeE = enemy.hp;
+            enemy.hp = Math.max(0, enemy.hp - back);
+            const dealt = beforeE - enemy.hp;
+            if (dealt > 0) {
+              enemy.tookHit = true;
+              log(`療刃。回復の余光が${enemy.name}に${dealt}のダメージ。`, "attack");
+            }
+          }
         }
-        return { got, over: Math.max(0, amount - got), raw: amount, punish };
+        const healed = { got, over: Math.max(0, amount - got), raw: amount, punish };
+        if (unit === player && got > 0) {
+          runPassives("afterPlayerHeal", healed);
+        }
+        return healed;
       },
       addEffect(unit, effect) {
         const next = { ...effect, fresh: unit === ctx.actor };
@@ -494,7 +551,7 @@
           if (next.kind === "defPct") next.value *= effectiveDefEff(unit);
           else if (next.scale === "def") next.value *= effectiveDefEff(unit);
         }
-        // 守集: 次の守り系効果を厚くする
+        // 守集（旧）: 次の守り系効果を厚くする
         const guardKinds = { defPct: 1, dr: 1, absorb: 1, reflect: 1, hitShield: 1 };
         if (guardKinds[next.kind] && (next.value > 0 || next.charges > 0)) {
           const gAmp = unit.effects.find((item) => item.kind === "guardAmp");
@@ -505,9 +562,23 @@
             if (next.charges) next.charges = Math.max(1, Math.floor(next.charges * bonus));
             unit.effects = unit.effects.filter((item) => item !== gAmp);
           }
+          // 守継（パッシブ）: 自分の守り効果を常時厚くする（消費なし）
+          if (unit === player) {
+            const wfLv = levels.wardfocus || 0;
+            const wfSkill = W.SKILL_BY_ID.wardfocus;
+            if (wfLv > 0 && wfSkill && wfSkill.passive) {
+              const bonus = 1 + W.scaled(0.22, 0.03, wfLv);
+              if (typeof next.value === "number" && next.value > 0) next.value *= bonus;
+              if (next.reduction) next.reduction = Math.min(0.9, next.reduction * bonus);
+              if (next.charges) next.charges = Math.max(1, Math.floor(next.charges * bonus));
+            }
+          }
         }
         unit.effects = unit.effects.filter((item) => item.id !== next.id);
         unit.effects.push(next);
+        if (unit === enemy) {
+          runPassives("afterEnemyGainEffect", next, unit);
+        }
       },
       /** 他の技の再使用待ちを即時に進める（exceptId は対象外） */
       advanceCds(unit, amount, exceptId) {
@@ -675,7 +746,17 @@
           kind: "hit",
         };
       }
-      return { dmg: dealt, over, amped: !!amp, reflect: back, absorbed };
+      const result = { dmg: dealt, over, amped: !!amp, reflect: back, absorbed };
+      if (attacker === player && defender === enemy) {
+        notifyPlayerDeal(result, opts);
+      }
+      if (attacker === enemy && defender === player) {
+        notifyPlayerTake(result);
+      }
+      if (back > 0 && attacker === player) {
+        notifyPlayerTake({ dmg: back, over: 0, amped: false, reflect: 0, absorbed: 0 });
+      }
+      return result;
     }
 
     function startTurn(unit) {
@@ -704,9 +785,24 @@
         unit.regenCounter += 1;
         if (unit.regenCounter >= regenEvery) {
           unit.regenCounter = 0;
-          const healed = ctx.heal(unit, regenPool);
-          if (healed.got > 0 || healed.over > 0) {
-            log(`${unit.name}の体力が${healed.got}回復した。${ctx.overNote(healed.over)}`, "heal");
+          let cancelRegen = false;
+          if (unit === enemy) {
+            Object.keys(levels).forEach((id) => {
+              if (cancelRegen) return;
+              const level = levels[id] || 0;
+              if (level <= 0) return;
+              const skill = W.SKILL_BY_ID[id];
+              if (!skill || !skill.passive || typeof skill.beforeEnemyRegen !== "function") return;
+              if (skill.beforeEnemyRegen(ctx, level, unit)) cancelRegen = true;
+            });
+          }
+          if (cancelRegen) {
+            // パッシブ側でログ済み（封痕など）
+          } else {
+            const healed = ctx.heal(unit, regenPool);
+            if (healed.got > 0 || healed.over > 0) {
+              log(`${unit.name}の体力が${healed.got}回復した。${ctx.overNote(healed.over)}`, "heal");
+            }
           }
         }
       }
@@ -813,6 +909,7 @@
         const skill = W.SKILL_BY_ID[node.skillId];
         const level = levels[node.skillId] || 0;
         if (!skill || level <= 0) continue;
+        if (skill.passive) continue;
         if (skill.available && !skill.available(ctx, level)) continue;
         if (!nodeConditionsMet(node, ctx)) continue;
         if (player.cd[skill.id] > 0) {
@@ -820,7 +917,9 @@
           continue;
         }
         ctx.p = `〔${nodeConditionLabel(node)}〕`;
+        ctx._castingSkill = skill;
         skill.use(ctx, level);
+        ctx._castingSkill = null;
         // 階調: 補助技以外の技を使うたびにチャージが乗る
         if (skill.id !== "crescendo") {
           const cresc = player.effects.find((effect) => effect.kind === "crescendo");
@@ -834,6 +933,7 @@
         player.lastSkillGroup = skill.group || null;
         if (skill.group === "攻撃") player.sinceAttackSkill = 0;
         else player.sinceAttackSkill = (player.sinceAttackSkill || 0) + 1;
+        runPassives("afterPlayerSkill", skill);
         return;
       }
       const hit = applyHit(ctx, player, enemy, 1, { amp: false });
@@ -842,6 +942,7 @@
       player.lastAction = "normal";
       player.lastSkillGroup = null;
       player.sinceAttackSkill = 0;
+      runPassives("afterPlayerNormal", hit);
     }
 
     function enemyAttack(mult, label) {
@@ -1493,6 +1594,8 @@
     }
 
     log(`${enemy.name}が行く手を阻む。`, "system");
+    player.passiveMem = {};
+    runPassives("onBattleStart");
 
     let nextP = 0;
     let nextE = 0;

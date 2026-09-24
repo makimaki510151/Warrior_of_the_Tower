@@ -178,6 +178,27 @@
     return `再使用まで自分の行動${n}回`;
   }
 
+  /** パッシブ技向け（手順に組まない） */
+  function passiveReuseText() {
+    return "所持するだけで発動する（手順には組まない）。";
+  }
+
+  function passiveShort() {
+    return "常時（パッシブ）";
+  }
+
+
+  function tickPulse(ctx, level) {
+    const mem = ctx.player.passiveMem || (ctx.player.passiveMem = {});
+    mem.pulseActs = (mem.pulseActs || 0) + 1;
+    if (mem.pulseActs % 4 !== 0) return;
+    const mult = scaled(1.4, 0.15, level);
+    const healed = ctx.heal(ctx.player, Math.max(0, ctx.player.regenAmount || 0) * mult);
+    if (healed.got > 0 || healed.over > 0) {
+      ctx.log(`脈律。拍に合わせて${healed.got}回復した。${ctx.overNote(healed.over)}`, "heal");
+    }
+  }
+
   const SKILLS = [
     {
       id: "slash",
@@ -601,33 +622,37 @@
     },
     {
       id: "blood",
-      name: "血誓",
+      name: "血脈",
       group: "守り",
-      blurb: "体力を代償に防御が大きく上がる。瀕死では使えない。",
-      tradeoff: "自動回復が遅く、量も減る。刺客の前で使うと自滅しやすい。",
-      cooldown: 4,
-      gain: gain({ maxHp: 10, def: 5, regenAmount: -1, regenInterval: 1 }),
-      available(ctx) {
-        return ctx.player.hp / ctx.player.maxHp > 0.32;
-      },
+      blurb: "体力が半分を切った瞬間、一度だけ鉄の守りが立つ。",
+      tradeoff: "戦闘中に一度きり。余裕がある戦いでは眠る。",
+      passive: true,
+      cooldown: 0,
+      gain: gain({ maxHp: 8, def: 4, defEff: 0.02 }),
       describe(level, stats) {
         return [
-          "現在体力の13%を払い、次の3行動、防御力を大きく上げる。",
-          defBuffText(0.5, 0.02, level, stats),
-          "体力が32%を超えているときだけ使える（32%以下では飛ばされる）。",
+          "戦闘中、体力が最大の50%未満へ落ちた最初の瞬間に一度だけ発動する。",
+          `次の4行動、${defBuffText(0.55, 0.03, level, stats)}`,
         ];
       },
-      use(ctx, level) {
-        const hurt = ctx.hurt(ctx.player, ctx.player.hp * 0.13, "self");
-        const cost = hurt.dealt;
-        ctx.addEffect(ctx.player, {
-          id: "blood",
-          kind: "defPct",
-          value: scaled(0.5, 0.02, level),
-          turns: 3,
-          scale: "def",
-        });
-        ctx.log(`${ctx.p}血誓。${cost}を払った。${ctx.overNote(hurt.over)}防御力が上がった。`, "buff");
+      afterPlayerTake(ctx, level, hit) {
+        if (!hit || hit.dmg <= 0) return;
+        const mem = ctx.player.passiveMem;
+        if (mem.bloodTriggered) return;
+        const max = ctx.player.maxHp;
+        const now = ctx.player.hp;
+        const before = now + hit.dmg;
+        if (before / max >= 0.5 && now / max < 0.5) {
+          mem.bloodTriggered = true;
+          ctx.addEffect(ctx.player, {
+            id: "blood",
+            kind: "defPct",
+            value: scaled(0.55, 0.03, level),
+            turns: 4,
+            scale: "def",
+          });
+          ctx.log(`血脈。半ばで体が鉄に変わった。`, "buff");
+        }
       },
     },
     {
@@ -682,28 +707,29 @@
     },
     {
       id: "pulse",
-      name: "脈動",
+      name: "脈律",
       group: "回復",
-      blurb: "しばらく自動回復が増える。短い戦いでは間に合わない。",
-      tradeoff: "即時回復はない。行動が大きく遅くなる。",
-      cooldown: 5,
-      gain: gain({ maxHp: 4, def: 1, regenAmount: 1, speed: -5 }),
+      blurb: "行動の拍に合わせて、自動回復量が傷を縫う。",
+      tradeoff: "即時の大きな回復はない。自動回復量が低いと薄い。",
+      passive: true,
+      cooldown: 0,
+      gain: gain({ maxHp: 5, regenAmount: 2, healEff: 0.01 }),
       describe(level, stats) {
-        const extra = scaled(3, 0.6, level);
-        const next = scaled(3, 0.6, level + 1);
+        const mult = scaled(1.4, 0.15, level);
+        const next = scaled(1.4, 0.15, level + 1);
+        const regen = stats ? Math.max(0, stats.regenAmount || 0) : 0;
+        const expect = stats ? Math.floor(regen * mult * (stats.healEff || 1)) : null;
         return [
-          `次の3行動、自動回復量+${extra.toFixed(1)}。${growthTail(`+${next.toFixed(1)}`, "0.6")}`,
-          "即時回復はない。速度低下の代償が大きい。",
+          `自分の行動4回ごとに、自動回復量×${mult.toFixed(2)}を基礎に回復する${
+            expect != null ? `（今なら約${expect}）` : ""
+          }。${growthTail(`×${next.toFixed(2)}`, "0.15")}`,
         ];
       },
-      use(ctx, level) {
-        ctx.addEffect(ctx.player, {
-          id: "pulse",
-          kind: "regenFlat",
-          value: scaled(3, 0.6, level),
-          turns: 3,
-        });
-        ctx.log(`${ctx.p}脈動。自動回復がわずかに強くなった。`, "heal");
+      afterPlayerSkill(ctx, level) {
+        tickPulse(ctx, level);
+      },
+      afterPlayerNormal(ctx, level) {
+        tickPulse(ctx, level);
       },
     },
     {
@@ -833,18 +859,23 @@
     },
     {
       id: "jab",
-      name: "刺突",
+      name: "針継",
       group: "攻撃",
-      blurb: "ごく軽い一撃。再使用が早い。",
-      tradeoff: "単発は弱い。連続で当てる前提。",
-      cooldown: 1,
-      gain: gain({ maxHp: 1, atk: 1, speed: 8 }),
+      blurb: "通常攻撃のあと、細い針がもう一度届く。",
+      tradeoff: "追撃は軽い。技のあとは乗らない。",
+      passive: true,
+      cooldown: 0,
+      gain: gain({ maxHp: 1, atk: 1, speed: 6 }),
       describe(level, stats) {
-        return [multText(1.05, 0.03, level, stats)];
+        return [
+          "通常攻撃のあと、追撃が1回入る。",
+          multText(0.35, 0.02, level, stats),
+        ];
       },
-      use(ctx, level) {
-        const r = ctx.damage(scaled(1.05, 0.03, level));
-        ctx.log(`${ctx.p}刺突。${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}`, "attack");
+      afterPlayerNormal(ctx, level) {
+        if (ctx.enemy.hp <= 0) return;
+        const r = ctx.damage(scaled(0.35, 0.02, level), { amp: false, fromPassive: true });
+        ctx.log(`針継。追撃で${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}`, "attack");
       },
     },
     {
@@ -908,28 +939,29 @@
     },
     {
       id: "drain",
-      name: "吸命",
+      name: "血吸印",
       group: "攻撃",
-      blurb: "吸血より回復寄り。火力は落ちる。",
-      tradeoff: "通らない相手では回復も薄い。火力は低く、再使用も遅い。",
-      cooldown: 3,
-      gain: gain({ maxHp: 3, atk: 0, healEff: 0.01, speed: -2 }),
+      blurb: "与えた傷の一部が、静かに体力へ戻る。",
+      tradeoff: "単発の回復技より弱い。通らない相手では戻らない。",
+      passive: true,
+      cooldown: 0,
+      gain: gain({ maxHp: 4, atk: 1, healEff: 0.015 }),
       describe(level, stats) {
-        const ratio = scaled(0.32, 0.012, level);
-        const next = scaled(0.32, 0.012, level + 1);
+        const ratio = scaled(0.12, 0.01, level);
+        const next = scaled(0.12, 0.01, level + 1);
         return [
-          multText(0.82, 0.025, level, stats),
-          `与ダメージの${pctNowLabel(ratio)}を基礎に回復する。${growthTail(
+          `自分が敵に与えたダメージの${pctNowLabel(ratio)}を基礎に回復する。${growthTail(
             pctNowLabel(next),
-            pctStepLabel(0.012)
+            pctStepLabel(0.01)
           )}`,
         ];
       },
-      use(ctx, level) {
-        const r = ctx.damage(scaled(0.82, 0.025, level));
-        const healed = ctx.heal(ctx.player, r.dmg * scaled(0.32, 0.012, level));
-        const got = healed.got;
-        ctx.log(`${ctx.p}吸命。${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}${got}回復した。${ctx.overNote(healed.over)}`, "attack");
+      afterPlayerDeal(ctx, level, hit) {
+        if (!hit || hit.dmg <= 0) return;
+        const healed = ctx.heal(ctx.player, hit.dmg * scaled(0.12, 0.01, level));
+        if (healed.got > 0) {
+          ctx.log(`血吸印。${healed.got}回復した。${ctx.overNote(healed.over)}`, "heal");
+        }
       },
     },
     {
@@ -937,19 +969,19 @@
       name: "奇襲",
       group: "攻撃",
       blurb: "戦闘序盤に強い。長引くと弱い。",
-      tradeoff: "開幕専用に近い。",
+      tradeoff: "開幕寄り。終盤専用の手順には向かない。",
       cooldown: 2,
       gain: gain({ maxHp: 2, atk: 3, speed: 5 }),
       describe(level, stats) {
         return [
-          `自分の行動が3回目までなら${atkMult(scaled(1.7, 0.06, level), stats)}。`,
-          `それ以降は${atkMult(scaled(0.75, 0.02, level), stats)}。`,
-          dualMultGrowth(1.7, 0.06, 0.75, 0.02, level),
+          `自分の行動が4回目までなら${atkMult(scaled(1.78, 0.06, level), stats)}。`,
+          `それ以降は${atkMult(scaled(0.95, 0.025, level), stats)}。`,
+          dualMultGrowth(1.78, 0.06, 0.95, 0.025, level),
         ];
       },
       use(ctx, level) {
-        const early = ctx.player.actionCount <= 3;
-        const mult = early ? scaled(1.7, 0.06, level) : scaled(0.75, 0.02, level);
+        const early = ctx.player.actionCount <= 4;
+        const mult = early ? scaled(1.78, 0.06, level) : scaled(0.95, 0.025, level);
         const r = ctx.damage(mult);
         ctx.log(`${ctx.p}奇襲。${early ? "先手を取り、" : "時機を逸し、"}${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}`, "attack");
       },
@@ -1119,53 +1151,86 @@
     },
     {
       id: "silence",
-      name: "封脈",
+      name: "封痕",
       group: "崩し",
-      blurb: "枯渇より短いが、すぐ自動回復を封じられる。",
-      tradeoff: "再生しない相手には過剰。即時ダメージはない。",
-      cooldown: 2,
+      blurb: "最初の自動回復を潰し、再生する敵へ短い封印を刻む。",
+      tradeoff: "再生しない相手にはほぼ効かない。",
+      passive: true,
+      cooldown: 0,
       gain: gain({ maxHp: 3, atk: 1, regenAmount: 1 }),
       describe(level) {
-        return ["敵の自動回復を、敵の3行動のあいだ止める。"];
+        const turns = Math.max(1, Math.floor(scaled(1, 0.35, level)));
+        const next = Math.max(1, Math.floor(scaled(1, 0.35, level + 1)));
+        return [
+          "戦闘中、敵の自動回復の最初の1回を封じる。",
+          `その後、自動回復持ちの敵への攻撃命中で、短い自動回復封じ（敵の${turns}行動）を付与する。${growthTail(
+            `${next}行動`,
+            "0.35切捨"
+          )}`,
+        ];
       },
-      use(ctx, level) {
+      beforeEnemyRegen(ctx, level, unit) {
+        const mem = ctx.player.passiveMem;
+        if (mem.silenceBlocked) return false;
+        mem.silenceBlocked = true;
+        ctx.log(`封痕。${unit.name}の最初の自動回復を封じた。`, "buff");
+        return true;
+      },
+      afterPlayerDeal(ctx, level, hit) {
+        if (!hit || hit.dmg <= 0) return;
+        if ((ctx.enemy.regenAmount || 0) <= 0) return;
+        const turns = Math.max(1, Math.floor(scaled(1, 0.35, level)));
+        const existing = ctx.findEffectById(ctx.enemy, "silence");
         ctx.addEffect(ctx.enemy, {
           id: "silence",
           kind: "noRegen",
           value: 1,
-          turns: 3,
+          turns,
           negative: true,
         });
-        ctx.log(`${ctx.p}封脈。${ctx.enemy.name}の自動回復を短く封じた。`, "buff");
+        if (!existing) {
+          ctx.log(`封痕。${ctx.enemy.name}の自動回復に短い傷を刻んだ。`, "buff");
+        }
       },
     },
     {
       id: "mark",
-      name: "印刻",
+      name: "印継",
       group: "崩し",
-      blurb: "弱体の印を刻み、弱点と組むための土台を作る。",
-      tradeoff: "単独では削れない。弱点や後続と組む前提。",
-      cooldown: 2,
-      gain: gain({ maxHp: 2, atk: 2, speed: 3 }),
-      describe(level) {
-        const down = scaled(0.24, 0.02, level);
-        const next = scaled(0.24, 0.02, level + 1);
+      blurb: "最初の攻撃技で印を刻み、次の一撃で爆発させる。",
+      tradeoff: "戦闘中に印の付与は一度きり。単発では伸びない。",
+      passive: true,
+      cooldown: 0,
+      gain: gain({ maxHp: 2, atk: 2, speed: 2 }),
+      describe(level, stats) {
         return [
-          `敵の攻撃力を${pctNowLabel(down)}下げる（敵の4行動）。弱体判定に乗る。${growthTail(
-            pctNowLabel(next),
-            pctStepLabel(0.02)
-          )}`,
+          "戦闘中、攻撃グループの技で初めて命中したとき、敵に印を刻む。",
+          `印のある敵への次の攻撃命中で追加ダメージ（${atkMult(scaled(0.45, 0.03, level), stats)}）を与え、印を消費する。`,
+          growthTail(`追撃×${scaled(0.45, 0.03, level + 1).toFixed(2)}`, "0.03"),
         ];
       },
-      use(ctx, level) {
-        ctx.addEffect(ctx.enemy, {
-          id: "mark",
-          kind: "atkPct",
-          value: -scaled(0.24, 0.02, level),
-          turns: 4,
-          negative: true,
-        });
-        ctx.log(`${ctx.p}印刻。${ctx.enemy.name}に印を刻んだ。`, "buff");
+      afterPlayerDeal(ctx, level, hit) {
+        if (!hit || hit.dmg <= 0 || ctx.enemy.hp <= 0) return;
+        const mem = ctx.player.passiveMem;
+        const marked = ctx.findEffectById(ctx.enemy, "mark-passive");
+        if (marked) {
+          ctx.enemy.effects = ctx.enemy.effects.filter((e) => e !== marked);
+          const r = ctx.damage(scaled(0.45, 0.03, level), { amp: false, fromPassive: true });
+          ctx.log(`印継。印が弾け、${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}`, "attack");
+          return;
+        }
+        const casting = ctx._castingSkill;
+        if (casting && casting.group === "攻撃" && !mem.markOnce) {
+          mem.markOnce = true;
+          ctx.addEffect(ctx.enemy, {
+            id: "mark-passive",
+            kind: "marked",
+            value: 1,
+            turns: 8,
+            negative: true,
+          });
+          ctx.log(`印継。${ctx.enemy.name}に印を刻んだ。`, "buff");
+        }
       },
     },
     {
@@ -1213,30 +1278,33 @@
     },
     {
       id: "mirror",
-      name: "鏡面",
+      name: "鏡応",
       group: "守り",
-      blurb: "反射より返しは弱いが、軽減はやや厚い。",
-      tradeoff: "一度返すと解ける。",
-      cooldown: 3,
-      gain: gain({ maxHp: 4, def: 4, speed: 2 }),
-      describe(level, stats) {
-        const ratio = scaled(0.35, 0.02, level);
-        const next = scaled(0.35, 0.02, level + 1);
+      blurb: "受けた打撃の三つに一度、一部が跳ね返る。",
+      tradeoff: "毎回は返らない。軽減そのものはない。",
+      passive: true,
+      cooldown: 0,
+      gain: gain({ maxHp: 4, def: 3, speed: 1 }),
+      describe(level) {
+        const ratio = scaled(0.28, 0.02, level);
+        const next = scaled(0.28, 0.02, level + 1);
         return [
-          "次に受ける打撃を28%軽減し、軽減後の一部を返す。",
-          `返しの割合は${pctNowLabel(ratio)}。${growthTail(pctNowLabel(next), pctStepLabel(0.02))}`,
+          `被弾3回ごとに、その打撃の${pctNowLabel(ratio)}を相手へ返す。${growthTail(
+            pctNowLabel(next),
+            pctStepLabel(0.02)
+          )}`,
         ];
       },
-      use(ctx, level) {
-        ctx.addEffect(ctx.player, {
-          id: "mirror",
-          kind: "reflect",
-          value: scaled(0.35, 0.02, level),
-          reduction: 0.28,
-          once: true,
-          turns: 3,
-        });
-        ctx.log(`${ctx.p}鏡面。次の一撃を受ける構えを取った。`, "buff");
+      afterPlayerTake(ctx, level, hit) {
+        if (!hit || hit.dmg <= 0 || ctx.enemy.hp <= 0) return;
+        const mem = ctx.player.passiveMem;
+        mem.mirrorHits = (mem.mirrorHits || 0) + 1;
+        if (mem.mirrorHits % 3 !== 0) return;
+        const back = Math.max(1, Math.floor(hit.dmg * scaled(0.28, 0.02, level)));
+        const hurt = ctx.hurt(ctx.enemy, back, "mirror");
+        if (hurt.dealt > 0) {
+          ctx.log(`鏡応。打撃が跳ね返り、${ctx.enemy.name}に${hurt.dealt}のダメージ。${ctx.overNote(hurt.over)}`, "attack");
+        }
       },
     },
     {
@@ -1267,25 +1335,31 @@
     },
     {
       id: "secondwind",
-      name: "息吹",
+      name: "息継",
       group: "回復",
-      blurb: "体力がかなり減ったときだけ戻す。",
-      tradeoff: "条件が厳しい。余裕があるときは使えない。",
-      cooldown: 6,
-      gain: gain({ maxHp: 5, healEff: 0.01, speed: -2 }),
-      available(ctx) {
-        return ctx.player.hp / ctx.player.maxHp <= 0.35;
-      },
+      blurb: "体力が尽きかけたとき、一度だけ大きく息を継ぐ。",
+      tradeoff: "戦闘中に一度きり。早めに落とされると間に合わない。",
+      passive: true,
+      cooldown: 0,
+      gain: gain({ maxHp: 6, healEff: 0.02 }),
       describe(level, stats) {
         return [
-          "体力35%以下のときだけ。",
-          healPctText(0.12, 0.005, level, stats),
+          "戦闘中、体力が最大の35%以下へ落ちた最初の瞬間に一度だけ発動する。",
+          healPctText(0.14, 0.008, level, stats),
         ];
       },
-      use(ctx, level) {
-        const healed = ctx.heal(ctx.player, ctx.player.maxHp * scaled(0.12, 0.005, level));
-        const got = healed.got;
-        ctx.log(`${ctx.p}息吹。体力が${got}回復した。${ctx.overNote(healed.over)}`, "heal");
+      afterPlayerTake(ctx, level, hit) {
+        if (!hit || hit.dmg <= 0) return;
+        const mem = ctx.player.passiveMem;
+        if (mem.secondwindTriggered) return;
+        const max = ctx.player.maxHp;
+        const now = ctx.player.hp;
+        const before = now + hit.dmg;
+        if (before / max > 0.35 && now / max <= 0.35) {
+          mem.secondwindTriggered = true;
+          const healed = ctx.heal(ctx.player, ctx.player.maxHp * scaled(0.14, 0.008, level));
+          ctx.log(`息継。体力が${healed.got}回復した。${ctx.overNote(healed.over)}`, "heal");
+        }
       },
     },
     {
@@ -1312,27 +1386,28 @@
     },
     {
       id: "keen",
-      name: "鋭気",
+      name: "余刃",
       group: "補助",
-      blurb: "集中より弱いが、通常攻撃にも乗る一時強化。",
-      tradeoff: "技専用の集中には単発で負ける。",
-      cooldown: 3,
-      gain: gain({ maxHp: 2, atk: 2, speed: 2, atkEff: 0.02 }),
+      blurb: "攻撃技のあと、次の一撃に切れ味が残る。",
+      tradeoff: "攻撃技以外では貯まらない。通常攻撃にも乗る。",
+      passive: true,
+      cooldown: 0,
+      gain: gain({ maxHp: 2, atk: 2, atkEff: 0.03 }),
       describe(level, stats) {
         return [
-          `次の3行動、${atkBuffText(0.18, 0.012, level, stats)}`,
-          "通常攻撃にも乗る。",
+          "攻撃グループの技を使ったあと、次に出す攻撃技の威力上乗せが乗る（通常攻撃では消費しない）。",
+          ampText(0.28, 0.025, level, stats),
         ];
       },
-      use(ctx, level) {
+      afterPlayerSkill(ctx, level, skill) {
+        if (!skill || skill.group !== "攻撃") return;
         ctx.addEffect(ctx.player, {
           id: "keen",
-          kind: "atkPct",
-          value: scaled(0.18, 0.012, level),
-          turns: 3,
-          scale: "atk",
+          kind: "skillAmp",
+          value: scaled(0.28, 0.025, level),
+          turns: null,
         });
-        ctx.log(`${ctx.p}鋭気。刃が軽く研がれた。`, "buff");
+        ctx.log(`余刃。次の攻撃技に切れ味が残った。`, "buff");
       },
     },
     {
@@ -1642,31 +1717,31 @@
       cooldown: 3,
       gain: gain({ maxHp: 5, regenAmount: 2, atkEff: 0.04, atk: 1, speed: 1 }),
       describe(level, stats) {
-        const per = scaled(0.012, 0.004, level);
-        const nextPer = scaled(0.012, 0.004, level + 1);
+        const per = scaled(0.018, 0.005, level);
+        const nextPer = scaled(0.018, 0.005, level + 1);
         const regen = stats ? Math.max(0, stats.regenAmount || 0) : 0;
-        const rate = Math.min(0.55, regen * per);
+        const rate = Math.min(0.65, regen * per);
         const flat =
           stats && rate > 0
             ? Math.floor(Math.max(1, stats.atk) * rate * (stats.atkEff || 1))
             : null;
         return [
-          `次の2行動、自動回復量×${per.toFixed(3)}分の攻撃力上昇（上限55%、攻撃力補助効率も乗る）${
+          `次の3行動、自動回復量×${per.toFixed(3)}分の攻撃力上昇（上限65%、攻撃力補助効率も乗る）${
             flat != null ? `。今なら+${pctNowLabel(rate)}(+${flat})` : ""
           }。`,
-          growthTail(`係数${nextPer.toFixed(3)}`, "0.004"),
+          growthTail(`係数${nextPer.toFixed(3)}`, "0.005"),
           "この行動では攻撃しない。",
         ];
       },
       use(ctx, level) {
-        const per = scaled(0.012, 0.004, level);
-        const rate = Math.min(0.55, Math.max(0, ctx.player.regenAmount || 0) * per);
+        const per = scaled(0.018, 0.005, level);
+        const rate = Math.min(0.65, Math.max(0, ctx.player.regenAmount || 0) * per);
         if (rate > 0) {
           ctx.addEffect(ctx.player, {
             id: "cycle",
             kind: "atkPct",
             value: rate,
-            turns: 2,
+            turns: 3,
             scale: "atk",
           });
         }
@@ -1888,31 +1963,26 @@
     },
     {
       id: "standoff",
-      name: "拮抗",
+      name: "拮抗牙",
       group: "攻撃",
-      blurb: "互いの体力割合が近いときだけ鋭くなる。",
-      tradeoff: "差が開くと一気に弱くなる。手順で体力差を見る技。",
-      cooldown: 2,
-      gain: gain({ maxHp: 3, atk: 3, atkEff: 0.02, speed: 1 }),
+      blurb: "互いの体力割合が近いとき、打撃のあとに牙が追う。",
+      tradeoff: "差が開くと追撃は出ない。",
+      passive: true,
+      cooldown: 0,
+      gain: gain({ maxHp: 3, atk: 2, atkEff: 0.02, speed: 1 }),
       describe(level, stats) {
-        const close = scaled(1.82, 0.07, level);
-        const far = scaled(0.6, 0.02, level);
         return [
-          `体力割合の差が20%以内なら${atkMult(close, stats)}。`,
-          `差が20%を超えるなら${atkMult(far, stats)}。`,
-          dualMultGrowth(1.82, 0.07, 0.6, 0.02, level),
+          "自分と敵の体力割合の差が18%以内のとき、命中のあとに追撃が入る。",
+          multText(0.28, 0.02, level, stats),
         ];
       },
-      use(ctx, level) {
+      afterPlayerDeal(ctx, level, hit) {
+        if (!hit || hit.dmg <= 0 || ctx.enemy.hp <= 0) return;
         const pRate = ctx.player.hp / ctx.player.maxHp;
         const eRate = ctx.enemy.hp / ctx.enemy.maxHp;
-        const close = Math.abs(pRate - eRate) <= 0.2;
-        const mult = close ? scaled(1.82, 0.07, level) : scaled(0.6, 0.02, level);
-        const r = ctx.damage(mult);
-        ctx.log(
-          `${ctx.p}拮抗。${close ? "互角の刃が交差し、" : "差が開きすぎて、"}${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}`,
-          "attack"
-        );
+        if (Math.abs(pRate - eRate) > 0.18) return;
+        const r = ctx.damage(scaled(0.28, 0.02, level), { amp: false, fromPassive: true });
+        ctx.log(`拮抗牙。互角の隙を噛み、${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}`, "attack");
       },
     },
     // ---- 革新的ユニーク10種 ----
@@ -2366,24 +2436,29 @@
     },
     {
       id: "dullhex",
-      name: "鈍律",
+      name: "鈍視",
       group: "崩し",
-      blurb: "敵の攻撃力補助効率を削り、バフ型を鈍らせる。攻撃はしない。",
-      tradeoff: "敵がバフを使わないと効果が薄い。",
-      cooldown: 3,
+      blurb: "敵が攻撃を高めた瞬間、その乗りを鈍らせる。",
+      tradeoff: "敵が攻撃バフを張らないと発動しない。",
+      passive: true,
+      cooldown: 0,
       gain: gain({ maxHp: 3, atk: 1, def: 2 }),
       describe(level) {
-        return [`敵の次の5行動、${flatEffText("攻撃力補助効率", -0.26, -0.03, level)}`];
+        return [
+          "敵が攻撃力上昇（割合）を得たとき、攻撃力補助効率を下げる弱体を付与する。",
+          `敵の次の4行動、${flatEffText("攻撃力補助効率", -0.22, -0.025, level)}`,
+        ];
       },
-      use(ctx, level) {
+      afterEnemyGainEffect(ctx, level, effect) {
+        if (!effect || effect.kind !== "atkPct" || !(effect.value > 0) || effect.negative) return;
         ctx.addEffect(ctx.enemy, {
           id: "dullhex",
           kind: "atkEffFlat",
-          value: -scaled(0.26, 0.03, level),
-          turns: 5,
+          value: -scaled(0.22, 0.025, level),
+          turns: 4,
           negative: true,
         });
-        ctx.log(`${ctx.p}鈍律。${ctx.enemy.name}の刃が鈍った。`, "buff");
+        ctx.log(`鈍視。${ctx.enemy.name}の刃の乗りが鈍った。`, "buff");
       },
     },
     {
@@ -2409,24 +2484,29 @@
     },
     {
       id: "frailty",
-      name: "脆律",
+      name: "脆視",
       group: "崩し",
-      blurb: "敵の防御力補助効率を削り、守りバフを効きにくくする。攻撃はしない。",
-      tradeoff: "敵が守りを張らないと恩恵が薄い。",
-      cooldown: 3,
+      blurb: "敵が守りを厚くした瞬間、その乗りを脆くする。",
+      tradeoff: "敵が防御バフを張らないと発動しない。",
+      passive: true,
+      cooldown: 0,
       gain: gain({ maxHp: 3, atk: 1, def: 3 }),
       describe(level) {
-        return [`敵の次の5行動、${flatEffText("防御力補助効率", -0.26, -0.03, level)}`];
+        return [
+          "敵が防御力上昇（割合）を得たとき、防御力補助効率を下げる弱体を付与する。",
+          `敵の次の4行動、${flatEffText("防御力補助効率", -0.22, -0.025, level)}`,
+        ];
       },
-      use(ctx, level) {
+      afterEnemyGainEffect(ctx, level, effect) {
+        if (!effect || effect.kind !== "defPct" || !(effect.value > 0) || effect.negative) return;
         ctx.addEffect(ctx.enemy, {
           id: "frailty",
           kind: "defEffFlat",
-          value: -scaled(0.26, 0.03, level),
-          turns: 5,
+          value: -scaled(0.22, 0.025, level),
+          turns: 4,
           negative: true,
         });
-        ctx.log(`${ctx.p}脆律。${ctx.enemy.name}の守りが脆くなった。`, "buff");
+        ctx.log(`脆視。${ctx.enemy.name}の守りの乗りが脆くなった。`, "buff");
       },
     },
     {
@@ -2452,24 +2532,37 @@
     },
     {
       id: "healsap",
-      name: "療削",
+      name: "癒腐",
       group: "崩し",
-      blurb: "敵の体力回復効率そのものを削る。攻撃はしない。",
-      tradeoff: "回復しない相手には効果が薄い。",
-      cooldown: 3,
+      blurb: "自動回復する敵への一撃が、回復の効きを腐らせる。",
+      tradeoff: "再生しない相手には発動しない。",
+      passive: true,
+      cooldown: 0,
       gain: gain({ maxHp: 4, atk: 1, regenAmount: 1 }),
       describe(level) {
-        return [`敵の次の5行動、${flatEffText("体力回復効率", -0.28, -0.035, level)}`];
+        const down = scaled(0.22, 0.025, level);
+        const next = scaled(0.22, 0.025, level + 1);
+        return [
+          `自動回復を持つ敵への攻撃命中で、回復効率を${pctNowLabel(down)}下げる（敵の3行動）。${growthTail(
+            pctNowLabel(next),
+            pctStepLabel(0.025)
+          )}`,
+        ];
       },
-      use(ctx, level) {
+      afterPlayerDeal(ctx, level, hit) {
+        if (!hit || hit.dmg <= 0) return;
+        if ((ctx.enemy.regenAmount || 0) <= 0) return;
+        const existing = ctx.findEffectById(ctx.enemy, "healsap");
         ctx.addEffect(ctx.enemy, {
           id: "healsap",
-          kind: "healEffFlat",
-          value: -scaled(0.28, 0.035, level),
-          turns: 5,
+          kind: "healDown",
+          value: scaled(0.22, 0.025, level),
+          turns: 3,
           negative: true,
         });
-        ctx.log(`${ctx.p}療削。${ctx.enemy.name}の回復の効きを削った。`, "buff");
+        if (!existing) {
+          ctx.log(`癒腐。${ctx.enemy.name}の回復の効きが腐った。`, "buff");
+        }
       },
     },
     {
@@ -2517,30 +2610,36 @@
     },
     {
       id: "ironveil",
-      name: "鉄膜",
+      name: "鉄衣",
       group: "守り",
-      blurb: "被ダメージ軽減を直接押し上げる薄い鉄の膜。",
-      tradeoff: "防御力バフではない。重ねすぎると頭打ちしやすい。",
-      cooldown: 4,
-      gain: gain({ maxHp: 5, def: 2, dmgReduction: 0.015 }),
+      blurb: "打撃を受けるたび、短い鉄の衣が肌を覆う。",
+      tradeoff: "再発動まで自分の行動2回を空ける。",
+      passive: true,
+      cooldown: 0,
+      gain: gain({ maxHp: 5, def: 2, dmgReduction: 0.01 }),
       describe(level) {
-        const now = scaled(0.12, 0.015, level);
-        const next = scaled(0.12, 0.015, level + 1);
+        const now = scaled(0.14, 0.015, level);
+        const next = scaled(0.14, 0.015, level + 1);
         return [
-          `次の4行動、被ダメージ軽減+${pctNowLabel(now)}。${growthTail(
+          `被弾時、次の2行動の被ダメージ軽減+${pctNowLabel(now)}。自分の行動2回空けるまで再発動しない。${growthTail(
             `+${pctNowLabel(next)}`,
             pctStepLabel(0.015)
           )}`,
         ];
       },
-      use(ctx, level) {
+      afterPlayerTake(ctx, level, hit) {
+        if (!hit || hit.dmg <= 0) return;
+        const mem = ctx.player.passiveMem;
+        const readyAt = mem.ironveilReadyAt || 0;
+        if (ctx.player.actionCount < readyAt) return;
+        mem.ironveilReadyAt = ctx.player.actionCount + 2;
         ctx.addEffect(ctx.player, {
           id: "ironveil",
           kind: "dr",
-          value: scaled(0.12, 0.015, level),
-          turns: 4,
+          value: scaled(0.14, 0.015, level),
+          turns: 2,
         });
-        ctx.log(`${ctx.p}鉄膜。薄い鉄が肌を覆った。`, "buff");
+        ctx.log(`鉄衣。短い鉄が肌を覆った。`, "buff");
       },
     },
     {
@@ -2627,25 +2726,33 @@
     },
     {
       id: "hexblade",
-      name: "呪刃",
+      name: "呪継",
       group: "攻撃",
-      blurb: "自分が弱体を負っているほど鋭い刃になる。",
-      tradeoff: "弱体がないと弱い。浄化と両立しにくい。",
-      cooldown: 2,
-      gain: gain({ maxHp: 3, atk: 3, def: 1, atkEff: 0.02 }),
+      blurb: "自分が弱体を負っているあいだ、打撃が呪いに継がれる。",
+      tradeoff: "弱体がないと沈黙する。浄化と両立しにくい。",
+      passive: true,
+      cooldown: 0,
+      gain: gain({ maxHp: 3, atk: 2, def: 1, atkEff: 0.02 }),
       describe(level, stats) {
         return [
-          `自分が弱体中なら${atkMult(scaled(2.15, 0.08, level), stats)}。`,
-          `弱体がなければ${atkMult(scaled(0.88, 0.03, level), stats)}。`,
-          dualMultGrowth(2.15, 0.08, 0.88, 0.03, level),
+          "自分が弱体中の攻撃命中で、短い追撃が入る。",
+          multText(0.22, 0.02, level, stats),
+          "あわせて敵の攻撃力を短く下げる（敵の2行動）。",
         ];
       },
-      use(ctx, level) {
-        const cursed = ctx.hasDebuff(ctx.player);
-        const mult = cursed ? scaled(2.15, 0.08, level) : scaled(0.88, 0.03, level);
-        const r = ctx.damage(mult);
+      afterPlayerDeal(ctx, level, hit) {
+        if (!hit || hit.dmg <= 0 || ctx.enemy.hp <= 0) return;
+        if (!ctx.hasDebuff(ctx.player)) return;
+        const r = ctx.damage(scaled(0.22, 0.02, level), { amp: false, fromPassive: true });
+        ctx.addEffect(ctx.enemy, {
+          id: "hexblade",
+          kind: "atkPct",
+          value: -scaled(0.12, 0.01, level),
+          turns: 2,
+          negative: true,
+        });
         ctx.log(
-          `${ctx.p}呪刃。${cursed ? "呪いを刃に乗せ、" : "呪いがなく、"}${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}`,
+          `呪継。呪いを継ぎ、${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}`,
           "attack"
         );
       },
@@ -2714,52 +2821,61 @@
     },
     {
       id: "outpace",
-      name: "先手",
+      name: "先制牙",
       group: "攻撃",
-      blurb: "自分の方が速いとき、先に深く斬る。",
-      tradeoff: "遅い相手には弱い。疾風や足枷と組む前提。",
-      cooldown: 2,
-      gain: gain({ maxHp: 2, atk: 2, speed: 6, atkEff: 0.02 }),
+      blurb: "自分が速いあいだ、打撃が鋭く、たまに牙が追う。",
+      tradeoff: "敵より遅いと発動しない。",
+      passive: true,
+      cooldown: 0,
+      gain: gain({ maxHp: 2, atk: 2, speed: 5, atkEff: 0.02 }),
       describe(level, stats) {
+        const bonus = scaled(0.1, 0.012, level);
+        const next = scaled(0.1, 0.012, level + 1);
         return [
-          `自分の行動速度が敵より高いとき${atkMult(scaled(2.05, 0.07, level), stats)}。`,
-          `そうでなければ${atkMult(scaled(0.85, 0.025, level), stats)}。`,
-          dualMultGrowth(2.05, 0.07, 0.85, 0.025, level),
+          `自分の行動速度が敵より高いとき、命中ダメージの${pctNowLabel(bonus)}を追加で与える。${growthTail(
+            pctNowLabel(next),
+            pctStepLabel(0.012)
+          )}`,
+          `さらに3回に1回、追撃（${atkMult(scaled(0.3, 0.02, level), stats)}）が入る。`,
         ];
       },
-      use(ctx, level) {
-        const fast = ctx.effectiveSpeed(ctx.player) > ctx.effectiveSpeed(ctx.enemy);
-        const mult = fast ? scaled(2.05, 0.07, level) : scaled(0.85, 0.025, level);
-        const r = ctx.damage(mult);
+      afterPlayerDeal(ctx, level, hit) {
+        if (!hit || hit.dmg <= 0 || ctx.enemy.hp <= 0) return;
+        if (ctx.effectiveSpeed(ctx.player) <= ctx.effectiveSpeed(ctx.enemy)) return;
+        const bonus = Math.max(1, Math.floor(hit.dmg * scaled(0.1, 0.012, level)));
+        const hurt = ctx.hurt(ctx.enemy, bonus, "outpace");
+        const mem = ctx.player.passiveMem;
+        mem.outpaceHits = (mem.outpaceHits || 0) + 1;
+        let extra = "";
+        if (mem.outpaceHits % 3 === 0 && ctx.enemy.hp > 0) {
+          const r = ctx.damage(scaled(0.3, 0.02, level), { amp: false, fromPassive: true });
+          extra = `追撃${r.dmg}。${ctx.overNote(r.over)}`;
+        }
         ctx.log(
-          `${ctx.p}先手。${fast ? "先手を取り、" : "後れを取り、"}${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}`,
+          `先制牙。${hurt.dealt}の追い打ち。${ctx.overNote(hurt.over)}${extra}`,
           "attack"
         );
       },
     },
     {
       id: "wardfocus",
-      name: "守集",
+      name: "守継",
       group: "補助",
-      blurb: "次の守り技を厚くする。攻撃はしない。",
-      tradeoff: "次が攻撃や回復だと乗らずに残る。",
-      cooldown: 2,
-      gain: gain({ maxHp: 4, def: 2, defEff: 0.05 }),
+      blurb: "守り技の厚みが、常に一段継がれる。",
+      tradeoff: "守りを張らないビルドでは沈黙する。",
+      passive: true,
+      cooldown: 0,
+      gain: gain({ maxHp: 4, def: 2, defEff: 0.04 }),
       describe(level) {
+        const now = scaled(0.22, 0.03, level);
+        const next = scaled(0.22, 0.03, level + 1);
         return [
-          `次に使う守り技の効果量を${pctNowLabel(scaled(0.45, 0.04, level))}上乗せする。`,
-          growthTail(pctNowLabel(scaled(0.45, 0.04, level + 1)), "4%"),
-          "防御上昇・軽減・層盾・反射・虚盾などに乗る。一度使うと消える。",
+          `自分に付く守り効果（防御上昇・軽減・層盾・反射・吸収）の効果量が常に${pctNowLabel(now)}上乗せされる。${growthTail(
+            pctNowLabel(next),
+            pctStepLabel(0.03)
+          )}`,
+          "バフ枠は消費しない。所持しているだけで働く。",
         ];
-      },
-      use(ctx, level) {
-        ctx.addEffect(ctx.player, {
-          id: "wardfocus",
-          kind: "guardAmp",
-          value: scaled(0.45, 0.04, level),
-          turns: null,
-        });
-        ctx.log(`${ctx.p}守集。次の守りに厚みをためた。`, "buff");
       },
     },
     {
@@ -2767,26 +2883,26 @@
       name: "積毒",
       group: "崩し",
       blurb: "すでに毒がある相手には毒を濃くする。なければ新しい毒を回す。",
-      tradeoff: "毒がない開幕は普通の毒刃に近い。",
+      tradeoff: "毒がない開幕でも毒刃級。濃縮でさらに伸びる。",
       cooldown: 2,
       gain: gain({ maxHp: 2, atk: 3, speed: 2, healEff: -0.015 }),
       describe(level, stats) {
-        const base = scaled(0.4, 0.03, level);
-        const boost = scaled(0.58, 0.04, level);
+        const base = scaled(0.5, 0.035, level);
+        const boost = scaled(0.68, 0.045, level);
         return [
-          `毒がなければ、5行動の毒（${atkMult(base, stats)}／回）。`,
-          `すでに毒があるときは上書きして濃くし、6行動の毒（${atkMult(boost, stats)}／回）。`,
+          `毒がなければ、6行動の毒（${atkMult(base, stats)}／回）。`,
+          `すでに毒があるときは上書きして濃くし、7行動の毒（${atkMult(boost, stats)}／回）。`,
           growthTail(
-            `基礎×${scaled(0.4, 0.03, level + 1).toFixed(2)}／濃縮×${scaled(0.58, 0.04, level + 1).toFixed(2)}`,
-            "0.03／0.04"
+            `基礎×${scaled(0.5, 0.035, level + 1).toFixed(2)}／濃縮×${scaled(0.68, 0.045, level + 1).toFixed(2)}`,
+            "0.035／0.045"
           ),
         ];
       },
       use(ctx, level) {
         const existing = ctx.findEffect(ctx.enemy, "dot");
         const boosted = !!existing;
-        const ratio = boosted ? scaled(0.58, 0.04, level) : scaled(0.4, 0.03, level);
-        const turns = boosted ? 6 : 5;
+        const ratio = boosted ? scaled(0.68, 0.045, level) : scaled(0.5, 0.035, level);
+        const turns = boosted ? 7 : 6;
         const offense = ctx.snapshotOffense({ consumeAmp: false });
         ctx.addEffect(ctx.enemy, {
           id: "stackvenom",
@@ -2806,40 +2922,30 @@
     },
     {
       id: "breakglass",
-      name: "破鏡",
+      name: "碎映",
       group: "崩し",
-      blurb: "反射や吸収の構えを砕き、その拍子に削る。",
-      tradeoff: "構えがない相手には軽い弱体だけ。",
-      cooldown: 3,
+      blurb: "反射や吸収に触れた打撃が、構えを砕いて追撃する。",
+      tradeoff: "構えがない相手には発動しない。",
+      passive: true,
+      cooldown: 0,
       gain: gain({ maxHp: 2, atk: 3, def: 1, dmgBonus: 0.008 }),
       describe(level, stats) {
         return [
-          `敵に反射または吸収があるとき、それを外し${atkMult(scaled(1.55, 0.06, level), stats)}。`,
-          `なければ攻撃力を${pctNowLabel(scaled(0.16, 0.015, level))}下げる（敵の3行動）。`,
-          growthTail(
-            `破砕×${scaled(1.55, 0.06, level + 1).toFixed(2)}／低下${pctNowLabel(scaled(0.16, 0.015, level + 1))}`,
-            "0.06／1.5%"
-          ),
+          "攻撃命中時、敵に反射または吸収があればそれを外し、追撃する。",
+          multText(0.55, 0.04, level, stats),
         ];
       },
-      use(ctx, level) {
-        const purged = ctx.purgeKinds(ctx.enemy, ["reflect", "absorb"]);
-        if (purged > 0) {
-          const r = ctx.damage(scaled(1.55, 0.06, level));
-          ctx.log(
-            `${ctx.p}破鏡。構えを砕き、${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}`,
-            "attack"
-          );
-          return;
-        }
-        ctx.addEffect(ctx.enemy, {
-          id: "breakglass",
-          kind: "atkPct",
-          value: -scaled(0.16, 0.015, level),
-          turns: 3,
-          negative: true,
-        });
-        ctx.log(`${ctx.p}破鏡。砕く構えはなく、${ctx.enemy.name}の攻撃を少し下げた。`, "buff");
+      afterPlayerDeal(ctx, level, hit) {
+        if (!hit || ctx.enemy.hp <= 0) return;
+        const touched = (hit.reflect || 0) > 0 || (hit.absorbed || 0) > 0;
+        const remains = ctx.enemy.effects.some((e) => e.kind === "reflect" || e.kind === "absorb");
+        if (!touched && !remains) return;
+        if (remains) ctx.purgeKinds(ctx.enemy, ["reflect", "absorb"]);
+        const r = ctx.damage(scaled(0.55, 0.04, level), { amp: false, fromPassive: true });
+        ctx.log(
+          `碎映。構えを砕き、${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}`,
+          "attack"
+        );
       },
     },
     {
@@ -2874,27 +2980,22 @@
     },
     {
       id: "punishwall",
-      name: "逆療壁",
+      name: "療刃",
       group: "守り",
-      blurb: "回復した分の一部を光にして敵へ返す壁。",
-      tradeoff: "回復しないと反撃もない。攻撃はしない。",
-      cooldown: 4,
+      blurb: "回復した分の一部が、光の刃となって敵へ向かう。",
+      tradeoff: "回復しないと光も出ない。",
+      passive: true,
+      cooldown: 0,
       gain: gain({ maxHp: 5, def: 2, healEff: 0.02, regenAmount: 1 }),
       describe(level) {
-        const rate = scaled(0.45, 0.05, level);
+        const rate = scaled(0.2, 0.025, level);
+        const next = scaled(0.2, 0.025, level + 1);
         return [
-          `次の4行動、自分が回復した量の${pctNowLabel(rate)}を敵へのダメージにする。`,
-          growthTail(pctNowLabel(scaled(0.45, 0.05, level + 1)), "5%"),
+          `自分が回復した量の${pctNowLabel(rate)}を、常に敵へのダメージにする。${growthTail(
+            pctNowLabel(next),
+            pctStepLabel(0.025)
+          )}`,
         ];
-      },
-      use(ctx, level) {
-        ctx.addEffect(ctx.player, {
-          id: "punishwall",
-          kind: "punishwall",
-          value: scaled(0.45, 0.05, level),
-          turns: 4,
-        });
-        ctx.log(`${ctx.p}逆療壁。傷が光に変わる構え。`, "buff");
       },
     },
     {
@@ -2929,29 +3030,32 @@
     },
     {
       id: "siphonseal",
-      name: "奪印",
+      name: "奪気",
       group: "崩し",
-      blurb: "敵の強化を1つ奪い取り、自分のものにする。",
-      tradeoff: "強化がない相手には何も起きない。攻撃はしない。",
-      cooldown: 3,
+      blurb: "強化中の敵への一撃が、その気を奪い取る。",
+      tradeoff: "強化がない相手には発動しない。再発動まで自分の行動2回。",
+      passive: true,
+      cooldown: 0,
       gain: gain({ maxHp: 3, atk: 2, def: 1, atkEff: 0.02, speed: 1 }),
       describe(level) {
-        const keep = scaled(0.65, 0.04, level);
+        const keep = scaled(0.55, 0.04, level);
         return [
-          `敵の強化を1つ奪い、自分に移す（残り行動は約${pctNowLabel(keep)}に短縮）。`,
-          growthTail(pctNowLabel(scaled(0.65, 0.04, level + 1)), "4%"),
-          "弱体や毒は奪えない。強化がなければ何もしない。",
+          `強化中の敵への攻撃命中で、強化を1つ奪い自分へ移す（残り行動は約${pctNowLabel(keep)}）。`,
+          growthTail(pctNowLabel(scaled(0.55, 0.04, level + 1)), "4%"),
+          "自分の行動2回空けるまで再発動しない。",
         ];
       },
-      use(ctx, level) {
-        const keep = scaled(0.65, 0.04, level);
+      afterPlayerDeal(ctx, level, hit) {
+        if (!hit || hit.dmg <= 0) return;
+        if (!ctx.hasBuff(ctx.enemy)) return;
+        const mem = ctx.player.passiveMem;
+        const readyAt = mem.siphonReadyAt || 0;
+        if (ctx.player.actionCount < readyAt) return;
+        const keep = scaled(0.55, 0.04, level);
         const stolen = ctx.stealBuff(ctx.enemy, ctx.player, keep);
-        ctx.log(
-          stolen
-            ? `${ctx.p}奪印。${ctx.enemy.name}の強化を奪い取った。`
-            : `${ctx.p}奪印。奪える強化がなかった。`,
-          "buff"
-        );
+        if (!stolen) return;
+        mem.siphonReadyAt = ctx.player.actionCount + 2;
+        ctx.log(`奪気。${ctx.enemy.name}の強化を奪い取った。`, "buff");
       },
     },
   ];
@@ -3041,4 +3145,6 @@
   W.atkMult = atkMult;
   W.cooldownReuseText = cooldownReuseText;
   W.cooldownShort = cooldownShort;
+  W.passiveReuseText = passiveReuseText;
+  W.passiveShort = passiveShort;
 })(typeof window !== "undefined" ? window : globalThis);

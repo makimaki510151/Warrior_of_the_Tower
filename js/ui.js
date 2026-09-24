@@ -268,7 +268,24 @@
     const filtered = raw.filter(
       (line) => !/行動あけると再使用|自分の行動を\d+回空けるとまた使える/.test(line)
     );
+    if (skill.passive) {
+      return [...filtered, W.passiveReuseText ? W.passiveReuseText() : "所持するだけで発動する（手順には組まない）。"];
+    }
     return [...filtered, W.cooldownReuseText(skill.cooldown)];
+  }
+
+  function skillCdShort(skill) {
+    if (skill && skill.passive) {
+      return W.passiveShort ? W.passiveShort() : "常時（パッシブ）";
+    }
+    return W.cooldownShort(skill.cooldown);
+  }
+
+  function skillCdReuse(skill) {
+    if (skill && skill.passive) {
+      return W.passiveReuseText ? W.passiveReuseText() : "所持するだけで発動する（手順には組まない）。";
+    }
+    return W.cooldownReuseText(skill.cooldown);
   }
 
   const GROUP_STYLE = {
@@ -291,7 +308,10 @@
 
   function skillGroupTag(skill) {
     const g = groupStyle(skill);
-    return `<span class="skill-tag skill-tag-${esc(g.slug)}" title="${esc(g.tip)}">${esc(g.tag)}</span>`;
+    const passive = skill && skill.passive
+      ? `<span class="skill-tag skill-tag-passive" title="パッシブ技（手順に組まない）">パッシブ</span>`
+      : "";
+    return `${passive}<span class="skill-tag skill-tag-${esc(g.slug)}" title="${esc(g.tip)}">${esc(g.tag)}</span>`;
   }
 
   function skillCardInner(skill, state, kind) {
@@ -302,8 +322,8 @@
     const showFull = ui.detail || kind === "zoom";
     const meta =
       sourceKind === "offer"
-        ? `${level ? `Lv.${level}→${level + 1}` : "新規"} · ${W.cooldownShort(skill.cooldown)}`
-        : `Lv.${level} · ${W.cooldownShort(skill.cooldown)}`;
+        ? `${level ? `Lv.${level}→${level + 1}` : "新規"} · ${skillCdShort(skill)}`
+        : `Lv.${level} · ${skillCdShort(skill)}`;
     let bodyExtra = "";
     if (sourceKind === "offer") {
       bodyExtra += gainList(skill, level, "offer");
@@ -329,7 +349,7 @@
                 .join("")
             : ""
         }
-        <p class="skill-cd">${esc(W.cooldownReuseText(skill.cooldown))}</p>
+        <p class="skill-cd">${esc(skillCdReuse(skill))}</p>
       </div>`;
     }
     return `
@@ -341,7 +361,11 @@
           </div>
           <span class="skill-meta">${esc(meta)}</span>
         </header>
-        <p class="skill-blurb">${esc(skill.blurb)}</p>
+        <p class="skill-blurb">${esc(skill.blurb)}${
+          sourceKind === "offer" && skill.passive
+            ? `<span class="skill-passive-note"> · パッシブ（手順不要）</span>`
+            : ""
+        }</p>
         ${bodyExtra}
       </div>
       ${
@@ -402,7 +426,9 @@
               <div class="offer-catalog-title">
                 ${skillGroupTag(skill)}
                 <strong>${esc(skill.name)}</strong>
-                <span class="tiny">${esc(W.cooldownShort(skill.cooldown))}</span>
+                <span class="tiny">${esc(skillCdShort(skill))}${
+                  skill.passive ? " · パッシブ" : ""
+                }</span>
               </div>
               <p class="offer-catalog-blurb">${esc(skill.blurb)}</p>
             </div>
@@ -458,28 +484,34 @@
     const skill = W.SKILL_BY_ID[id];
     if (!skill) return "";
     const g = groupStyle(skill);
+    const isPassive = !!skill.passive;
     const inFlow = state.flow.some((node) => node.skillId === id);
-    const canDrag = !inFlow && state.flow.length < W.MAX_FLOW;
-    const mobileExtra = canDrag
-      ? `<button type="button" class="btn btn-primary btn-add-flow m-only" data-action="add-flow-skill" data-skill="${esc(id)}">手順へ追加</button>`
-      : !inFlow
-        ? `<p class="owned-status is-full m-only">手順がいっぱい</p>`
-        : "";
+    const canDrag = !isPassive && !inFlow && state.flow.length < W.MAX_FLOW;
+    const mobileExtra = isPassive
+      ? `<p class="owned-status owned-passive m-only">パッシブ · 手順不要</p>`
+      : canDrag
+        ? `<button type="button" class="btn btn-primary btn-add-flow m-only" data-action="add-flow-skill" data-skill="${esc(id)}">手順へ追加</button>`
+        : !inFlow
+          ? `<p class="owned-status is-full m-only">手順がいっぱい</p>`
+          : "";
     return `
       <article
         class="skill-card owned-card is-interactive group-${esc(g.slug)} ${ui.detail ? "is-detail" : ""}${
           canDrag ? " is-draggable" : ""
-        }${inFlow ? " is-in-flow" : ""}"
+        }${inFlow ? " is-in-flow" : ""}${isPassive ? " is-passive" : ""}"
         data-card-kind="owned"
         data-card-id="${esc(id)}"
         data-group="${esc(skill.group || "")}"
         ${canDrag ? `draggable="true" data-drag-skill="${esc(id)}"` : ""}
         role="button"
         tabindex="0"
-        aria-label="${esc(g.tag)} ${esc(skill.name)}${inFlow ? "（手順で使用中）" : canDrag ? "（手順へ追加可）" : ""}の詳細を開く"
+        aria-label="${esc(g.tag)} ${esc(skill.name)}${
+          isPassive ? "（パッシブ）" : inFlow ? "（手順で使用中）" : canDrag ? "（手順へ追加可）" : ""
+        }の詳細を開く"
       >
         ${skillCardInner(skill, state, "owned")}
         ${inFlow ? `<p class="tiny owned-used">手順で使用中</p>` : ""}
+        ${isPassive && !inFlow ? `<p class="tiny owned-used">パッシブ（所持で発動）</p>` : ""}
         ${mobileExtra}
       </article>
     `;
@@ -500,7 +532,7 @@
 
   function flowPaletteChip(id) {
     const skill = W.SKILL_BY_ID[id];
-    if (!skill) return "";
+    if (!skill || skill.passive) return "";
     const g = groupStyle(skill);
     const level = W.getState().skills[id] || 1;
     return `
@@ -592,7 +624,7 @@
     return Object.keys(state.skills)
       .filter((id) => state.skills[id] > 0)
       .map((id) => W.SKILL_BY_ID[id])
-      .filter(Boolean)
+      .filter((skill) => skill && !skill.passive)
       .map((skill) => {
         const used = state.flow.some((node) => node.skillId === skill.id && skill.id !== currentId);
         return `<option value="${skill.id}" ${skill.id === currentId ? "selected" : ""} ${used ? "disabled" : ""}>${esc(skill.name)} Lv.${state.skills[skill.id]}${used ? "（使用中）" : ""}</option>`;
@@ -670,7 +702,11 @@
     const state = W.getState();
     const stats = W.computeStats(state.skills);
     const ownedIds = Object.keys(state.skills).filter((id) => state.skills[id] > 0);
-    const unused = ownedIds.filter((id) => !state.flow.some((node) => node.skillId === id));
+    const unused = ownedIds.filter((id) => {
+      const skill = W.SKILL_BY_ID[id];
+      if (!skill || skill.passive) return false;
+      return !state.flow.some((node) => node.skillId === id);
+    });
 
     const nodes = state.flow
       .map((node, index) => {
@@ -983,6 +1019,7 @@
         heading: "手順の組み方",
         lead: `手順は最大${W.MAX_FLOW}個。上から順に条件を見て、最初に合う技を使う。どれも外れれば通常攻撃。`,
         items: [
+          "パッシブ技は手順に組まない。所持しているだけで、戦闘中に条件を満たすと発動する。",
           "PCでは習得技をドラッグして、手順のすき間へ挿入できる。",
           "スマホでは未使用技をタップして末尾に追加できる。",
           `使用条件は体力・序盤／終盤・直前の行動・強化弱体など。1つの技に最大${W.MAX_CONDS || 3}つまで付けられ、「かつ／または」でつなげる。`,
@@ -1010,7 +1047,7 @@
           "50層以降は浅い層の敵を混ぜず、専用ローテのビルドのみ。",
           "100層は育成と手順の両方が要る。",
           "回復技は少なめ。自動回復に注目した技もある。",
-          "残響・階調・血契・返礼・共鳴・時縫い・終焔・虚盾・溢光・無限廊・剥印・凱斬・呪刃・双閃・層盾・先手・守集・積毒・破鏡・献閃・逆療壁・戒律など、癖の強い技もある。",
+          "残響・階調・血契・返礼・共鳴・時縫い・終焔・虚盾・溢光・無限廊・剥印・凱斬・双閃・層盾・積毒・献閃・戒律など、癖の強い技もある。パッシブ技（針継・余刃・血脈など）は手順不要で所持するだけで発動する。",
         ],
       },
       {
