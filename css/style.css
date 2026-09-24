@@ -122,6 +122,11 @@ h1, h2, .brand { font-family: var(--serif); }
   border-color: rgba(228, 192, 122, 0.7);
   color: var(--gold);
 }
+.offer-catalog-group-passive.is-active {
+  background: rgba(160, 140, 100, 0.28);
+  border-color: rgba(160, 140, 100, 0.75);
+  color: #e8dcc0;
+}
 .offer-catalog-search input {
   width: 100%;
   min-height: 36px;
