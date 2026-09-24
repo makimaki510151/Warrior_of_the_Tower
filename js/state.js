@@ -116,7 +116,7 @@
   function ensureOffer() {
     if (!state.pendingPick || state.clearedTower) return state.offer;
     if (state.offer && state.offer.length === W.OFFER_COUNT) return state.offer;
-    state.offer = W.rollOffer(offerSeed(), W.OFFER_COUNT);
+    state.offer = W.rollOffer(offerSeed(), W.OFFER_COUNT, state.skills);
     save();
     return state.offer;
   }
@@ -127,7 +127,7 @@
     if (!free && (state.rerollPoints || 0) < 1) return false;
     if (!free) state.rerollPoints -= 1;
     state.rerollSalt = (state.rerollSalt || 0) + 1;
-    state.offer = W.rollOffer(offerSeed(), W.OFFER_COUNT);
+    state.offer = W.rollOffer(offerSeed(), W.OFFER_COUNT, state.skills);
     save();
     return true;
   }

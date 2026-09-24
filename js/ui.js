@@ -588,11 +588,16 @@
     const canReroll = freeReroll || points >= 1;
     const stats = W.computeStats(state.skills);
     const ownedCount = Object.keys(state.skills).filter((id) => state.skills[id] > 0).length;
+    const affinity = W.groupAffinity ? W.groupAffinity(state.skills) : null;
+    const affinityTip =
+      affinity && Object.values(affinity).some((n) => n > 0)
+        ? " · 所持系統の技は候補に少し出やすい（パッシブ除外）"
+        : "";
     return shell(
       `
       <p class="hint offer-hint">技を1つ選ぶ（${W.SKILLS.length}種から${offer.length}） · いま${ui.detail ? "詳細" : "標準"}表示 · カードを開いて確認${
         freeReroll ? " · 下の一覧からも選べます" : ""
-      }</p>
+      }${affinityTip}</p>
       <div class="offer-self">
         <div class="offer-self-stats" aria-label="いまの能力（要約）">
           <span><b>体力</b>${intNum(stats.maxHp)}</span>
@@ -1019,6 +1024,7 @@
         items: [
           "同じ技を重ねると効果は伸びる。",
           `付随ステータスは1枚目が満額。2枚目以降は基礎gainの約${stackPct}%だけ追加（例: +6なら2枚で約+7.8）。`,
+          "持っている系統（攻撃・崩し・守り・回復・補助）と同じ技は、候補にほんの少し出やすくなる。パッシブは系統ボーナスの対象外。",
           "最初の1枚を取るまでは、候補の入れ替えが無料で何度でもできる。あわせて下の一覧から任意の技を1つ直接選べる。",
           "2枚目以降の入れ替えはリロールポイントを1消費。階層クリアごとに+1（上限なし）。",
           "候補画面の「能力を見る」で、いまのステータスを確認できる。",
