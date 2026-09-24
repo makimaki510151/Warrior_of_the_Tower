@@ -576,16 +576,21 @@
     return { cleared, floor, rerollPoints: state.rerollPoints, scaleTier: state.scaleTier || 0 };
   }
 
-  /** クリア後: ビルドをリセットし、敵強化段階を+1して次の登塔へ */
-  function beginNextScale() {
+  /** クリア後: ビルドをリセットし、選んだ敵強化段階で次の登塔へ */
+  function beginScaledRun(tier) {
     if (!state.clearedTower) return false;
-    const nextTier = (state.scaleTier || 0) + 1;
+    const nextTier = Math.max(0, Math.floor(Number(tier) || 0));
     const chronicle = state.chronicle;
     const best = Math.max(state.bestCleared || 0, towerHeight());
     state = blank(best, chronicle, nextTier);
     ensureOffer();
     save();
     return true;
+  }
+
+  /** クリア後: 強化段階を+1して次の登塔へ（互換用） */
+  function beginNextScale() {
+    return beginScaledRun((state.scaleTier || 0) + 1);
   }
 
   function clearReport(data) {
@@ -679,6 +684,7 @@
   W.commitWin = commitWin;
   W.recordBattle = recordBattle;
   W.clearReport = clearReport;
+  W.beginScaledRun = beginScaledRun;
   W.beginNextScale = beginNextScale;
   W.ackSpecNotice = ackSpecNotice;
   W.scaleLabel = scaleLabel;

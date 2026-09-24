@@ -884,7 +884,7 @@
       <div class="title-pane">
         <p class="eyebrow">${esc(W.GAME_TITLE_EN || "True Warrior of the Tower")}</p>
         <h1>${esc(gameTitle())}</h1>
-        <p class="lede">技を1つ選び、手順を組んで自動戦闘で第${height}層を目指す。クリア後は敵がさらに強くなる無限の試練へ。</p>
+        <p class="lede">技を1つ選び、手順を組んで自動戦闘で第${height}層を目指す。クリア後は、強化された敵に挑むかどうかを自分で選べる。</p>
         <p class="record">${
           state.bestCleared
             ? `最高 ${state.bestCleared}層${clears ? ` · 通算クリア ${clears}回` : ""}${
@@ -1112,10 +1112,10 @@
         <header class="clear-hero">
           <p class="eyebrow">第${height}層</p>
           <h1>塔の頂</h1>
-          <p class="lede">第${height}層を突破した。ビルドはここで一度リセットされ、次はさらに強い敵が待つ。</p>
+          <p class="lede">第${height}層を突破した。ビルドはここで一度リセットされる。次に挑む敵の強さは自分で選べる。</p>
           <p class="record">通算クリア ${intNum(chronicle.clearCount || 1)}回 · 今回 ${
             scalePct > 0 ? `敵強化 +${scalePct}%` : "通常"
-          } · 次は <b>+${nextPct}%</b></p>
+          }</p>
         </header>
 
         <section class="clear-section" aria-label="この登頂の統計">
@@ -1154,8 +1154,20 @@
         </section>
 
         <div class="clear-actions">
-          <p class="tiny clear-next-note">次の試練では所持技・手順がリセットされ、敵の基礎能力がさらに+50%されます。</p>
-          <button type="button" class="btn btn-primary" data-action="next-scale">次の試練へ（敵+${nextPct}%）</button>
+          <p class="tiny clear-next-note">所持技・手順はリセットされます。強化された敵に挑むか、同じ強さ（または通常）で再挑戦するか選べます。</p>
+          <button type="button" class="btn btn-primary" data-action="begin-scale" data-tier="${
+            (state.scaleTier || 0) + 1
+          }">強化された敵に挑む（+${nextPct}%）</button>
+          <button type="button" class="btn btn-ghost" data-action="begin-scale" data-tier="${
+            state.scaleTier || 0
+          }">${
+            scalePct > 0 ? `同じ強さでもう一度（+${scalePct}%）` : "通常の敵でもう一度"
+          }</button>
+          ${
+            (state.scaleTier || 0) > 0
+              ? `<button type="button" class="btn btn-ghost" data-action="begin-scale" data-tier="0">通常の敵で始める</button>`
+              : ""
+          }
           <button type="button" class="btn btn-ghost" data-action="to-title">タイトルへ</button>
         </div>
       </div>
@@ -1192,7 +1204,7 @@
     const sections = [
       {
         heading: "このゲームでやること",
-        lead: `${W.TOWER_HEIGHT || 30}層を突破すればクリア。その後は敵が+50%ずつ強くなる無限の試練が続く。戦闘はすべて自動です。`,
+        lead: `${W.TOWER_HEIGHT || 30}層を突破すればクリア。クリア後は強化された敵に挑むかどうかを自分で選べる。戦闘はすべて自動です。`,
         items: [
           "技を選んで強くし、使う順番と条件（手順）を組む。",
           "階層をクリアするたびに新しい技を1つ獲得／強化できる。",
@@ -1239,9 +1251,8 @@
       {
         heading: "敵と育成",
         items: [
-          "敵は序盤だけ弱く、以降は急に強くなる。",
-          "50層以降は浅い層の敵を混ぜず、専用ローテのビルドのみ。",
-          `${W.TOWER_HEIGHT || 30}層は育成と手順の両方が要る。クリア後はビルドをリセットし、敵強化段階が上がる。`,
+          "敵は序盤だけ弱く、以降は急に強くなる。1〜30層はそれぞれ固有の敵。",
+          `${W.TOWER_HEIGHT || 30}層は育成と手順の両方が要る。クリア後はビルドをリセットし、次の敵強化段階（+50%ずつ）に挑むか選べる。`,
           "回復技は少なめ。自動回復に注目した技もある。",
           "残響・階調・血契・返礼・共鳴・時縫い・終焔・虚盾・溢光・無限廊・剥印・凱斬・双閃・層盾・積毒・献閃・戒律など、癖の強い技もある。パッシブ技（針継・余刃・血脈など）は手順不要で所持するだけで発動する。",
         ],
@@ -1421,7 +1432,7 @@
               <ul class="patch-list">
                 <li>1〜${height}層は、それぞれ異なる固有の敵が待ちます。戦闘前に能力と特殊行動を確認できます。</li>
                 <li>${height}層をクリアすると統計が見られ、その後ビルドはリセットされます。</li>
-                <li>代わりに、次の登塔では敵の基礎能力が<strong>+50%</strong>されます。クリアするたびに+50%ずつ上限が上がり、無限に強くなります。</li>
+                <li>次の登塔では、敵を<strong>+50%</strong>強化して挑むか、同じ強さ／通常のまま再挑戦するかを自分で選べます。強化を選ぶたび+50%ずつ上がります。</li>
                 <li>旧セーブの進行中ビルドは引き継げません。了解後、新しい登塔から始めます（最高到達の記録は可能な範囲で残します）。</li>
               </ul>
             </div>
@@ -2021,16 +2032,24 @@
       }
       if (action === "climb-again") {
         if (W.sfx) W.sfx.ui();
-        if (W.beginNextScale) W.beginNextScale();
+        if (W.beginScaledRun) W.beginScaledRun(0);
+        else if (W.beginNextScale) W.beginNextScale();
         else beginRun();
         ui.battle = null;
         ui.screen = "offer";
         render();
         return;
       }
-      if (action === "next-scale") {
+      if (action === "begin-scale" || action === "next-scale") {
         if (W.sfx) W.sfx.ui();
-        if (W.beginNextScale && W.beginNextScale()) {
+        const tier =
+          action === "begin-scale"
+            ? Number(button.dataset.tier)
+            : (W.getState().scaleTier || 0) + 1;
+        const ok = W.beginScaledRun
+          ? W.beginScaledRun(tier)
+          : W.beginNextScale && W.beginNextScale();
+        if (ok) {
           ui.battle = null;
           closeOverlays();
           ui.screen = "offer";
