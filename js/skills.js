@@ -407,33 +407,31 @@
       id: "sunder",
       name: "崩甲",
       group: "崩し",
-      blurb: "小さな傷と引き換えに、敵の防御をしばらく下げる。",
-      tradeoff: "その一撃は弱い。後続の攻撃や弱点と組んで初めて活きる。",
+      blurb: "敵の防御をしばらく大きく下げる。攻撃はしない。",
+      tradeoff: "その行動では削らない。後続の攻撃や弱点と組んで初めて活きる。",
       cooldown: 3,
-      gain: gain({ maxHp: 2, atk: 2, def: 1, atkEff: 0.03 }),
-      describe(level, stats) {
-        const down = scaled(0.3, 0.02, level);
-        const next = scaled(0.3, 0.02, level + 1);
+      gain: gain({ maxHp: 3, atk: 1, def: 2, atkEff: 0.03 }),
+      describe(level) {
+        const down = scaled(0.36, 0.025, level);
+        const next = scaled(0.36, 0.025, level + 1);
         return [
-          multText(0.95, 0.035, level, stats),
-          `敵の防御力を${pctNowLabel(down)}下げる（敵の4行動）。${growthTail(
+          `敵の防御力を${pctNowLabel(down)}下げる（敵の5行動）。${growthTail(
             pctNowLabel(next),
-            pctStepLabel(0.02)
+            pctStepLabel(0.025)
           )}`,
           "この低下に、自分の補助効率は乗らない。",
         ];
       },
       use(ctx, level) {
-        const r = ctx.damage(scaled(0.95, 0.035, level));
-        const down = scaled(0.3, 0.02, level);
+        const down = scaled(0.36, 0.025, level);
         ctx.addEffect(ctx.enemy, {
           id: "sunder",
           kind: "defPct",
           value: -down,
-          turns: 4,
+          turns: 5,
           negative: true,
         });
-        ctx.log(`${ctx.p}崩甲。${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}防御力を下げた。`, "attack");
+        ctx.log(`${ctx.p}崩甲。${ctx.enemy.name}の防御力を下げた。`, "buff");
       },
     },
     {
@@ -465,60 +463,56 @@
       id: "venom",
       name: "毒刃",
       group: "崩し",
-      blurb: "直後の威力は低いが、毒が長く効く。短期決戦には向かない。",
+      blurb: "即時の一撃はなく、毒が長く効く。短期決戦には向かない。",
       tradeoff: "回復効率が下がり、自分の回復技と相性が悪い。",
       cooldown: 2,
       gain: gain({ maxHp: 2, atk: 3, speed: 4, healEff: -0.02 }),
       describe(level, stats) {
-        const ratio = scaled(0.4, 0.03, level);
-        const next = scaled(0.4, 0.03, level + 1);
+        const ratio = scaled(0.52, 0.04, level);
+        const next = scaled(0.52, 0.04, level + 1);
         return [
-          multText(0.72, 0.03, level, stats),
-          `その後、敵は5行動のあいだ行動ごとに${atkMult(ratio, stats)}の毒を受ける。${growthTail(
+          `敵に毒を回す。6行動のあいだ行動ごとに${atkMult(ratio, stats)}の毒を受ける。${growthTail(
             `×${next.toFixed(2)}`,
-            "0.03"
+            "0.04"
           )}`,
-          "毒は重ねがけせず、打ち直すと残りが更新される。",
+          "毒は重ねがけせず、打ち直すと残りが更新される。即時ダメージはない。",
         ];
       },
       use(ctx, level) {
-        const r = ctx.damage(scaled(0.72, 0.03, level));
-        const dot = Math.max(1, Math.floor(ctx.effectiveAtk(ctx.player) * scaled(0.4, 0.03, level)));
+        const dot = Math.max(1, Math.floor(ctx.effectiveAtk(ctx.player) * scaled(0.52, 0.04, level)));
         ctx.addEffect(ctx.enemy, {
           id: "venom",
           kind: "dot",
           value: dot,
-          turns: 5,
+          turns: 6,
           negative: true,
         });
-        ctx.log(`${ctx.p}毒刃。${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}毒が回る。`, "attack");
+        ctx.log(`${ctx.p}毒刃。${ctx.enemy.name}に毒が回る。`, "buff");
       },
     },
     {
       id: "wither",
       name: "枯渇",
       group: "崩し",
-      blurb: "敵の自動回復を止める。回復しない相手にはただの弱い攻撃。",
-      tradeoff: "再生する敵専用に近い。通常の敵には斬撃の方が上。",
+      blurb: "敵の自動回復を止める。回復しない相手には効果が薄い。",
+      tradeoff: "再生する敵専用に近い。削りは他の技に任せる。",
       cooldown: 3,
-      gain: gain({ maxHp: 3, atk: 1, def: 2, regenAmount: 1 }),
-      describe(level, stats) {
+      gain: gain({ maxHp: 4, atk: 1, def: 2, regenAmount: 1 }),
+      describe(level) {
         return [
-          multText(0.64, 0.03, level, stats),
-          "敵の自動回復を、敵の4行動のあいだ止める。",
-          "継続回復そのものは消さない。止めたあいだだけ働かない。",
+          "敵の自動回復を、敵の5行動のあいだ止める。",
+          "継続回復そのものは消さない。止めたあいだだけ働かない。即時ダメージはない。",
         ];
       },
       use(ctx, level) {
-        const r = ctx.damage(scaled(0.64, 0.03, level));
         ctx.addEffect(ctx.enemy, {
           id: "wither",
           kind: "noRegen",
           value: 1,
-          turns: 4,
+          turns: 5,
           negative: true,
         });
-        ctx.log(`${ctx.p}枯渇。${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}自動回復を封じた。`, "attack");
+        ctx.log(`${ctx.p}枯渇。${ctx.enemy.name}の自動回復を封じた。`, "buff");
       },
     },
     {
@@ -1007,171 +1001,169 @@
       id: "rift",
       name: "裂甲",
       group: "崩し",
-      blurb: "崩甲より防御低下は大きいが、ダメージはほぼない。",
-      tradeoff: "単体では削れない。",
+      blurb: "崩甲より深く防御を裂く。攻撃はしない。",
+      tradeoff: "単体では削れない。後続と組む前提。",
       cooldown: 3,
-      gain: gain({ maxHp: 2, atk: 1, def: 2, atkEff: 0.02 }),
-      describe(level, stats) {
-        const down = scaled(0.38, 0.02, level);
-        const next = scaled(0.38, 0.02, level + 1);
+      gain: gain({ maxHp: 3, atk: 1, def: 2, atkEff: 0.02 }),
+      describe(level) {
+        const down = scaled(0.44, 0.025, level);
+        const next = scaled(0.44, 0.025, level + 1);
         return [
-          multText(0.55, 0.025, level, stats),
-          `敵の防御力を${pctNowLabel(down)}下げる（敵の4行動）。${growthTail(
+          `敵の防御力を${pctNowLabel(down)}下げる（敵の5行動）。${growthTail(
             pctNowLabel(next),
-            pctStepLabel(0.02)
+            pctStepLabel(0.025)
           )}`,
         ];
       },
       use(ctx, level) {
-        const r = ctx.damage(scaled(0.55, 0.025, level));
         ctx.addEffect(ctx.enemy, {
           id: "rift",
           kind: "defPct",
-          value: -scaled(0.38, 0.02, level),
-          turns: 4,
+          value: -scaled(0.44, 0.025, level),
+          turns: 5,
           negative: true,
         });
-        ctx.log(`${ctx.p}裂甲。${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}防御を大きく下げた。`, "attack");
+        ctx.log(`${ctx.p}裂甲。${ctx.enemy.name}の防御を大きく下げた。`, "buff");
       },
     },
     {
       id: "plague",
       name: "疫刃",
       group: "崩し",
-      blurb: "毒刃より長い毒。直後の威力はさらに低い。",
+      blurb: "毒刃より長い毒。即時の一撃はない。",
       tradeoff: "短期決戦ではほぼ役に立たない。",
       cooldown: 3,
       gain: gain({ maxHp: 2, atk: 2, speed: 2, healEff: -0.02 }),
       describe(level, stats) {
-        const ratio = scaled(0.32, 0.02, level);
-        const next = scaled(0.32, 0.02, level + 1);
+        const ratio = scaled(0.42, 0.025, level);
+        const next = scaled(0.42, 0.025, level + 1);
         return [
-          multText(0.55, 0.025, level, stats),
-          `7行動のあいだ、行動ごとに${atkMult(ratio, stats)}の毒。${growthTail(
+          `8行動のあいだ、行動ごとに${atkMult(ratio, stats)}の毒。${growthTail(
             `×${next.toFixed(2)}`,
-            "0.02"
+            "0.025"
           )}`,
+          "即時ダメージはない。打ち直すと残りが更新される。",
         ];
       },
       use(ctx, level) {
-        const r = ctx.damage(scaled(0.55, 0.025, level));
-        const dot = Math.max(1, Math.floor(ctx.effectiveAtk(ctx.player) * scaled(0.32, 0.02, level)));
+        const dot = Math.max(1, Math.floor(ctx.effectiveAtk(ctx.player) * scaled(0.42, 0.025, level)));
         ctx.addEffect(ctx.enemy, {
           id: "plague",
           kind: "dot",
           value: dot,
-          turns: 7,
+          turns: 8,
           negative: true,
         });
-        ctx.log(`${ctx.p}疫刃。${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}長い毒が回る。`, "attack");
+        ctx.log(`${ctx.p}疫刃。${ctx.enemy.name}に長い毒が回る。`, "buff");
       },
     },
     {
       id: "sap",
       name: "削気",
       group: "崩し",
-      blurb: "敵の攻撃力を下げる。",
-      tradeoff: "ダメージは弱い。刺客向き。",
+      blurb: "敵の攻撃力を大きく下げる。攻撃はしない。",
+      tradeoff: "その行動では削らない。刺客・耐久向き。",
       cooldown: 3,
-      gain: gain({ maxHp: 4, def: 3, defEff: 0.02 }),
-      describe(level, stats) {
-        const down = scaled(0.3, 0.02, level);
-        const next = scaled(0.3, 0.02, level + 1);
+      gain: gain({ maxHp: 5, def: 3, defEff: 0.03 }),
+      describe(level) {
+        const down = scaled(0.36, 0.025, level);
+        const next = scaled(0.36, 0.025, level + 1);
         return [
-          multText(0.75, 0.03, level, stats),
-          `敵の攻撃力を${pctNowLabel(down)}下げる（敵の4行動）。${growthTail(
+          `敵の攻撃力を${pctNowLabel(down)}下げる（敵の5行動）。${growthTail(
             pctNowLabel(next),
-            pctStepLabel(0.02)
+            pctStepLabel(0.025)
           )}`,
         ];
       },
       use(ctx, level) {
-        const r = ctx.damage(scaled(0.75, 0.03, level));
         ctx.addEffect(ctx.enemy, {
           id: "sap",
           kind: "atkPct",
-          value: -scaled(0.3, 0.02, level),
-          turns: 4,
+          value: -scaled(0.36, 0.025, level),
+          turns: 5,
           negative: true,
         });
-        ctx.log(`${ctx.p}削気。${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}攻撃力を下げた。`, "attack");
+        ctx.log(`${ctx.p}削気。${ctx.enemy.name}の攻撃力を下げた。`, "buff");
       },
     },
     {
       id: "expose",
       name: "露呈",
       group: "崩し",
-      blurb: "敵の被ダメージ軽減を下げ、少し削る。",
-      tradeoff: "軽減がない相手にはただの弱い攻撃。",
+      blurb: "敵の被ダメージ軽減を引き剥がす。攻撃はしない。",
+      tradeoff: "軽減がない相手には効果が薄い。",
       cooldown: 3,
-      gain: gain({ maxHp: 2, atk: 2, dmgBonus: 0.008 }),
-      describe(level, stats) {
-        const down = scaled(0.22, 0.015, level);
-        const next = scaled(0.22, 0.015, level + 1);
+      gain: gain({ maxHp: 2, atk: 2, dmgBonus: 0.01 }),
+      describe(level) {
+        const down = scaled(0.28, 0.02, level);
+        const next = scaled(0.28, 0.02, level + 1);
         return [
-          multText(0.9, 0.035, level, stats),
-          `敵の被ダメージ軽減を${pctNowLabel(down)}下げる（敵の4行動）。${growthTail(
+          `敵の被ダメージ軽減を${pctNowLabel(down)}下げる（敵の5行動）。${growthTail(
             pctNowLabel(next),
-            pctStepLabel(0.015)
+            pctStepLabel(0.02)
           )}`,
         ];
       },
       use(ctx, level) {
-        const r = ctx.damage(scaled(0.9, 0.035, level));
         ctx.addEffect(ctx.enemy, {
           id: "expose",
           kind: "dr",
-          value: -scaled(0.22, 0.015, level),
-          turns: 4,
+          value: -scaled(0.28, 0.02, level),
+          turns: 5,
           negative: true,
         });
-        ctx.log(`${ctx.p}露呈。${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}守りを開いた。`, "attack");
+        ctx.log(`${ctx.p}露呈。${ctx.enemy.name}の守りを開いた。`, "buff");
       },
     },
     {
       id: "silence",
       name: "封脈",
       group: "崩し",
-      blurb: "枯渇より短いが、即時ダメージはやや高い。",
-      tradeoff: "再生しない相手には過剰。",
+      blurb: "枯渇より短いが、すぐ自動回復を封じられる。",
+      tradeoff: "再生しない相手には過剰。即時ダメージはない。",
       cooldown: 2,
-      gain: gain({ maxHp: 2, atk: 2, regenAmount: 1 }),
-      describe(level, stats) {
-        return [multText(0.9, 0.035, level, stats), "敵の自動回復を、敵の2行動のあいだ止める。"];
+      gain: gain({ maxHp: 3, atk: 1, regenAmount: 1 }),
+      describe(level) {
+        return ["敵の自動回復を、敵の3行動のあいだ止める。"];
       },
       use(ctx, level) {
-        const r = ctx.damage(scaled(0.9, 0.035, level));
         ctx.addEffect(ctx.enemy, {
           id: "silence",
           kind: "noRegen",
           value: 1,
-          turns: 2,
+          turns: 3,
           negative: true,
         });
-        ctx.log(`${ctx.p}封脈。${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}自動回復を短く封じた。`, "attack");
+        ctx.log(`${ctx.p}封脈。${ctx.enemy.name}の自動回復を短く封じた。`, "buff");
       },
     },
     {
       id: "mark",
       name: "印刻",
       group: "崩し",
-      blurb: "弱体を付けたあと、弱点と組むための印。",
-      tradeoff: "単独では弱い。",
+      blurb: "弱体の印を刻み、弱点と組むための土台を作る。",
+      tradeoff: "単独では削れない。弱点や後続と組む前提。",
       cooldown: 2,
-      gain: gain({ maxHp: 1, atk: 2, speed: 3 }),
-      describe(level, stats) {
-        return [multText(0.8, 0.03, level, stats), "敵に攻撃低下を付ける（敵の3行動）。弱体判定に乗る。"];
+      gain: gain({ maxHp: 2, atk: 2, speed: 3 }),
+      describe(level) {
+        const down = scaled(0.24, 0.02, level);
+        const next = scaled(0.24, 0.02, level + 1);
+        return [
+          `敵の攻撃力を${pctNowLabel(down)}下げる（敵の4行動）。弱体判定に乗る。${growthTail(
+            pctNowLabel(next),
+            pctStepLabel(0.02)
+          )}`,
+        ];
       },
       use(ctx, level) {
-        const r = ctx.damage(scaled(0.8, 0.03, level));
         ctx.addEffect(ctx.enemy, {
           id: "mark",
           kind: "atkPct",
-          value: -scaled(0.18, 0.015, level),
-          turns: 3,
+          value: -scaled(0.24, 0.02, level),
+          turns: 4,
           negative: true,
         });
-        ctx.log(`${ctx.p}印刻。${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}印を刻んだ。`, "attack");
+        ctx.log(`${ctx.p}印刻。${ctx.enemy.name}に印を刻んだ。`, "buff");
       },
     },
     {
@@ -1687,33 +1679,28 @@
       name: "蝕癒",
       group: "崩し",
       blurb: "回復の効きそのものを腐らせる。再生型へのメタ。",
-      tradeoff: "回復しない相手には弱い崩しにすぎない。",
+      tradeoff: "回復しない相手には効果が薄い。即時ダメージはない。",
       cooldown: 3,
-      gain: gain({ maxHp: 3, atk: 2, def: 1, regenAmount: 1 }),
-      describe(level, stats) {
-        const down = scaled(0.28, 0.04, level);
-        const next = scaled(0.28, 0.04, level + 1);
+      gain: gain({ maxHp: 4, atk: 1, def: 2, regenAmount: 1 }),
+      describe(level) {
+        const down = scaled(0.34, 0.045, level);
+        const next = scaled(0.34, 0.045, level + 1);
         return [
-          multText(0.72, 0.03, level, stats),
-          `敵の回復効率を${pctNowLabel(down)}下げる（敵の4行動）。即時・自動・再生すべてに掛かる。${growthTail(
+          `敵の回復効率を${pctNowLabel(down)}下げる（敵の5行動）。即時・自動・再生すべてに掛かる。${growthTail(
             pctNowLabel(next),
-            pctStepLabel(0.04)
+            pctStepLabel(0.045)
           )}`,
         ];
       },
       use(ctx, level) {
-        const r = ctx.damage(scaled(0.72, 0.03, level));
         ctx.addEffect(ctx.enemy, {
           id: "corrodeheal",
           kind: "healDown",
-          value: Math.min(0.85, scaled(0.28, 0.04, level)),
-          turns: 4,
+          value: Math.min(0.85, scaled(0.34, 0.045, level)),
+          turns: 5,
           negative: true,
         });
-        ctx.log(
-          `${ctx.p}蝕癒。${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}回復の効きを腐らせた。`,
-          "attack"
-        );
+        ctx.log(`${ctx.p}蝕癒。${ctx.enemy.name}の回復の効きを腐らせた。`, "buff");
       },
     },
     {
@@ -1721,29 +1708,24 @@
       name: "干潟",
       group: "崩し",
       blurb: "長く自動回復を封じる。枯渇より間が長い。",
-      tradeoff: "即時ダメージはかなり薄い。再生しない相手には過剰。",
+      tradeoff: "即時ダメージはない。再生しない相手には過剰。",
       cooldown: 4,
-      gain: gain({ maxHp: 4, atk: 1, def: 2, regenAmount: 1 }),
-      describe(level, stats) {
+      gain: gain({ maxHp: 5, atk: 1, def: 2, regenAmount: 1 }),
+      describe(level) {
         return [
-          multText(0.48, 0.025, level, stats),
-          "敵の自動回復を、敵の6行動のあいだ止める。",
+          "敵の自動回復を、敵の7行動のあいだ止める。",
           "継続回復そのものは消さない。止めたあいだだけ働かない。",
         ];
       },
       use(ctx, level) {
-        const r = ctx.damage(scaled(0.48, 0.025, level));
         ctx.addEffect(ctx.enemy, {
           id: "drytide",
           kind: "noRegen",
           value: 1,
-          turns: 6,
+          turns: 7,
           negative: true,
         });
-        ctx.log(
-          `${ctx.p}干潟。${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}泉を干した。`,
-          "attack"
-        );
+        ctx.log(`${ctx.p}干潟。${ctx.enemy.name}の泉を干した。`, "buff");
       },
     },
     {
@@ -1777,41 +1759,36 @@
       id: "stealpulse",
       name: "奪脈",
       group: "崩し",
-      blurb: "敵の自動回復量を削り、自分の脈へ少し回す。",
-      tradeoff: "削る量は固定寄り。回復しない相手には弱い。",
+      blurb: "敵の自動回復量を削り、自分の脈へ回す。攻撃はしない。",
+      tradeoff: "削る量は固定寄り。回復しない相手には効果が薄い。",
       cooldown: 3,
-      gain: gain({ maxHp: 4, atk: 1, regenAmount: 2, healEff: 0.01 }),
-      describe(level, stats) {
-        const sap = Math.max(1, Math.floor(scaled(4, 1.2, level)));
-        const nextSap = Math.max(1, Math.floor(scaled(4, 1.2, level + 1)));
-        const selfFlat = scaled(2, 0.8, level);
-        const nextFlat = scaled(2, 0.8, level + 1);
+      gain: gain({ maxHp: 5, atk: 1, regenAmount: 2, healEff: 0.015 }),
+      describe(level) {
+        const sap = Math.max(1, Math.floor(scaled(5.5, 1.5, level)));
+        const nextSap = Math.max(1, Math.floor(scaled(5.5, 1.5, level + 1)));
+        const selfFlat = scaled(3, 1, level);
+        const nextFlat = scaled(3, 1, level + 1);
         return [
-          multText(0.58, 0.03, level, stats),
-          `敵の自動回復量を${sap}削る（敵の4行動）。下限0。${growthTail(`${nextSap}`, "1.2")}`,
-          `次の3行動、自分の自動回復量+${selfFlat.toFixed(1)}。${growthTail(`+${nextFlat.toFixed(1)}`, "0.8")}`,
+          `敵の自動回復量を${sap}削る（敵の5行動）。下限0。${growthTail(`${nextSap}`, "1.5")}`,
+          `次の4行動、自分の自動回復量+${selfFlat.toFixed(1)}。${growthTail(`+${nextFlat.toFixed(1)}`, "1")}`,
         ];
       },
       use(ctx, level) {
-        const r = ctx.damage(scaled(0.58, 0.03, level));
-        const sap = Math.max(1, Math.floor(scaled(4, 1.2, level)));
+        const sap = Math.max(1, Math.floor(scaled(5.5, 1.5, level)));
         ctx.addEffect(ctx.enemy, {
           id: "stealpulse",
           kind: "regenSap",
           value: sap,
-          turns: 4,
+          turns: 5,
           negative: true,
         });
         ctx.addEffect(ctx.player, {
           id: "stealpulse-self",
           kind: "regenFlat",
-          value: scaled(2, 0.8, level),
-          turns: 3,
+          value: scaled(3, 1, level),
+          turns: 4,
         });
-        ctx.log(
-          `${ctx.p}奪脈。${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}脈を奪った。`,
-          "attack"
-        );
+        ctx.log(`${ctx.p}奪脈。${ctx.enemy.name}から脈を奪った。`, "buff");
       },
     },
     {
@@ -2172,28 +2149,25 @@
       name: "終焔",
       group: "崩し",
       blurb: "敵に終末の印を押し、時が来たときド級の爆発を起こす。",
-      tradeoff: "すぐには削れない。倒す前に爆発しないと取りこぼす。",
+      tradeoff: "すぐには削れない。倒す前に爆発しないと取りこぼす。即時の一撃はない。",
       cooldown: 4,
-      gain: gain({ maxHp: 3, atk: 3, def: 1, dmgBonus: 0.01 }),
+      gain: gain({ maxHp: 3, atk: 3, def: 1, dmgBonus: 0.012 }),
       describe(level, stats) {
-        const hit = scaled(0.55, 0.03, level);
-        const boom = scaled(2.1, 0.15, level);
+        const boom = scaled(2.35, 0.18, level);
         const delay = Math.max(2, Math.floor(scaled(3, -0.25, level)));
         return [
-          `軽い一撃（${atkMult(hit, stats)}）と同時に終焔の印を付与する。`,
+          `終焔の印を付与する（即時ダメージなし）。`,
           `敵の行動がおよそ${delay}回終わると印が弾け、${atkMult(boom, stats)}相当の爆発が起きる。`,
           "打ち直すと爆発倍率は更新され、残り時間も振り直される。",
           growthTail(
-            `一撃×${scaled(0.55, 0.03, level + 1).toFixed(2)}／爆発×${scaled(2.1, 0.15, level + 1).toFixed(2)}`,
-            "0.03／0.15"
+            `爆発×${scaled(2.35, 0.18, level + 1).toFixed(2)}`,
+            "0.18"
           ),
         ];
       },
       use(ctx, level) {
-        const hit = scaled(0.55, 0.03, level);
-        const boom = scaled(2.1, 0.15, level);
+        const boom = scaled(2.35, 0.18, level);
         const delay = Math.max(2, Math.floor(scaled(3, -0.25, level)));
-        const r = ctx.damage(hit);
         ctx.addEffect(ctx.enemy, {
           id: "doommark",
           kind: "doom",
@@ -2203,10 +2177,7 @@
           turns: delay,
           negative: true,
         });
-        ctx.log(
-          `${ctx.p}終焔。${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}終末の印を押した。`,
-          "attack"
-        );
+        ctx.log(`${ctx.p}終焔。${ctx.enemy.name}に終末の印を押した。`, "buff");
       },
     },
     {
@@ -2350,29 +2321,22 @@
       id: "fetter",
       name: "足枷",
       group: "崩し",
-      blurb: "敵の行動速度を落とす。速い相手へのメタ。",
+      blurb: "敵の行動速度を落とす。速い相手へのメタ。攻撃はしない。",
       tradeoff: "すでに遅い相手にはご褒美が薄い。",
       cooldown: 3,
-      gain: gain({ maxHp: 3, atk: 2, speed: 3 }),
-      describe(level, stats) {
-        return [
-          multText(0.75, 0.03, level, stats),
-          `敵の次の4行動、${speedBuffText(-0.2, -0.025, level)}`,
-        ];
+      gain: gain({ maxHp: 3, atk: 1, speed: 4 }),
+      describe(level) {
+        return [`敵の次の5行動、${speedBuffText(-0.26, -0.03, level)}`];
       },
       use(ctx, level) {
-        const r = ctx.damage(scaled(0.75, 0.03, level));
         ctx.addEffect(ctx.enemy, {
           id: "fetter",
           kind: "speedPct",
-          value: -scaled(0.2, 0.025, level),
-          turns: 4,
+          value: -scaled(0.26, 0.03, level),
+          turns: 5,
           negative: true,
         });
-        ctx.log(
-          `${ctx.p}足枷。${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}動きが鈍った。`,
-          "attack"
-        );
+        ctx.log(`${ctx.p}足枷。${ctx.enemy.name}の動きが鈍った。`, "buff");
       },
     },
     {
@@ -2400,29 +2364,22 @@
       id: "dullhex",
       name: "鈍律",
       group: "崩し",
-      blurb: "敵の攻撃力補助効率を削り、バフ型を鈍らせる。",
+      blurb: "敵の攻撃力補助効率を削り、バフ型を鈍らせる。攻撃はしない。",
       tradeoff: "敵がバフを使わないと効果が薄い。",
       cooldown: 3,
-      gain: gain({ maxHp: 3, atk: 2, def: 1 }),
-      describe(level, stats) {
-        return [
-          multText(0.78, 0.03, level, stats),
-          `敵の次の4行動、${flatEffText("攻撃力補助効率", -0.2, -0.025, level)}`,
-        ];
+      gain: gain({ maxHp: 3, atk: 1, def: 2 }),
+      describe(level) {
+        return [`敵の次の5行動、${flatEffText("攻撃力補助効率", -0.26, -0.03, level)}`];
       },
       use(ctx, level) {
-        const r = ctx.damage(scaled(0.78, 0.03, level));
         ctx.addEffect(ctx.enemy, {
           id: "dullhex",
           kind: "atkEffFlat",
-          value: -scaled(0.2, 0.025, level),
-          turns: 4,
+          value: -scaled(0.26, 0.03, level),
+          turns: 5,
           negative: true,
         });
-        ctx.log(
-          `${ctx.p}鈍律。${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}刃が鈍った。`,
-          "attack"
-        );
+        ctx.log(`${ctx.p}鈍律。${ctx.enemy.name}の刃が鈍った。`, "buff");
       },
     },
     {
@@ -2450,29 +2407,22 @@
       id: "frailty",
       name: "脆律",
       group: "崩し",
-      blurb: "敵の防御力補助効率を削り、守りバフを効きにくくする。",
+      blurb: "敵の防御力補助効率を削り、守りバフを効きにくくする。攻撃はしない。",
       tradeoff: "敵が守りを張らないと恩恵が薄い。",
       cooldown: 3,
-      gain: gain({ maxHp: 3, atk: 2, def: 2 }),
-      describe(level, stats) {
-        return [
-          multText(0.78, 0.03, level, stats),
-          `敵の次の4行動、${flatEffText("防御力補助効率", -0.2, -0.025, level)}`,
-        ];
+      gain: gain({ maxHp: 3, atk: 1, def: 3 }),
+      describe(level) {
+        return [`敵の次の5行動、${flatEffText("防御力補助効率", -0.26, -0.03, level)}`];
       },
       use(ctx, level) {
-        const r = ctx.damage(scaled(0.78, 0.03, level));
         ctx.addEffect(ctx.enemy, {
           id: "frailty",
           kind: "defEffFlat",
-          value: -scaled(0.2, 0.025, level),
-          turns: 4,
+          value: -scaled(0.26, 0.03, level),
+          turns: 5,
           negative: true,
         });
-        ctx.log(
-          `${ctx.p}脆律。${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}守りが脆くなった。`,
-          "attack"
-        );
+        ctx.log(`${ctx.p}脆律。${ctx.enemy.name}の守りが脆くなった。`, "buff");
       },
     },
     {
@@ -2500,29 +2450,22 @@
       id: "healsap",
       name: "療削",
       group: "崩し",
-      blurb: "敵の体力回復効率そのものを削る。",
-      tradeoff: "回復しない相手には弱い崩し。",
+      blurb: "敵の体力回復効率そのものを削る。攻撃はしない。",
+      tradeoff: "回復しない相手には効果が薄い。",
       cooldown: 3,
-      gain: gain({ maxHp: 3, atk: 2, regenAmount: 1 }),
-      describe(level, stats) {
-        return [
-          multText(0.72, 0.03, level, stats),
-          `敵の次の4行動、${flatEffText("体力回復効率", -0.22, -0.03, level)}`,
-        ];
+      gain: gain({ maxHp: 4, atk: 1, regenAmount: 1 }),
+      describe(level) {
+        return [`敵の次の5行動、${flatEffText("体力回復効率", -0.28, -0.035, level)}`];
       },
       use(ctx, level) {
-        const r = ctx.damage(scaled(0.72, 0.03, level));
         ctx.addEffect(ctx.enemy, {
           id: "healsap",
           kind: "healEffFlat",
-          value: -scaled(0.22, 0.03, level),
-          turns: 4,
+          value: -scaled(0.28, 0.035, level),
+          turns: 5,
           negative: true,
         });
-        ctx.log(
-          `${ctx.p}療削。${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}回復の効きを削った。`,
-          "attack"
-        );
+        ctx.log(`${ctx.p}療削。${ctx.enemy.name}の回復の効きを削った。`, "buff");
       },
     },
     {
@@ -2550,29 +2493,22 @@
       id: "enfeeble",
       name: "無力",
       group: "崩し",
-      blurb: "敵の与ダメージ補正を下げ、打撃を軽くする。",
+      blurb: "敵の与ダメージ補正を下げ、打撃を軽くする。攻撃はしない。",
       tradeoff: "防御を上げるわけではない。",
       cooldown: 3,
-      gain: gain({ maxHp: 4, def: 2, dmgReduction: 0.008 }),
-      describe(level, stats) {
-        return [
-          multText(0.7, 0.03, level, stats),
-          `敵の次の4行動、${dmgBonusText(-0.14, -0.02, level)}`,
-        ];
+      gain: gain({ maxHp: 5, def: 2, dmgReduction: 0.01 }),
+      describe(level) {
+        return [`敵の次の5行動、${dmgBonusText(-0.18, -0.025, level)}`];
       },
       use(ctx, level) {
-        const r = ctx.damage(scaled(0.7, 0.03, level));
         ctx.addEffect(ctx.enemy, {
           id: "enfeeble",
           kind: "dmgBonus",
-          value: -scaled(0.14, 0.02, level),
-          turns: 4,
+          value: -scaled(0.18, 0.025, level),
+          turns: 5,
           negative: true,
         });
-        ctx.log(
-          `${ctx.p}無力。${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}打撃が軽くなった。`,
-          "attack"
-        );
+        ctx.log(`${ctx.p}無力。${ctx.enemy.name}の打撃が軽くなった。`, "buff");
       },
     },
     {
@@ -2607,36 +2543,31 @@
       id: "rendveil",
       name: "裂膜",
       group: "崩し",
-      blurb: "敵の被ダメージ軽減を大きく引き剥がす。負の領域まで落とせる。",
+      blurb: "敵の被ダメージ軽減を大きく引き剥がす。負の領域まで落とせる。攻撃はしない。",
       tradeoff: "敵の軽減がもともと低いと伸びしろは限られる。",
       cooldown: 3,
-      gain: gain({ maxHp: 2, atk: 3, dmgBonus: 0.008 }),
-      describe(level, stats) {
-        const down = scaled(0.2, 0.02, level);
-        const next = scaled(0.2, 0.02, level + 1);
+      gain: gain({ maxHp: 2, atk: 2, dmgBonus: 0.01 }),
+      describe(level) {
+        const down = scaled(0.26, 0.025, level);
+        const next = scaled(0.26, 0.025, level + 1);
         return [
-          multText(0.85, 0.03, level, stats),
-          `敵の被ダメージ軽減を${pctNowLabel(down)}下げる（敵の4行動）。下限はさらに低い負の領域まで。${growthTail(
+          `敵の被ダメージ軽減を${pctNowLabel(down)}下げる（敵の5行動）。下限はさらに低い負の領域まで。${growthTail(
             pctNowLabel(next),
-            pctStepLabel(0.02)
+            pctStepLabel(0.025)
           )}`,
         ];
       },
       use(ctx, level) {
-        const r = ctx.damage(scaled(0.85, 0.03, level));
         ctx.addEffect(ctx.enemy, {
           id: "rendveil",
           kind: "dr",
-          value: -scaled(0.2, 0.02, level),
-          turns: 4,
+          value: -scaled(0.26, 0.025, level),
+          turns: 5,
           negative: true,
         });
-        ctx.log(
-          `${ctx.p}裂膜。${ctx.enemy.name}に${r.dmg}のダメージ。${ctx.overNote(r.over)}防護の膜を裂いた。`,
-          "attack"
-        );
+        ctx.log(`${ctx.p}裂膜。${ctx.enemy.name}の防護の膜を裂いた。`, "buff");
       },
-    },
+    },,
   ];
 
   const GROUPS = ["攻撃", "崩し", "守り", "回復", "補助"];
