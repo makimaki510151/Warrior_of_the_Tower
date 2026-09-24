@@ -1907,23 +1907,26 @@
     }
   }
 
+  function refreshOfferCatalogList() {
+    const list = document.querySelector("[data-offer-catalog-list]");
+    if (!list) return;
+    list.innerHTML = offerCatalogRows(W.getState());
+  }
+
   function onInput(event) {
     const el = event.target;
-    if (el && el.dataset && el.dataset.bind === "offer-catalog-q") {
-      const start = el.selectionStart;
-      const end = el.selectionEnd;
-      ui.offerCatalogQuery = el.value || "";
-      render();
-      const next = document.querySelector("[data-offer-catalog-q]");
-      if (next) {
-        next.focus();
-        try {
-          if (typeof start === "number") next.setSelectionRange(start, end);
-        } catch (err) {
-          /* ignore */
-        }
-      }
-    }
+    if (!el || !el.dataset || el.dataset.bind !== "offer-catalog-q") return;
+    // IME変換中（ローマ字→かな等）はDOMを壊さない。確定後に絞り込み。
+    if (event.isComposing || event.inputType === "insertCompositionText") return;
+    ui.offerCatalogQuery = el.value || "";
+    refreshOfferCatalogList();
+  }
+
+  function onCompositionEnd(event) {
+    const el = event.target;
+    if (!el || !el.dataset || el.dataset.bind !== "offer-catalog-q") return;
+    ui.offerCatalogQuery = el.value || "";
+    refreshOfferCatalogList();
   }
 
   function onKey(event) {
@@ -1963,6 +1966,7 @@
       app.addEventListener("click", onBackdrop);
       app.addEventListener("change", onChange);
       app.addEventListener("input", onInput);
+      app.addEventListener("compositionend", onCompositionEnd);
       app.addEventListener("pointerover", onPointerOver);
       app.addEventListener("dragstart", onDragStart);
       app.addEventListener("dragend", onDragEnd);
