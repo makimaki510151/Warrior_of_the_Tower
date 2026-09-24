@@ -17,6 +17,21 @@
   /** @type {{ version: string, date: string, title: string, sections: { heading: string, items: string[] }[] }[]} */
   const PATCH_NOTES = [
     {
+      version: "0.5.28",
+      date: "2026-09-24",
+      title: "任意チュートリアルを追加",
+      sections: [
+        {
+          heading: "内容",
+          items: [
+            "強制なしのチュートリアルを追加（タイトル「チュートリアル」、ヘッダー「講座」、遊び方からのリンク）。",
+            "章: 一通りの流れ／ビルドの考え方／手順の基本／手順の応用／詰まらない心得。",
+            "章チップと前後移動で必要な項目だけ読める。",
+          ],
+        },
+      ],
+    },
+    {
       version: "0.5.27",
       date: "2026-09-24",
       title: "遊び方を見出し付きで読みやすく",
