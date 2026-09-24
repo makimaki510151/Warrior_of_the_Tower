@@ -17,6 +17,20 @@
   /** @type {{ version: string, date: string, title: string, sections: { heading: string, items: string[] }[] }[]} */
   const PATCH_NOTES = [
     {
+      version: "0.5.37",
+      date: "2026-09-24",
+      title: "開幕の技選択で二重スクロールと横はみ出しを修正",
+      sections: [
+        {
+          heading: "UI",
+          items: [
+            "開幕画面で一覧内スクロールと本体スクロールが重なっていたのをやめ、縦スクロールを本体に一本化した。",
+            "候補カード右端ホバー時の拡大で横スクロールが出る問題を修正（候補カードはホバー拡大しない）。",
+          ],
+        },
+      ],
+    },
+    {
       version: "0.5.36",
       date: "2026-09-24",
       title: "パッシブ技の付随ステータス初期値を引き上げ",

@@ -79,7 +79,8 @@ h1, h2, .brand { font-family: var(--serif); }
 }
 .main-offer {
   justify-content: flex-start;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   -webkit-overflow-scrolling: touch;
 }
 .main-offer .offer-grid {
@@ -139,10 +140,10 @@ h1, h2, .brand { font-family: var(--serif); }
 .offer-catalog-list {
   display: grid;
   gap: 6px;
-  max-height: min(52dvh, 520px);
-  overflow: auto;
-  -webkit-overflow-scrolling: touch;
-  padding-right: 2px;
+  /* 二重スクロール防止: 縦スクロールは .main-offer に一本化 */
+  max-height: none;
+  overflow: visible;
+  padding-right: 0;
 }
 .offer-catalog-row {
   display: grid;
@@ -633,9 +634,11 @@ h1, h2, .brand { font-family: var(--serif); }
   color: var(--gold);
 }
 
-/* 狭い列での scale は横スクロールバーの原因になるため、所持技は拡大しない */
+/* 狭い列での scale は横スクロールバーの原因になるため、所持技・候補カードは拡大しない */
 .owned-card.is-interactive:hover,
-.owned-card.is-interactive:focus-visible {
+.owned-card.is-interactive:focus-visible,
+.offer-card.is-interactive:hover,
+.offer-card.is-interactive:focus-visible {
   transform: none;
 }
 
@@ -1299,7 +1302,8 @@ select {
     padding-top: 8px;
   }
   .offer-catalog-list {
-    max-height: min(48dvh, 420px);
+    max-height: none;
+    overflow: visible;
   }
   .offer-catalog-row {
     padding: 10px;
