@@ -401,9 +401,15 @@
       .trim()
       .toLowerCase();
     const rows = W.SKILLS.filter((skill) => {
-      if (group !== "all" && skill.group !== group) return false;
+      if (group === "passive") {
+        if (!skill.passive) return false;
+      } else if (group !== "all" && skill.group !== group) {
+        return false;
+      }
       if (!q) return true;
-      const hay = `${skill.name} ${skill.blurb} ${skill.group} ${skill.id}`.toLowerCase();
+      const hay = `${skill.name} ${skill.blurb} ${skill.group} ${skill.id}${
+        skill.passive ? " パッシブ passive" : ""
+      }`.toLowerCase();
       return hay.includes(q);
     });
     if (!rows.length) {
@@ -414,17 +420,20 @@
         const g = groupStyle(skill);
         return `
           <article
-            class="offer-catalog-row is-interactive group-${esc(g.slug)}"
+            class="offer-catalog-row is-interactive group-${esc(g.slug)}${
+              skill.passive ? " is-passive" : ""
+            }"
             data-card-kind="offer"
             data-card-id="${esc(skill.id)}"
             data-group="${esc(skill.group || "")}"
             role="button"
             tabindex="0"
-            aria-label="${esc(g.tag)} ${esc(skill.name)}の詳細を開く"
+            aria-label="${esc(g.tag)} ${esc(skill.name)}${skill.passive ? "（パッシブ）" : ""}の詳細を開く"
           >
             <div class="offer-catalog-main">
               <div class="offer-catalog-title">
                 ${skillGroupTag(skill)}
+                ${skill.passive ? `<span class="skill-tag skill-tag-passive" title="パッシブ技">パッシブ</span>` : ""}
                 <strong>${esc(skill.name)}</strong>
                 <span class="tiny">${esc(skillCdShort(skill))}${
                   skill.passive ? " · パッシブ" : ""
@@ -440,8 +449,16 @@
   }
 
   function offerCatalog(state) {
-    const groups = ["all", ...(W.SKILL_GROUPS || [])];
-    const labels = { all: "すべて", 攻撃: "攻撃", 崩し: "弱体", 守り: "守り", 回復: "回復", 補助: "強化" };
+    const groups = ["all", "passive", ...(W.SKILL_GROUPS || [])];
+    const labels = {
+      all: "すべて",
+      passive: "パッシブ",
+      攻撃: "攻撃",
+      崩し: "弱体",
+      守り: "守り",
+      回復: "回復",
+      補助: "強化",
+    };
     return `
       <section class="offer-catalog" aria-label="全技から選ぶ">
         <div class="offer-catalog-head">
@@ -455,7 +472,7 @@
                 const active = (ui.offerCatalogGroup || "all") === g;
                 return `<button type="button" class="btn btn-ghost btn-compact offer-catalog-group${
                   active ? " is-active" : ""
-                }" data-action="offer-catalog-group" data-group="${esc(g)}" role="tab" aria-selected="${
+                }${g === "passive" ? " offer-catalog-group-passive" : ""}" data-action="offer-catalog-group" data-group="${esc(g)}" role="tab" aria-selected="${
                   active ? "true" : "false"
                 }">${esc(labels[g] || g)}</button>`;
               })

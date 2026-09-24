@@ -17,6 +17,20 @@
   /** @type {{ version: string, date: string, title: string, sections: { heading: string, items: string[] }[] }[]} */
   const PATCH_NOTES = [
     {
+      version: "0.5.34",
+      date: "2026-09-24",
+      title: "開幕一覧でパッシブ絞り込み",
+      sections: [
+        {
+          heading: "UI",
+          items: [
+            "開幕の「または一覧から選ぶ」に「パッシブ」タグを追加。パッシブ技だけに絞り込める。",
+            "一覧行にもパッシブバッジを表示。検索語「パッシブ」でもヒットする。",
+          ],
+        },
+      ],
+    },
+    {
       version: "0.5.33",
       date: "2026-09-24",
       title: "開幕の技検索でIME入力できるように修正",
