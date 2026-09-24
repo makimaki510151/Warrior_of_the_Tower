@@ -48,6 +48,8 @@
     const flow = [];
     (Array.isArray(rawFlow) ? rawFlow : []).forEach((node) => {
       if (!node || seen[node.skillId] || !skills[node.skillId]) return;
+      const meta = W.SKILL_BY_ID[node.skillId];
+      if (meta && meta.passive) return;
       let rawConds = Array.isArray(node.conds) ? node.conds : null;
       if (!rawConds || !rawConds.length) {
         rawConds = [node.cond || { type: "always" }];
@@ -169,10 +171,12 @@
     if (!W.SKILL_BY_ID[id]) return false;
     // 開幕（無限リロール中）は候補外の技も直接獲得できる
     if (!isOpeningPick() && (!state.offer || !state.offer.includes(id))) return false;
+    const skill = W.SKILL_BY_ID[id];
     state.skills[id] = (state.skills[id] || 0) + 1;
     state.offer = null;
     state.pendingPick = false;
     if (
+      !skill.passive &&
       state.flow.length < MAX_FLOW &&
       !state.flow.some((node) => node.skillId === id)
     ) {
@@ -193,6 +197,8 @@
 
   function insertNode(skillId, index) {
     if (!(state.skills[skillId] > 0)) return false;
+    const skill = W.SKILL_BY_ID[skillId];
+    if (!skill || skill.passive) return false;
     if (state.flow.length >= MAX_FLOW) return false;
     if (state.flow.some((node) => node.skillId === skillId)) return false;
     const at = Math.max(0, Math.min(state.flow.length, Number(index)));
@@ -223,6 +229,8 @@
     }
     if (patch.skillId) {
       if (!(state.skills[patch.skillId] > 0)) return false;
+      const nextSkill = W.SKILL_BY_ID[patch.skillId];
+      if (!nextSkill || nextSkill.passive) return false;
       if (state.flow.some((item, i) => i !== index && item.skillId === patch.skillId)) return false;
       node.skillId = patch.skillId;
     }
