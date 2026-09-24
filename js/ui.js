@@ -369,6 +369,12 @@
     const g = groupStyle(skill);
     const inFlow = state.flow.some((node) => node.skillId === id);
     const canDrag = !inFlow && state.flow.length < W.MAX_FLOW;
+    const mobileExtra = canDrag
+      ? `<p class="owned-status is-ready m-only">「手順へ追加」で入れられる</p>
+         <button type="button" class="btn btn-primary btn-add-flow m-only" data-action="add-flow-skill" data-skill="${esc(id)}">手順へ追加</button>`
+      : !inFlow
+        ? `<p class="owned-status is-full m-only">手順がいっぱい</p>`
+        : "";
     return `
       <article
         class="skill-card owned-card is-interactive group-${esc(g.slug)} ${ui.detail ? "is-detail" : ""}${
@@ -380,10 +386,11 @@
         ${canDrag ? `draggable="true" data-drag-skill="${esc(id)}"` : ""}
         role="button"
         tabindex="0"
-        aria-label="${esc(g.tag)} ${esc(skill.name)}${inFlow ? "（手順で使用中）" : canDrag ? "（ドラッグで手順へ）" : ""}の詳細を開く"
+        aria-label="${esc(g.tag)} ${esc(skill.name)}${inFlow ? "（手順で使用中）" : canDrag ? "（手順へ追加可）" : ""}の詳細を開く"
       >
         ${skillCardInner(skill, state, "owned")}
         ${inFlow ? `<p class="tiny owned-used">手順で使用中</p>` : ""}
+        ${mobileExtra}
       </article>
     `;
   }
@@ -395,7 +402,8 @@
         data-drop-index="${index}"
         aria-label="${empty ? "ここに技をドロップして手順へ" : `ここに挿入（${index + 1}番目）`}"
       >
-        <span>${empty ? "技をここにドロップ" : "ここに挿入"}</span>
+        <span class="pc-only">${empty ? "技をここにドロップ" : "ここに挿入"}</span>
+        <span class="m-only" aria-hidden="true">${empty ? "下の技をタップして追加" : ""}</span>
       </li>
     `;
   }
@@ -404,14 +412,23 @@
     const skill = W.SKILL_BY_ID[id];
     if (!skill) return "";
     const g = groupStyle(skill);
+    const level = W.getState().skills[id] || 1;
     return `
       <button
         type="button"
         class="flow-chip skill-tag-${esc(g.slug)} is-draggable"
         draggable="true"
         data-drag-skill="${esc(id)}"
-        title="手順へドラッグ"
-      >${esc(skill.name)}</button>
+        data-action="add-flow-skill"
+        data-skill="${esc(id)}"
+        title="手順へ追加（PCはドラッグ）"
+        aria-label="${esc(skill.name)}を手順へ追加"
+      >
+        <span class="flow-chip-tag m-only">${esc(g.tag)}</span>
+        <span class="flow-chip-name">${esc(skill.name)}</span>
+        <span class="flow-chip-lv m-only">Lv.${level}</span>
+        <span class="flow-chip-cta m-only">＋追加</span>
+      </button>
     `;
   }
 
@@ -542,7 +559,7 @@
             ${meta.value ? valueField(meta, index, condIndex, value) : `<span class="value-spacer"></span>`}
             ${
               conds.length > 1
-                ? `<button type="button" class="btn btn-ghost btn-icon" data-action="remove-cond" data-index="${index}" data-cond-index="${condIndex}" aria-label="条件を外す">×</button>`
+                ? `<button type="button" class="btn btn-ghost btn-icon" data-action="remove-cond" data-index="${index}" data-cond-index="${condIndex}" aria-label="条件を外す"><span aria-hidden="true">×</span><span class="btn-lab">外す</span></button>`
                 : ""
             }
           </div>
@@ -564,17 +581,28 @@
 
     const nodes = state.flow
       .map((node, index) => {
+        const skill = W.SKILL_BY_ID[node.skillId];
+        const g = skill ? groupStyle(skill) : null;
         return `
           ${flowDropSlot(index, false)}
-          <li class="flow-item">
-            <span class="idx">${index + 1}</span>
-            <select data-bind="node-skill" data-index="${index}">${ownedOptions(state, node.skillId)}</select>
-            <div class="flow-mini">
-              <button type="button" class="btn btn-ghost btn-icon" data-action="move-node" data-index="${index}" data-dir="-1" ${index === 0 ? "disabled" : ""} aria-label="上へ">↑</button>
-              <button type="button" class="btn btn-ghost btn-icon" data-action="move-node" data-index="${index}" data-dir="1" ${index === state.flow.length - 1 ? "disabled" : ""} aria-label="下へ">↓</button>
-              <button type="button" class="btn btn-ghost btn-icon" data-action="remove-node" data-index="${index}" aria-label="外す">×</button>
+          <li class="flow-item${g ? ` group-${esc(g.slug)}` : ""}">
+            <div class="flow-item-head">
+              <span class="idx" aria-hidden="true">${index + 1}</span>
+              <div class="flow-item-title">
+                <span class="flow-item-label m-only">手順 ${index + 1} · 技を選ぶ</span>
+                <label class="sr" for="node-skill-${index}">技</label>
+                <select id="node-skill-${index}" data-bind="node-skill" data-index="${index}">${ownedOptions(state, node.skillId)}</select>
+              </div>
             </div>
-            ${renderFlowConds(node, index)}
+            <div class="flow-mini" role="group" aria-label="手順の操作">
+              <button type="button" class="btn btn-ghost btn-icon" data-action="move-node" data-index="${index}" data-dir="-1" ${index === 0 ? "disabled" : ""} aria-label="上へ"><span aria-hidden="true">↑</span><span class="btn-lab">上へ</span></button>
+              <button type="button" class="btn btn-ghost btn-icon" data-action="move-node" data-index="${index}" data-dir="1" ${index === state.flow.length - 1 ? "disabled" : ""} aria-label="下へ"><span aria-hidden="true">↓</span><span class="btn-lab">下へ</span></button>
+              <button type="button" class="btn btn-ghost btn-icon btn-remove-node" data-action="remove-node" data-index="${index}" aria-label="外す"><span aria-hidden="true">×</span><span class="btn-lab">外す</span></button>
+            </div>
+            <div class="flow-conds-wrap">
+              <p class="flow-conds-label m-only">使う条件</p>
+              ${renderFlowConds(node, index)}
+            </div>
           </li>
         `;
       })
@@ -603,7 +631,8 @@
         </section>
         <section class="pane pane-skills ${ui.prepTab === "skills" ? "is-active" : ""}" data-prep-pane="skills">
           <h2>習得技</h2>
-          <p class="tiny pane-hint">未使用の技は手順へドラッグできる</p>
+          <p class="tiny pane-hint pc-only">未使用の技は手順へドラッグできる</p>
+          <p class="tiny pane-hint m-only">未使用の技は「手順へ追加」で入れられる。カード本体をタップすると詳細。</p>
           <div class="owned-grid">
             ${
               ownedIds.length
@@ -614,13 +643,17 @@
         </section>
         <section class="pane pane-flow ${ui.prepTab === "flow" ? "is-active" : ""}" data-prep-pane="flow">
           <h2>手順 <span class="tiny">上から判定・外れは通常攻撃</span></h2>
+          <p class="flow-guide m-only">上から順に判定。条件が合えばその技、どれも外れれば通常攻撃。</p>
           ${
             canAdd
               ? `<div class="flow-palette" aria-label="手順に追加できる技">
-                  <p class="tiny">ドラッグして手順のすき間へ（間にも挿入可）</p>
+                  <p class="tiny pc-only">ドラッグして手順のすき間へ（間にも挿入可）</p>
+                  <p class="flow-palette-title m-only">未使用の技 <span class="tiny">タップで末尾に追加</span></p>
                   <div class="flow-chips">${unused.map((id) => flowPaletteChip(id)).join("")}</div>
                 </div>`
-              : ""
+              : state.flow.length >= W.MAX_FLOW
+                ? `<p class="flow-full m-only">手順は最大${W.MAX_FLOW}個まで（外して入れ替え）</p>`
+                : ""
           }
           <ol class="flow-list" data-flow-list>
             ${
@@ -634,7 +667,7 @@
           </ol>
           ${
             canAdd
-              ? `<div class="add-row">
+              ? `<div class="add-row pc-only">
                   <select data-new-skill>${addable}</select>
                   <button type="button" class="btn btn-ghost" data-action="add-node">追加</button>
                 </div>`
@@ -1181,6 +1214,21 @@
         const select = document.querySelector("[data-new-skill]");
         if (select) W.addNode(select.value);
         render();
+        return;
+      }
+      if (action === "add-flow-skill") {
+        // PCはドラッグ操作のまま。タップ追加は狭い画面のみ。
+        if (!window.matchMedia("(max-width: 720px)").matches) return;
+        if (ui.suppressCardClick) {
+          ui.suppressCardClick = false;
+          return;
+        }
+        const skillId = button.getAttribute("data-skill");
+        if (skillId && W.addNode(skillId)) {
+          if (W.sfx) W.sfx.ui();
+          ui.prepTab = "flow";
+          render();
+        }
         return;
       }
       if (action === "remove-node") {
