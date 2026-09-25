@@ -21,6 +21,8 @@
     /** 開幕の全技一覧フィルタ（"all" またはグループ名） */
     offerCatalogGroup: "all",
     offerCatalogQuery: "",
+    /** 準備・習得技タブの系統フィルタ */
+    ownedSkillGroup: "all",
   };
 
   let app = null;
@@ -403,6 +405,57 @@
     `;
   }
 
+  function skillGroupFilterLabels() {
+    return {
+      all: "すべて",
+      passive: "パッシブ",
+      攻撃: "攻撃",
+      崩し: "弱体",
+      守り: "守り",
+      回復: "回復",
+      補助: "強化",
+    };
+  }
+
+  function skillGroupFilterButtons(action, activeGroup) {
+    const groups = ["all", "passive", ...(W.SKILL_GROUPS || [])];
+    const labels = skillGroupFilterLabels();
+    return groups
+      .map((g) => {
+        const active = (activeGroup || "all") === g;
+        return `<button type="button" class="btn btn-ghost btn-compact skill-group-filter${
+          active ? " is-active" : ""
+        }${g === "passive" ? " skill-group-filter-passive" : ""}" data-action="${esc(action)}" data-group="${esc(
+          g
+        )}" role="tab" aria-selected="${active ? "true" : "false"}">${esc(labels[g] || g)}</button>`;
+      })
+      .join("");
+  }
+
+  function ownedSkillIdsFiltered(state) {
+    const group = ui.ownedSkillGroup || "all";
+    return Object.keys(state.skills || {})
+      .filter((id) => (state.skills[id] || 0) > 0)
+      .filter((id) => {
+        const skill = W.SKILL_BY_ID[id];
+        if (!skill) return false;
+        if (group === "all") return true;
+        if (group === "passive") return !!skill.passive;
+        return skill.group === group;
+      })
+      .sort((a, b) => {
+        const sa = W.SKILL_BY_ID[a];
+        const sb = W.SKILL_BY_ID[b];
+        const pa = !!(sa && sa.passive);
+        const pb = !!(sb && sb.passive);
+        if (pa !== pb) return pa ? 1 : -1;
+        const ga = (sa && sa.group) || "";
+        const gb = (sb && sb.group) || "";
+        if (ga !== gb) return String(ga).localeCompare(String(gb), "ja");
+        return String((sa && sa.name) || a).localeCompare(String((sb && sb.name) || b), "ja");
+      });
+  }
+
   function offerCatalogRows(state) {
     const group = ui.offerCatalogGroup || "all";
     const q = String(ui.offerCatalogQuery || "")
@@ -454,16 +507,6 @@
   }
 
   function offerCatalog(state) {
-    const groups = ["all", "passive", ...(W.SKILL_GROUPS || [])];
-    const labels = {
-      all: "すべて",
-      passive: "パッシブ",
-      攻撃: "攻撃",
-      崩し: "弱体",
-      守り: "守り",
-      回復: "回復",
-      補助: "強化",
-    };
     return `
       <section class="offer-catalog" aria-label="全技から選ぶ">
         <div class="offer-catalog-head">
@@ -472,16 +515,7 @@
         </div>
         <div class="offer-catalog-tools">
           <div class="offer-catalog-groups" role="tablist" aria-label="グループ">
-            ${groups
-              .map((g) => {
-                const active = (ui.offerCatalogGroup || "all") === g;
-                return `<button type="button" class="btn btn-ghost btn-compact offer-catalog-group${
-                  active ? " is-active" : ""
-                }${g === "passive" ? " offer-catalog-group-passive" : ""}" data-action="offer-catalog-group" data-group="${esc(g)}" role="tab" aria-selected="${
-                  active ? "true" : "false"
-                }">${esc(labels[g] || g)}</button>`;
-              })
-              .join("")}
+            ${skillGroupFilterButtons("offer-catalog-group", ui.offerCatalogGroup)}
           </div>
           <label class="offer-catalog-search">
             <span class="sr">技を検索</span>
@@ -728,6 +762,7 @@
     const state = W.getState();
     const stats = W.computeStats(state.skills);
     const ownedIds = Object.keys(state.skills).filter((id) => state.skills[id] > 0);
+    const filteredOwned = ownedSkillIdsFiltered(state);
     const unused = ownedIds.filter((id) => {
       const skill = W.SKILL_BY_ID[id];
       if (!skill || skill.passive) return false;
@@ -738,10 +773,26 @@
       .map((node, index) => {
         const skill = W.SKILL_BY_ID[node.skillId];
         const g = skill ? groupStyle(skill) : null;
+        const canReorder = state.flow.length > 1;
         return `
           ${flowDropSlot(index, false)}
-          <li class="flow-item${g ? ` group-${esc(g.slug)}` : ""}">
+          <li
+            class="flow-item${g ? ` group-${esc(g.slug)}` : ""}${canReorder ? " is-reorderable" : ""}"
+            data-flow-index="${index}"
+          >
             <div class="flow-item-head">
+              ${
+                canReorder
+                  ? `<button
+                      type="button"
+                      class="flow-handle"
+                      data-flow-handle
+                      data-index="${index}"
+                      aria-label="長押しして手順 ${index + 1} を並べ替え"
+                      title="長押しして上下にスライドで優先度を入れ替え"
+                    ><span class="flow-handle-grip" aria-hidden="true"></span><span class="btn-lab">並べ替え</span></button>`
+                  : ""
+              }
               <span class="idx" aria-hidden="true">${index + 1}</span>
               <div class="flow-item-title">
                 <span class="flow-item-label m-only">手順 ${index + 1} · 技を選ぶ</span>
@@ -787,19 +838,30 @@
         </section>
         <section class="pane pane-skills ${ui.prepTab === "skills" ? "is-active" : ""}" data-prep-pane="skills">
           <h2>習得技</h2>
-          <p class="tiny pane-hint pc-only">未使用の技は手順へドラッグできる</p>
-          <p class="tiny pane-hint m-only">未使用の技は「手順へ追加」で入れられる。カード本体をタップすると詳細。</p>
+          <p class="tiny pane-hint pc-only">未使用の技は手順へドラッグできる。系統で絞り込める。</p>
+          <p class="tiny pane-hint m-only">系統で絞り込み。未使用は「手順へ追加」。カード本体で詳細。</p>
+          <div class="owned-filters" role="tablist" aria-label="習得技の系統">
+            ${skillGroupFilterButtons("owned-skill-group", ui.ownedSkillGroup)}
+          </div>
+          <p class="tiny owned-filter-count">${
+            filteredOwned.length === ownedIds.length
+              ? `${ownedIds.length}種`
+              : `${filteredOwned.length} / ${ownedIds.length}種`
+          }</p>
           <div class="owned-grid">
             ${
-              ownedIds.length
-                ? ownedIds.map((id) => ownedSkillCard(id, state)).join("")
-                : `<p class="empty">まだ技がない</p>`
+              filteredOwned.length
+                ? filteredOwned.map((id) => ownedSkillCard(id, state)).join("")
+                : ownedIds.length
+                  ? `<p class="empty">この系統の技はない</p>`
+                  : `<p class="empty">まだ技がない</p>`
             }
           </div>
         </section>
         <section class="pane pane-flow ${ui.prepTab === "flow" ? "is-active" : ""}" data-prep-pane="flow">
           <h2>手順 <span class="tiny">上から判定・外れは通常攻撃</span></h2>
-          <p class="flow-guide m-only">上から順に判定。条件が合えばその技、どれも外れれば通常攻撃。</p>
+          <p class="flow-guide m-only">上から順に判定。左の取っ手を長押ししてスライドすると優先度を入れ替えられる。↑↓でも移動可。</p>
+          <p class="tiny flow-guide-pc pc-only">取っ手を長押しして上下にスライドで優先度を入れ替え。↑↓ボタンでも移動できる。</p>
           <ol class="flow-list" data-flow-list>
             ${
               state.flow.length
@@ -1228,7 +1290,9 @@
         lead: `手順は最大${W.MAX_FLOW}個。上から順に条件を見て、最初に合う技を使う。どれも外れれば通常攻撃。`,
         items: [
           "パッシブ技は手順に組まない。所持しているだけで、戦闘中に条件を満たすと発動する。",
+          "取っ手を長押しして上下にスライドすると、手順の優先度を入れ替えられる（↑↓ボタンも可）。",
           "PCでは習得技をドラッグして、手順のすき間へ挿入できる。",
+          "習得技タブでは系統（攻撃・弱体・守り・回復・強化・パッシブ）で絞り込んで確認できる。",
           "スマホでは未使用技をタップして末尾に追加できる。",
           `使用条件は体力・序盤／終盤・直前の行動・強化弱体など。1つの技に最大${W.MAX_CONDS || 3}つまで付けられ、「かつ／または」でつなげる。`,
           "再使用は「自分の行動を何回空けるか」。待ちが残っている技は使えない。",
@@ -1919,6 +1983,12 @@
         render();
         return;
       }
+      if (action === "owned-skill-group") {
+        if (W.sfx) W.sfx.ui();
+        ui.ownedSkillGroup = button.getAttribute("data-group") || "all";
+        render();
+        return;
+      }
       if (action === "add-node") {
         if (W.sfx) W.sfx.ui();
         const select = document.querySelector("[data-new-skill]");
@@ -2087,6 +2157,194 @@
     document.querySelectorAll(".is-dragging").forEach((el) => el.classList.remove("is-dragging"));
   }
 
+  const FLOW_REORDER_HOLD_MS = 380;
+  const FLOW_REORDER_SLOP = 18;
+  const flowReorder = {
+    pointerId: null,
+    fromIndex: -1,
+    toIndex: -1,
+    holdTimer: 0,
+    startX: 0,
+    startY: 0,
+    lastX: 0,
+    lastY: 0,
+    active: false,
+    item: null,
+    handle: null,
+    ghost: null,
+    offsetY: 0,
+  };
+
+  function clearFlowReorderHighlight() {
+    document.querySelectorAll(".flow-item.is-reorder-target").forEach((el) => {
+      el.classList.remove("is-reorder-target");
+    });
+    document.querySelectorAll(".flow-list.is-reordering").forEach((el) => {
+      el.classList.remove("is-reordering");
+    });
+    document.querySelectorAll(".flow-item.is-reorder-source").forEach((el) => {
+      el.classList.remove("is-reorder-source");
+    });
+  }
+
+  function endFlowReorder(commit) {
+    if (flowReorder.holdTimer) {
+      clearTimeout(flowReorder.holdTimer);
+      flowReorder.holdTimer = 0;
+    }
+    const from = flowReorder.fromIndex;
+    const to = flowReorder.toIndex;
+    const wasActive = flowReorder.active;
+    if (flowReorder.ghost && flowReorder.ghost.parentNode) {
+      flowReorder.ghost.parentNode.removeChild(flowReorder.ghost);
+    }
+    const captureEl = flowReorder.handle || flowReorder.item;
+    if (captureEl && flowReorder.pointerId != null) {
+      try {
+        captureEl.releasePointerCapture(flowReorder.pointerId);
+      } catch (err) {
+        /* ignore */
+      }
+    }
+    clearFlowReorderHighlight();
+    document.body.classList.remove("is-flow-reordering");
+    flowReorder.pointerId = null;
+    flowReorder.fromIndex = -1;
+    flowReorder.toIndex = -1;
+    flowReorder.active = false;
+    flowReorder.item = null;
+    flowReorder.handle = null;
+    flowReorder.ghost = null;
+    if (wasActive) {
+      ui.suppressCardClick = true;
+      setTimeout(() => {
+        ui.suppressCardClick = false;
+      }, 0);
+    }
+    if (commit && wasActive && from >= 0 && to >= 0 && from !== to && W.moveNodeTo) {
+      if (W.moveNodeTo(from, to)) {
+        if (W.sfx) W.sfx.ui();
+        render();
+      }
+    }
+  }
+
+  function flowReorderTargetIndex(clientY) {
+    const items = Array.from(document.querySelectorAll(".flow-item[data-flow-index]"));
+    if (!items.length) return flowReorder.fromIndex;
+    for (let i = 0; i < items.length; i += 1) {
+      const rect = items[i].getBoundingClientRect();
+      const mid = rect.top + rect.height / 2;
+      if (clientY < mid) return Number(items[i].getAttribute("data-flow-index"));
+    }
+    return Number(items[items.length - 1].getAttribute("data-flow-index"));
+  }
+
+  function updateFlowReorderTarget(clientY) {
+    const to = flowReorderTargetIndex(clientY);
+    flowReorder.toIndex = to;
+    document.querySelectorAll(".flow-item[data-flow-index]").forEach((el) => {
+      const idx = Number(el.getAttribute("data-flow-index"));
+      el.classList.toggle("is-reorder-target", idx === to && idx !== flowReorder.fromIndex);
+    });
+  }
+
+  function startFlowReorder(handle, event) {
+    const index = Number(handle.getAttribute("data-index"));
+    const item = handle.closest(".flow-item");
+    if (!item || !Number.isFinite(index)) return;
+    flowReorder.active = true;
+    flowReorder.fromIndex = index;
+    flowReorder.toIndex = index;
+    flowReorder.item = item;
+    const rect = item.getBoundingClientRect();
+    const clientY = event.clientY != null ? event.clientY : flowReorder.startY;
+    flowReorder.offsetY = clientY - rect.top;
+    item.classList.add("is-reorder-source");
+    const list = item.closest(".flow-list");
+    if (list) list.classList.add("is-reordering");
+    document.body.classList.add("is-flow-reordering");
+    const ghost = item.cloneNode(true);
+    ghost.classList.add("flow-reorder-ghost");
+    ghost.removeAttribute("data-flow-index");
+    ghost.querySelectorAll("[data-flow-handle], button, select, input").forEach((el) => {
+      el.setAttribute("disabled", "true");
+      el.tabIndex = -1;
+    });
+    ghost.style.width = `${rect.width}px`;
+    ghost.style.left = `${rect.left}px`;
+    ghost.style.top = `${rect.top}px`;
+    ghost.style.height = `${rect.height}px`;
+    document.body.appendChild(ghost);
+    flowReorder.ghost = ghost;
+    if (typeof navigator !== "undefined" && navigator.vibrate) {
+      try {
+        navigator.vibrate(12);
+      } catch (err) {
+        /* ignore */
+      }
+    }
+    if (W.sfx) W.sfx.ui();
+    updateFlowReorderTarget(clientY);
+  }
+
+  function onFlowReorderPointerDown(event) {
+    if (event.button != null && event.button !== 0) return;
+    if (flowReorder.active || flowReorder.holdTimer) return;
+    const handle = event.target.closest("[data-flow-handle]");
+    if (!handle || !app.contains(handle)) return;
+    const index = Number(handle.getAttribute("data-index"));
+    if (!Number.isFinite(index)) return;
+    flowReorder.pointerId = event.pointerId;
+    flowReorder.fromIndex = index;
+    flowReorder.toIndex = index;
+    flowReorder.startX = event.clientX;
+    flowReorder.startY = event.clientY;
+    flowReorder.lastX = event.clientX;
+    flowReorder.lastY = event.clientY;
+    flowReorder.item = handle.closest(".flow-item");
+    flowReorder.handle = handle;
+    try {
+      handle.setPointerCapture(event.pointerId);
+    } catch (err) {
+      /* ignore */
+    }
+    flowReorder.holdTimer = setTimeout(() => {
+      flowReorder.holdTimer = 0;
+      if (flowReorder.pointerId !== event.pointerId) return;
+      startFlowReorder(handle, {
+        pointerId: event.pointerId,
+        clientX: flowReorder.lastX,
+        clientY: flowReorder.lastY,
+      });
+    }, FLOW_REORDER_HOLD_MS);
+  }
+
+  function onFlowReorderPointerMove(event) {
+    if (flowReorder.pointerId !== event.pointerId) return;
+    flowReorder.lastX = event.clientX;
+    flowReorder.lastY = event.clientY;
+    if (!flowReorder.active) {
+      const dx = event.clientX - flowReorder.startX;
+      const dy = event.clientY - flowReorder.startY;
+      if (Math.hypot(dx, dy) > FLOW_REORDER_SLOP) {
+        endFlowReorder(false);
+      }
+      return;
+    }
+    event.preventDefault();
+    if (flowReorder.ghost) {
+      flowReorder.ghost.style.top = `${event.clientY - flowReorder.offsetY}px`;
+    }
+    updateFlowReorderTarget(event.clientY);
+  }
+
+  function onFlowReorderPointerUp(event) {
+    if (flowReorder.pointerId !== event.pointerId) return;
+    const commit = flowReorder.active;
+    endFlowReorder(commit);
+  }
+
   function onDragStart(event) {
     const source = event.target.closest("[data-drag-skill]");
     if (!source || !event.dataTransfer) return;
@@ -2251,6 +2509,10 @@
       app.addEventListener("input", onInput);
       app.addEventListener("compositionend", onCompositionEnd);
       app.addEventListener("pointerover", onPointerOver);
+      app.addEventListener("pointerdown", onFlowReorderPointerDown);
+      app.addEventListener("pointermove", onFlowReorderPointerMove);
+      app.addEventListener("pointerup", onFlowReorderPointerUp);
+      app.addEventListener("pointercancel", onFlowReorderPointerUp);
       app.addEventListener("dragstart", onDragStart);
       app.addEventListener("dragend", onDragEnd);
       app.addEventListener("dragover", onDragOver);

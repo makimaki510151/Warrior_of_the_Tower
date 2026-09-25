@@ -118,12 +118,14 @@ h1, h2, .brand { font-family: var(--serif); }
   flex-wrap: wrap;
   gap: 6px;
 }
-.offer-catalog-group.is-active {
+.offer-catalog-group.is-active,
+.skill-group-filter.is-active {
   background: rgba(228, 192, 122, 0.18);
   border-color: rgba(228, 192, 122, 0.7);
   color: var(--gold);
 }
-.offer-catalog-group-passive.is-active {
+.offer-catalog-group-passive.is-active,
+.skill-group-filter-passive.is-active {
   background: rgba(160, 140, 100, 0.28);
   border-color: rgba(160, 140, 100, 0.75);
   color: #e8dcc0;
@@ -542,6 +544,15 @@ h1, h2, .brand { font-family: var(--serif); }
   overflow-y: auto;
   padding: 2px 4px 4px 2px;
 }
+.owned-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 4px;
+}
+.owned-filter-count {
+  margin: 0 0 4px;
+}
 .owned-card { padding: 6px 8px; }
 .owned-card.is-in-flow { opacity: 0.72; }
 .owned-card.is-draggable { cursor: grab; }
@@ -566,11 +577,94 @@ h1, h2, .brand { font-family: var(--serif); }
 .owned-status {
   display: none;
 }
+.flow-guide-pc {
+  display: block;
+  margin: 0 0 6px;
+  color: var(--muted);
+}
 .flow-chip-name { display: inline; }
 .flow-item-head,
 .flow-item-title,
 .flow-conds-wrap {
   display: contents;
+}
+
+.flow-handle {
+  appearance: none;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 28px;
+  min-height: 32px;
+  margin: 0;
+  padding: 4px 2px;
+  border: 1px solid rgba(109, 87, 56, 0.55);
+  border-radius: var(--radius);
+  background: rgba(255, 244, 220, 0.06);
+  color: var(--muted);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  grid-column: 1;
+  grid-row: 1;
+}
+.flow-handle:active,
+.flow-item.is-reorder-source .flow-handle {
+  cursor: grabbing;
+  color: var(--gold);
+  border-color: rgba(228, 192, 122, 0.7);
+  background: rgba(228, 192, 122, 0.14);
+}
+.flow-handle-grip {
+  display: block;
+  width: 12px;
+  height: 14px;
+  background:
+    radial-gradient(circle, currentColor 1.1px, transparent 1.2px) 0 0 / 6px 6px,
+    radial-gradient(circle, currentColor 1.1px, transparent 1.2px) 6px 0 / 6px 6px;
+  background-repeat: repeat;
+  opacity: 0.9;
+}
+.flow-item.is-reorderable .idx {
+  grid-column: 2;
+}
+.flow-item.is-reorderable select[data-bind="node-skill"] {
+  grid-column: 3;
+}
+.flow-item.is-reorderable .flow-mini {
+  grid-column: 4;
+}
+.flow-item.is-reorder-source {
+  opacity: 0.35;
+}
+.flow-item.is-reorder-target {
+  box-shadow: inset 0 3px 0 0 var(--gold);
+}
+.flow-list.is-reordering {
+  touch-action: none;
+}
+.flow-reorder-ghost {
+  position: fixed;
+  z-index: 80;
+  margin: 0;
+  pointer-events: none;
+  opacity: 0.92;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(228, 192, 122, 0.75);
+  border-radius: 10px;
+  background: rgba(24, 18, 14, 0.96);
+  list-style: none;
+}
+body.is-flow-reordering {
+  cursor: grabbing;
+  user-select: none;
+  -webkit-user-select: none;
+}
+body.is-flow-reordering * {
+  cursor: grabbing !important;
 }
 
 .flow-palette {
@@ -738,6 +832,9 @@ h1, h2, .brand { font-family: var(--serif); }
   grid-template-rows: auto auto;
   gap: 6px;
   align-items: start;
+}
+.flow-item.is-reorderable {
+  grid-template-columns: 28px 20px minmax(0, 1fr) auto;
 }
 .flow-item .idx {
   grid-column: 1;
@@ -1610,6 +1707,7 @@ select {
 
   /* —— スマホ：手順／習得の入れ替えを読みやすく —— */
   .pc-only { display: none !important; }
+  .flow-guide-pc { display: none !important; }
   p.m-only,
   .flow-guide,
   .flow-full,
@@ -1803,6 +1901,23 @@ select {
     align-items: flex-start;
     gap: 10px;
   }
+  .flow-handle {
+    flex: none;
+    width: 40px;
+    min-height: 48px;
+    margin-top: 0;
+    border-radius: 10px;
+    grid-column: auto;
+    grid-row: auto;
+  }
+  .flow-handle .btn-lab {
+    display: none !important;
+  }
+  .flow-handle-grip {
+    width: 14px;
+    height: 18px;
+    background-size: 7px 7px;
+  }
   .flow-item .idx {
     flex: none;
     width: 32px;
@@ -1810,6 +1925,8 @@ select {
     margin-top: 0;
     font-size: 0.95em;
     border-radius: 8px;
+    grid-column: auto;
+    grid-row: auto;
   }
   .flow-item-title {
     display: flex;
@@ -1830,6 +1947,8 @@ select {
     font-size: 16px;
     font-weight: 700;
     padding: 8px 10px;
+    grid-column: auto;
+    grid-row: auto;
   }
 
   .flow-item .flow-mini {
@@ -1837,6 +1956,8 @@ select {
     grid-template-columns: 1fr 1fr 1fr;
     gap: 8px;
     width: 100%;
+    grid-column: auto;
+    grid-row: auto;
   }
   .flow-item .flow-mini .btn-icon {
     display: inline-flex;

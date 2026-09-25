@@ -17,6 +17,20 @@
   /** @type {{ version: string, date: string, title: string, sections: { heading: string, items: string[] }[] }[]} */
   const PATCH_NOTES = [
     {
+      version: "0.6.3",
+      date: "2026-09-25",
+      title: "手順の長押し並べ替えと習得技の系統フィルター",
+      sections: [
+        {
+          heading: "操作",
+          items: [
+            "手順の取っ手を長押しして上下にスライドすると、優先度（順番）を入れ替えられる。従来の↑↓ボタンもそのまま使える。",
+            "準備画面の習得技タブで、系統（すべて／パッシブ／攻撃／弱体／守り／回復／強化）ごとに絞り込んで確認できるようにした。",
+          ],
+        },
+      ],
+    },
+    {
       version: "0.6.2",
       date: "2026-09-24",
       title: "仕様周知モーダルが閉じない不具合を修正",
