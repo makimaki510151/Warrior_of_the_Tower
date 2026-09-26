@@ -525,10 +525,26 @@
 
   function moveNode(index, dir) {
     const next = index + dir;
-    if (!state.flow[index] || next < 0 || next >= state.flow.length) return;
+    if (!state.flow[index] || next < 0 || next >= state.flow.length) return false;
     const [item] = state.flow.splice(index, 1);
     state.flow.splice(next, 0, item);
     save();
+    return true;
+  }
+
+  /** 手順ノードを from から to へ移動（優先度の入れ替え） */
+  function moveNodeTo(from, to) {
+    const len = state.flow.length;
+    const src = Math.floor(Number(from));
+    let dst = Math.floor(Number(to));
+    if (!Number.isFinite(src) || !Number.isFinite(dst)) return false;
+    if (src < 0 || src >= len) return false;
+    dst = Math.max(0, Math.min(len - 1, dst));
+    if (src === dst) return false;
+    const [item] = state.flow.splice(src, 1);
+    state.flow.splice(dst, 0, item);
+    save();
+    return true;
   }
 
   function removeNode(index) {
@@ -680,6 +696,7 @@
   W.insertNode = insertNode;
   W.updateNode = updateNode;
   W.moveNode = moveNode;
+  W.moveNodeTo = moveNodeTo;
   W.removeNode = removeNode;
   W.commitWin = commitWin;
   W.recordBattle = recordBattle;
